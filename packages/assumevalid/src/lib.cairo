@@ -2,6 +2,7 @@ use consensus::types::block::Block;
 use consensus::types::chain_state::{ChainState, ChainStateHashTrait};
 use consensus::validation::header::validate_block_header;
 use stwo_cairo_air::{CairoProof, VerificationOutput, get_verification_output, verify_cairo};
+use utils::hash::Digest;
 
 #[derive(Drop, Serde)]
 struct Args {
@@ -45,4 +46,47 @@ fn main(args: Args) -> Result {
     }
 
     Result { initial_hash: chain_state.hash(), final_hash: chain_state.hash() }
+}
+
+
+
+#[derive(Drop, Serde)]
+struct FoldArgs {
+    chain_state_proof: Option<CairoProof>,
+    chain_state: ChainState,
+    blocks: Array<Block>,
+}
+
+#[derive(Drop, Serde)]
+struct FoldResult {
+    final_block_hash: Digest,
+}
+
+#[executable]
+fn fold(args: FoldArgs) -> FoldResult {
+
+    let FoldArgs { mut chain_state, blocks, chain_state_proof } = args;
+
+    if chain_state.block_height != 0 {
+
+        let chain_state_proof = chain_state_proof.expect('No proof for non-genesis block!');
+        let VerificationOutput { program_hash, output } = get_verification_output(proof: @chain_state_proof);
+
+        // TODO: assert on program hash
+        assert_ne!(program_hash, 0,);
+
+        let mut output = output.span();
+        let final_block_hash = Serde::deserialize(ref output).expect('Can\'t deserialize final hash!');
+
+        assert_eq!(final_block_hash, chain_state.best_block_hash, "Final block hash does not match!");
+    }   
+
+    for block in blocks {
+        match validate_block_header(chain_state, block) {
+            Ok(new_chain_state) => { chain_state = new_chain_state; },
+            Err(err) => panic!("Error: '{}'", err),
+        }
+    }
+
+    FoldResult { final_block_hash: chain_state.best_block_hash }
 }

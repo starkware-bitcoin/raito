@@ -14,6 +14,7 @@ function = "assumevalid::main"
 [dependencies]
 cairo_execute = "2.11.4"
 consensus = { path = "../consensus" }
+utils = { path = "../utils" }
 stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "a9d4ad392d0de4a83f2e176e6f9a6f81feb4ecf0" }
 
 [dev-dependencies]
