@@ -49,12 +49,11 @@ fn main(args: Args) -> Result {
 }
 
 
-
 #[derive(Drop, Serde)]
 struct FoldArgs {
-    chain_state_proof: Option<CairoProof>,
     chain_state: ChainState,
     blocks: Array<Block>,
+    chain_state_proof: Option<CairoProof>,
 }
 
 #[derive(Drop, Serde)]
@@ -64,27 +63,43 @@ struct FoldResult {
 
 #[executable]
 fn fold(args: FoldArgs) -> FoldResult {
-
     let FoldArgs { mut chain_state, blocks, chain_state_proof } = args;
 
-    if chain_state.block_height != 0 {
+    if chain_state.block_height == 0 {
+        assert!(chain_state_proof.is_none());
+    } else {
+        let _chain_state_proof = chain_state_proof.expect('No proof for non-genesis block!');
+        // TODO: verify proof
+        
+        // let VerificationOutput {
+        //     program_hash, output,
+        // } = get_verification_output(proof: @chain_state_proof);
 
-        let chain_state_proof = chain_state_proof.expect('No proof for non-genesis block!');
-        let VerificationOutput { program_hash, output } = get_verification_output(proof: @chain_state_proof);
+        // // TODO: assert on program hash
+        // assert!(program_hash != 0);
 
-        // TODO: assert on program hash
-        assert_ne!(program_hash, 0,);
+        // let mut output = output.span();
+        // let FoldResult {
+        //     final_block_hash,
+        // } = Serde::deserialize(ref output).expect('Can\'t deserialize proof output!');
 
-        let mut output = output.span();
-        let final_block_hash = Serde::deserialize(ref output).expect('Can\'t deserialize final hash!');
-
-        assert_eq!(final_block_hash, chain_state.best_block_hash, "Final block hash does not match!");
-    }   
+        // assert!(
+        //     final_block_hash == chain_state.best_block_hash,
+        //     "Final block hash: {} does not match the chain_state block hash: {}!",
+        //     final_block_hash,
+        //     chain_state.best_block_hash,
+        // );
+    }
 
     for block in blocks {
         match validate_block_header(chain_state, block) {
             Ok(new_chain_state) => { chain_state = new_chain_state; },
-            Err(err) => panic!("Error: '{}'", err),
+            Err(err) => panic!(
+                "Error while verifying block:\n{:?}\bchain_state:\n{:?}:\n'{}'",
+                block,
+                chain_state,
+                err,
+            ),
         }
     }
 

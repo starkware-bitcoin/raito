@@ -56,3 +56,14 @@ assumevalid:
 	$(MAKE) assumevalid-build
 	$(MAKE) assumevalid-prove
 	$(MAKE) assumevalid-execute-rec
+
+
+data-generate-timestamp:
+	cd scripts/data && python generate_timestamp_data.py
+
+data-generate-utxo:
+	cd scripts/data && python generate_utxo_data.py
+
+data-generate:
+	$(MAKE) data-generate-timestamp
+	$(MAKE) data-generate-utxo
