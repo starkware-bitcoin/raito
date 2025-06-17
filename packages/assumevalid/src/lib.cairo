@@ -2,7 +2,10 @@ use consensus::types::block::Block;
 use consensus::types::chain_state::{ChainState, ChainStateHashTrait};
 use consensus::validation::header::validate_block_header;
 use stwo_cairo_air::{CairoProof, VerificationOutput, get_verification_output, verify_cairo};
-use utils::hash::Digest;
+
+/// Hash of the bootloader program.
+/// See https://github.com/m-kus/cairo-bootloader/blob/main/resources/stwo-bootloader.json
+const BOOTLOADER_PROGRAM_HASH: felt252 = 2494357015748342749807586816445211447933813471303162239123730354369899819316;
 
 #[derive(Drop, Serde)]
 struct Args {
@@ -10,98 +13,99 @@ struct Args {
     chain_state: ChainState,
     /// Batch of blocks that have to be applied to the current chain state.
     blocks: Array<Block>,
-}
-
-#[derive(Drop, Serde)]
-struct Result {
-    /// Hash of the initial chain state.
-    initial_hash: felt252,
-    /// Hash of the final chain state.
-    final_hash: felt252,
-}
-
-#[executable]
-fn agg(proof: CairoProof) -> VerificationOutput {
-    let verification_output = get_verification_output(proof: @proof);
-
-    if let Err(err) = verify_cairo(proof) {
-        panic!("Verification failed: {:?}", err);
-    }
-
-    verification_output
-}
-
-#[executable]
-fn main(args: Args) -> Result {
-    // Force cairo-prove to use canonical PP variant
-    // core::internal::require_implicit::<core::pedersen::Pedersen>();
-
-    let Args { mut chain_state, blocks } = args;
-
-    for block in blocks {
-        match validate_block_header(chain_state, block) {
-            Ok(new_chain_state) => { chain_state = new_chain_state; },
-            Err(err) => panic!("Error: '{}'", err),
-        }
-    }
-
-    Result { initial_hash: chain_state.hash(), final_hash: chain_state.hash() }
-}
-
-
-#[derive(Drop, Serde)]
-struct FoldArgs {
-    chain_state: ChainState,
-    blocks: Array<Block>,
+    /// Proof of the previos chain state transition.
+    /// If set to None, the chain state is assumed to be the genesis state.
     chain_state_proof: Option<CairoProof>,
 }
 
 #[derive(Drop, Serde)]
-struct FoldResult {
-    final_block_hash: Digest,
+struct Result {
+    /// Hash of the chain state after the blocks have been applied.
+    chain_state_hash: felt252,
+    /// Hash of the program that was recursively verified.
+    prev_program_hash: felt252,
+}
+
+#[derive(Drop, Serde)]
+struct BootloaderOutput {
+    /// Bootloader output
+    _0: felt252,
+    _1: felt252,
+    /// Number of tasks (must be always 1)
+    n_tasks: usize,
+    /// Size of the task output in felts (including the size field)
+    task_output_size: usize,
+    /// Hash of the payload program.
+    task_program_hash: felt252,
+    /// Output of the payload program.
+    task_result: Result,
 }
 
 #[executable]
-fn fold(args: FoldArgs) -> FoldResult {
-    let FoldArgs { mut chain_state, blocks, chain_state_proof } = args;
+fn main(args: Args) -> Result {
+    let Args { chain_state, blocks, chain_state_proof } = args;
 
-    if chain_state.block_height == 0 {
-        assert!(chain_state_proof.is_none());
+    let mut prev_result = if let Some(proof) = chain_state_proof {
+        get_prev_result(proof)
     } else {
-        let _chain_state_proof = chain_state_proof.expect('No proof for non-genesis block!');
-        // TODO: verify proof
-        
-        // let VerificationOutput {
-        //     program_hash, output,
-        // } = get_verification_output(proof: @chain_state_proof);
+        assert(chain_state == Default::default(), 'Invalid genesis state');
+        Result {
+            chain_state_hash: chain_state.hash(),
+            prev_program_hash: 0,
+        }
+    };
 
-        // // TODO: assert on program hash
-        // assert!(program_hash != 0);
+    // Check that the provided chain state matches the final state hash of the previous run.
+    assert(prev_result.chain_state_hash == chain_state.hash(), 'Invalid initial state');
+    let mut current_chain_state = chain_state;
 
-        // let mut output = output.span();
-        // let FoldResult {
-        //     final_block_hash,
-        // } = Serde::deserialize(ref output).expect('Can\'t deserialize proof output!');
-
-        // assert!(
-        //     final_block_hash == chain_state.best_block_hash,
-        //     "Final block hash: {} does not match the chain_state block hash: {}!",
-        //     final_block_hash,
-        //     chain_state.best_block_hash,
-        // );
-    }
-
+    // Validate the blocks and update the current chain state
     for block in blocks {
-        match validate_block_header(chain_state, block) {
-            Ok(new_chain_state) => { chain_state = new_chain_state; },
-            Err(err) => panic!(
-                "Error while verifying block:\n{:?}\bchain_state:\n{:?}:\n'{}'",
-                block,
-                chain_state,
-                err,
-            ),
+        match validate_block_header(current_chain_state, block) {
+            Ok(new_chain_state) => { current_chain_state = new_chain_state; },
+            Err(err) => panic!("Error: '{}'", err),
         }
     }
 
-    FoldResult { final_block_hash: chain_state.best_block_hash }
+    Result {
+        chain_state_hash: current_chain_state.hash(),
+        prev_program_hash: prev_result.prev_program_hash,
+    }
+}
+
+/// Verify Cairo proof, extract and validate the task output.
+fn get_prev_result(proof: CairoProof) -> Result {
+    let VerificationOutput {
+        program_hash, output,
+    } = get_verification_output(proof: @proof);
+
+    // Check that the program hash is the bootloader program hash
+    assert(program_hash == BOOTLOADER_PROGRAM_HASH, 'Unexpected bootloader');
+
+    // Verify the proof
+    verify_cairo(proof).expect('Invalid proof');
+
+    // Deserialize the bootloader output
+    let mut serialized_bootloader_output = output.span();
+    let BootloaderOutput {
+        _0: _, _1: _, n_tasks, task_output_size, task_program_hash, task_result,
+    }: BootloaderOutput = Serde::deserialize(ref serialized_bootloader_output).expect('Invalid bootloader output');
+
+    // Check that the bootloader output contains exactly one task
+    assert(serialized_bootloader_output.is_empty(), 'Output too long');
+    assert(n_tasks == 1, 'Unexpected number of tasks');
+    assert(task_output_size == 4, 'Unexpected task output size'); // 1 felt for program hash, 2 for output, 1 for the size
+
+    // Check that the task program hash is the same as the previous program hash
+    // In case of the genesis state, the previous program hash must be 0
+    if task_result.chain_state_hash != Default::default() {
+        assert(task_result.prev_program_hash == task_program_hash, 'Program hash mismatch');
+    } else {
+        assert(task_result.prev_program_hash == 0, 'Invalid genesis program hash');
+    }
+
+    Result {
+        chain_state_hash: task_result.chain_state_hash,
+        prev_program_hash: task_program_hash,
+    }
 }
