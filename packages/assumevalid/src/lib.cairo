@@ -1,7 +1,6 @@
 use consensus::types::block::Block;
 use consensus::types::chain_state::{ChainState, ChainStateHashTrait};
 use consensus::validation::header::validate_block_header;
-
 use stwo_cairo_air::{CairoProof, VerificationOutput, get_verification_output, verify_cairo};
 
 /// Hash of the bootloader program.
@@ -15,7 +14,7 @@ struct Args {
     chain_state: ChainState,
     /// Batch of blocks that have to be applied to the current chain state.
     blocks: Array<Block>,
-    /// Proof of the previos chain state transition.
+    /// Proof of the previous chain state transition.
     /// If set to None, the chain state is assumed to be the genesis state.
     chain_state_proof: Option<CairoProof>,
 }
