@@ -85,6 +85,10 @@ data-generate-utxo:
 	# Ensure the venv is activated for this script as well
 	. venv/bin/activate && cd scripts/data && python generate_utxo_data.py
 
+prove-pow:
+	@echo ">>> Prove POW..."
+	. venv/bin/activate && cd scripts/data && python prove_pow.py --blocks 100
+
 # Main data generation target, depending on specific data generation tasks
 data-generate: data-generate-timestamp data-generate-utxo
 	@echo "All data generation tasks completed."
