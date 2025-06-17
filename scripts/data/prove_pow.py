@@ -73,39 +73,78 @@ def setup_logging(verbose=False, log_filename="client.log"):
 
 
 def run(cmd, timeout=None):
-    """Run a subprocess and measure execution time and memory usage (Linux only, using resource module)"""
+    """Run a subprocess and measure execution time and memory usage (Linux only, using /usr/bin/time -v)"""
     import time
-    import resource
     import platform
+    import re
 
     if platform.system() != "Linux":
         raise RuntimeError(
             "This script only supports Linux for timing and memory measurement."
         )
+    # Prepend /usr/bin/time -v to the command
+    time_cmd = ["/usr/bin/time", "-v"] + cmd
     start_time = time.time()
-    usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True, timeout=timeout
+            time_cmd, capture_output=True, text=True, check=True, timeout=timeout
         )
         elapsed = time.time() - start_time
-        usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
-        # ru_maxrss is in kilobytes on Linux
-        max_memory = usage_after.ru_maxrss - usage_before.ru_maxrss
-        return result.stdout, result.stderr, result.returncode, elapsed, max_memory
+        # /usr/bin/time -v outputs memory usage to stderr
+        max_mem_match = re.search(
+            r"Maximum resident set size \(kbytes\): (\d+)", result.stderr
+        )
+        max_memory = int(max_mem_match.group(1)) if max_mem_match else None
+        # Remove the /usr/bin/time output from stderr for clarity
+        # Split stderr into time output and actual stderr
+        time_lines = []
+        actual_stderr = []
+        for line in result.stderr.splitlines():
+            if (
+                line.startswith("\t")
+                or "Maximum resident set size" in line
+                or "Command being timed" in line
+                or "User time" in line
+                or "System time" in line
+                or "Percent of CPU" in line
+                or "Elapsed (wall clock) time" in line
+                or "Average" in line
+                or "Exit status" in line
+            ):
+                time_lines.append(line)
+            else:
+                actual_stderr.append(line)
+        cleaned_stderr = "\n".join(actual_stderr)
+        return result.stdout, cleaned_stderr, result.returncode, elapsed, max_memory
     except subprocess.TimeoutExpired as e:
         elapsed = time.time() - start_time
-        usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
-        max_memory = usage_after.ru_maxrss - usage_before.ru_maxrss
-        return "", f"Process timed out after {timeout} seconds", -1, elapsed, max_memory
+        return "", f"Process timed out after {timeout} seconds", -1, elapsed, None
+
+
+def run_prover(job_info, executable, proof, arguments):
+
+    command = [
+        "cairo-prove",
+        "prove",
+        executable,
+        proof,
+        "--arguments-file",
+        arguments,
+        "--proof-format",
+        "cairo-serde",
+    ]
+
+    logger.debug(f"{job_info} with command:\n{' '.join(command)}")
+
+    return run(command)
 
 
 def prove_batch(height, step):
 
     mode = "light"
-    job_info = f"Job(height='{height}', step={step})"
+    job_info = f"Job(height='{height}', blocks={step})"
 
-    logger.info(f"Proving {job_info}")
+    logger.info(f"{job_info} proving...")
 
     try:
         # Load previous proof
@@ -122,7 +161,7 @@ def prove_batch(height, step):
                 chain_state_proof = [hex(0)] + chain_state_proof
             else:
                 raise Exception(
-                    f"Previous proof file {str(previous_proof_file)} does not exist"
+                    f"{job_info} previous proof file {str(previous_proof_file)} does not exist"
                 )
 
         # Load batch data
@@ -151,30 +190,15 @@ def prove_batch(height, step):
 
         proof_file = PROOF_DIR / f"{mode}_{height + step}.proof.json"
 
-        command = [
-            "cairo-prove",
-            "prove",
+        # run prover
+        stdout, stderr, returncode, elapsed_time, max_memory = run_prover(
+            job_info,
             "../../target/proving/fold.executable.json",
             str(proof_file),
-            "--arguments-file",
             str(arguments_file),
-            "--proof-format",
-            "cairo-serde",
-        ]
+        )
 
-        # command = [
-        #     "scarb", "--profile", "proving", "execute",
-        #     "--no-build",
-        #     "--package", "assumevalid",
-        #     "--executable-name", "fold",
-        #     "--arguments-file", str(arguments_file),
-        #     "--print-resource-usage"
-        # ]
-
-        logger.debug(f"With command:\n{' '.join(command)}")
-
-        stdout, stderr, returncode, elapsed_time, max_memory = run(command)
-
+        # TODO: probably needs improvement
         if (
             returncode != 0
             or "FAIL" in stdout
@@ -196,15 +220,16 @@ def prove_batch(height, step):
             return True
 
     except Exception as e:
-        logger.error(f"Error while processing: {job_info}:\n{e}")
-        logger.error(f"Stacktrace:\n{traceback.format_exc()}")
+        logger.error(
+            f"{job_info} error while processing: {job_info}:\n{e}\nstacktrace:\n{traceback.format_exc()}"
+        )
         return False
 
 
 def main(start, blocks, step):
-    """Main processing function - single threaded"""
+
     logger.info(
-        "Starting single-threaded client, initial height: %d, blocks: %d, step: %d",
+        "Initial height: %d, blocks: %d, step: %d",
         start,
         blocks,
         step,
@@ -224,31 +249,30 @@ def main(start, blocks, step):
 
     # Process jobs sequentially
     for height in height_range:
-        try:
-            # Process the height (generate and process in one step)
-            success = prove_batch(height, processing_step)
-            if success:
-                processed_count += 1
-        except subprocess.TimeoutExpired:
-            logger.warning(f"Timeout while processing height {height}")
-            return
-        except Exception as e:
-            logger.error(f"Error while processing height {height}: {e}")
+        success = prove_batch(height, processing_step)
+        if success:
+            processed_count += 1
+        else:
+            logger.info(f"Job at height: {height} failed, stopping further processing")
             return
 
-    logger.info(f"All {processed_count} jobs have been processed successfully.")
+    logger.info(f"All {processed_count} jobs have been processed successfully")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run single-threaded client script")
-    parser.add_argument("--start", type=int, required=True, help="Start block height")
+    parser.add_argument(
+        "--start",
+        type=int,
+        required=False,
+        help="Start block height (if not set, will auto-detect from last proof)",
+    )
     parser.add_argument(
         "--blocks", type=int, default=1, help="Number of blocks to process"
     )
     parser.add_argument(
-        "--step", type=int, default=1, help="Step size for block processing"
+        "--step", type=int, default=10, help="Step size for block processing"
     )
-
     parser.add_argument("--verbose", action="store_true", help="Verbose logging")
 
     args = parser.parse_args()
@@ -256,4 +280,23 @@ if __name__ == "__main__":
     # Setup logging using the extracted function
     setup_logging(verbose=args.verbose)
 
-    main(args.start, args.blocks, args.step)
+    start = args.start
+    if start is None:
+        # Find last available proof file in PROOF_DIR
+        import re
+
+        proof_files = list(PROOF_DIR.glob("light_*.proof.json"))
+        max_height = 0
+        pattern = re.compile(r"light_(\d+).proof.json")
+        for pf in proof_files:
+            logger.debug(f"Checking proof file: {pf.name}")
+            m = pattern.match(pf.name)
+            if m:
+                logger.debug(f"Matched proof file: {pf.name}")
+                h = int(m.group(1))
+                if h > max_height:
+                    max_height = h
+        start = max_height
+        logger.info(f"Auto-detected start height: {start}")
+
+    main(start, args.blocks, args.step)
