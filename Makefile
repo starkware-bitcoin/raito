@@ -2,8 +2,11 @@ install-cairo-prove:
 	RUSTFLAGS="-C target-cpu=native -C opt-level=3" \
 		cargo install \
 			--git https://github.com/starkware-libs/stwo-cairo \
-			--rev adc68829b0e913d5a8bdf14932a45fde27a2e335 \
+			--rev a9fd9934eabb5ca1a06a910ef04ed4c0dae9114c \
 			cairo-prove
+			
+install-cairo-execute:
+	cargo install --git https://github.com/m-kus/cairo --rev 9117214e4a3509870c6a6db8e61ddcdaf9ade561 cairo-execute
 
 client-build:
 	scarb --profile proving build --package client --target-kinds executable
@@ -15,7 +18,7 @@ client-build-with-shinigami:
 
 assumevalid-build:
 	sed -i.bak 's/default = \["syscalls"\]/default = \[\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
-	scarb --profile proving build --package assumevalid
+	scarb --profile proving build --package assumevalid --target-names main
 	sed -i.bak 's/default = \[\]/default = \["syscalls"\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
 
 assumevalid-execute:
@@ -26,6 +29,24 @@ assumevalid-execute:
 		--executable-name main \
 		--arguments-file target/execute/assumevalid/args.json \
 		--print-resource-usage
+
+assumevalid-pie:
+	rm -rf target/execute/assumevalid/execution1
+	mkdir -p target/execute/assumevalid/execution1
+	scripts/data/format_args.py --input_file packages/assumevalid/tests/data/light_169.json > target/execute/assumevalid/args.json
+	cairo-execute \
+		--layout all_cairo_stwo \
+		--args-file target/execute/assumevalid/args.json \
+		--prebuilt \
+		--output-path target/execute/assumevalid/execution1/raito_1.zip \
+		target/proving/main.executable.json
+
+assumevalid-bootload:
+	cairo-bootloader --cairo_pies target/execute/assumevalid/execution1/cairo_pie.zip \
+		--layout all_cairo \
+		--secure_run true \
+		--ignore_fact_topologies true \
+		--cairo_pie_output target/execute/assumevalid/boot.zip
 
 assumevalid-execute-rec:
 	scarb --profile proving execute \
