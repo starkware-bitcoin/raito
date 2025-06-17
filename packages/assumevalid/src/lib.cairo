@@ -1,6 +1,7 @@
 use consensus::types::block::Block;
 use consensus::types::chain_state::{ChainState, ChainStateHashTrait};
 use consensus::validation::header::validate_block_header;
+
 use stwo_cairo_air::{CairoProof, VerificationOutput, get_verification_output, verify_cairo};
 
 /// Hash of the bootloader program.
