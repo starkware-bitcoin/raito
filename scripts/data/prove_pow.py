@@ -18,10 +18,11 @@ logger = logging.getLogger(__name__)
 TMP_DIR = Path(".tmp")
 PROOF_DIR = Path(".proofs")
 
+
 def setup_logging(verbose=False, log_filename="client.log"):
     """
     Set up logging configuration with both file and console handlers.
-    
+
     Args:
         verbose (bool): If True, set DEBUG level; otherwise INFO level
         log_filename (str): Name of the log file
@@ -46,12 +47,12 @@ def setup_logging(verbose=False, log_filename="client.log"):
         colorlog.ColoredFormatter(
             "%(asctime)s - %(log_color)s%(levelname)s%(reset)s - %(message)s",
             log_colors={
-                'DEBUG':    'cyan',
-                'INFO':     'green',
-                'WARNING': 'yellow',
-                'ERROR':   'red',
-                'CRITICAL': 'red,bg_white',
-            }
+                "DEBUG": "cyan",
+                "INFO": "green",
+                "WARNING": "yellow",
+                "ERROR": "red",
+                "CRITICAL": "red,bg_white",
+            },
         )
     )
 
@@ -76,17 +77,16 @@ def run(cmd, timeout=None):
     import time
     import resource
     import platform
+
     if platform.system() != "Linux":
-        raise RuntimeError("This script only supports Linux for timing and memory measurement.")
+        raise RuntimeError(
+            "This script only supports Linux for timing and memory measurement."
+        )
     start_time = time.time()
     usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
     try:
         result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=timeout
+            cmd, capture_output=True, text=True, check=True, timeout=timeout
         )
         elapsed = time.time() - start_time
         usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -99,10 +99,11 @@ def run(cmd, timeout=None):
         max_memory = usage_after.ru_maxrss - usage_before.ru_maxrss
         return "", f"Process timed out after {timeout} seconds", -1, elapsed, max_memory
 
+
 def prove_batch(height, step):
 
     mode = "light"
-    job_info = f"Job(height='{height}', step={step})"    
+    job_info = f"Job(height='{height}', step={step})"
 
     logger.info(f"Proving {job_info}")
 
@@ -110,21 +111,23 @@ def prove_batch(height, step):
         # Load previous proof
         if height == 0:
             # Option::None
-            chain_state_proof = [hex(1)] 
+            chain_state_proof = [hex(1)]
         else:
             # load previous proof file
-            previous_proof_file = PROOF_DIR / f"{mode}_{height}.proof.json"        
-            
+            previous_proof_file = PROOF_DIR / f"{mode}_{height}.proof.json"
+
             if previous_proof_file.exists():
                 chain_state_proof = json.loads(previous_proof_file.read_text())
                 # Option::Some(chain_state_proof)
-                chain_state_proof = [hex(0)] + chain_state_proof 
+                chain_state_proof = [hex(0)] + chain_state_proof
             else:
-                raise Exception(f"Previous proof file {str(previous_proof_file)} does not exist")
+                raise Exception(
+                    f"Previous proof file {str(previous_proof_file)} does not exist"
+                )
 
         # Load batch data
         batch_file = TMP_DIR / f"{mode}_{height}_{step}.json"
-        
+
         batch_data = generate_data(
             mode=mode, initial_height=height, num_blocks=step, fast=True
         )
@@ -135,9 +138,9 @@ def prove_batch(height, step):
             "blocks": batch_data["blocks"],
         }
 
-        Path(batch_file).write_text(json.dumps(batch_args, indent=2))        
+        Path(batch_file).write_text(json.dumps(batch_args, indent=2))
         arguments_file = batch_file.as_posix().replace(".json", "-arguments.json")
-        args = format_args(batch_file)        
+        args = format_args(batch_file)
 
         # add chain state proof to arguments
         args = json.loads(args)
@@ -145,13 +148,13 @@ def prove_batch(height, step):
 
         with open(arguments_file, "w") as af:
             af.write(json.dumps(args))
-        
+
         proof_file = PROOF_DIR / f"{mode}_{height + step}.proof.json"
 
         command = [
             "cairo-prove",
             "prove",
-            "../../target/proving/fold.executable.json", 
+            "../../target/proving/fold.executable.json",
             str(proof_file),
             "--arguments-file",
             str(arguments_file),
@@ -171,18 +174,27 @@ def prove_batch(height, step):
         logger.debug(f"With command:\n{' '.join(command)}")
 
         stdout, stderr, returncode, elapsed_time, max_memory = run(command)
-        
-        if returncode != 0 or "FAIL" in stdout or "error" in stdout or "panicked" in stdout:
+
+        if (
+            returncode != 0
+            or "FAIL" in stdout
+            or "error" in stdout
+            or "panicked" in stdout
+        ):
             error = stdout or stderr
             logger.error(f"{job_info} error: {error}")
             return False
         else:
             logger.info(
-                f"{job_info} done, execution time: {elapsed_time:.2f} seconds" + 
-                (f", max memory: {max_memory/1024:.1f} MB" if max_memory is not None else "")
+                f"{job_info} done, execution time: {elapsed_time:.2f} seconds"
+                + (
+                    f", max memory: {max_memory/1024:.1f} MB"
+                    if max_memory is not None
+                    else ""
+                )
             )
             return True
-            
+
     except Exception as e:
         logger.error(f"Error while processing: {job_info}:\n{e}")
         logger.error(f"Stacktrace:\n{traceback.format_exc()}")
@@ -193,7 +205,9 @@ def main(start, blocks, step):
     """Main processing function - single threaded"""
     logger.info(
         "Starting single-threaded client, initial height: %d, blocks: %d, step: %d",
-        start, blocks, step,
+        start,
+        blocks,
+        step,
     )
 
     TMP_DIR.mkdir(exist_ok=True)
