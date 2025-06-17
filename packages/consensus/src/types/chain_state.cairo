@@ -49,7 +49,7 @@ impl ChainStateDefault of Default<ChainState> {
                 .into(),
             current_target: 0x00000000ffff0000000000000000000000000000000000000000000000000000_u256,
             epoch_start_time: 1231006505,
-            prev_timestamps: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1231006505].span(),
+            prev_timestamps: [1231006505].span(),
         }
     }
 }

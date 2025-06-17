@@ -5,7 +5,8 @@ use stwo_cairo_air::{CairoProof, VerificationOutput, get_verification_output, ve
 
 /// Hash of the bootloader program.
 /// See https://github.com/m-kus/cairo-bootloader/blob/main/resources/stwo-bootloader.json
-const BOOTLOADER_PROGRAM_HASH: felt252 = 2494357015748342749807586816445211447933813471303162239123730354369899819316;
+const BOOTLOADER_PROGRAM_HASH: felt252 =
+    2494357015748342749807586816445211447933813471303162239123730354369899819316;
 
 #[derive(Drop, Serde)]
 struct Args {
@@ -28,9 +29,6 @@ struct Result {
 
 #[derive(Drop, Serde)]
 struct BootloaderOutput {
-    /// Bootloader output
-    _0: felt252,
-    _1: felt252,
     /// Number of tasks (must be always 1)
     n_tasks: usize,
     /// Size of the task output in felts (including the size field)
@@ -49,10 +47,7 @@ fn main(args: Args) -> Result {
         get_prev_result(proof)
     } else {
         assert(chain_state == Default::default(), 'Invalid genesis state');
-        Result {
-            chain_state_hash: chain_state.hash(),
-            prev_program_hash: 0,
-        }
+        Result { chain_state_hash: chain_state.hash(), prev_program_hash: 0 }
     };
 
     // Check that the provided chain state matches the final state hash of the previous run.
@@ -75,9 +70,7 @@ fn main(args: Args) -> Result {
 
 /// Verify Cairo proof, extract and validate the task output.
 fn get_prev_result(proof: CairoProof) -> Result {
-    let VerificationOutput {
-        program_hash, output,
-    } = get_verification_output(proof: @proof);
+    let VerificationOutput { program_hash, output } = get_verification_output(proof: @proof);
 
     // Check that the program hash is the bootloader program hash
     assert(program_hash == BOOTLOADER_PROGRAM_HASH, 'Unexpected bootloader');
@@ -88,13 +81,16 @@ fn get_prev_result(proof: CairoProof) -> Result {
     // Deserialize the bootloader output
     let mut serialized_bootloader_output = output.span();
     let BootloaderOutput {
-        _0: _, _1: _, n_tasks, task_output_size, task_program_hash, task_result,
-    }: BootloaderOutput = Serde::deserialize(ref serialized_bootloader_output).expect('Invalid bootloader output');
+        n_tasks, task_output_size, task_program_hash, task_result,
+    }: BootloaderOutput =
+        Serde::deserialize(ref serialized_bootloader_output).expect('Invalid bootloader output');
 
     // Check that the bootloader output contains exactly one task
     assert(serialized_bootloader_output.is_empty(), 'Output too long');
     assert(n_tasks == 1, 'Unexpected number of tasks');
-    assert(task_output_size == 4, 'Unexpected task output size'); // 1 felt for program hash, 2 for output, 1 for the size
+    assert(
+        task_output_size == 4, 'Unexpected task output size',
+    ); // 1 felt for program hash, 2 for output, 1 for the size
 
     // Check that the task program hash is the same as the previous program hash
     // In case of the genesis state, the previous program hash must be 0
@@ -104,8 +100,5 @@ fn get_prev_result(proof: CairoProof) -> Result {
         assert(task_result.prev_program_hash == 0, 'Invalid genesis program hash');
     }
 
-    Result {
-        chain_state_hash: task_result.chain_state_hash,
-        prev_program_hash: task_program_hash,
-    }
+    Result { chain_state_hash: task_result.chain_state_hash, prev_program_hash: task_program_hash }
 }

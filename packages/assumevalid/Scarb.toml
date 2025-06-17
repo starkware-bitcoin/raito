@@ -3,17 +3,7 @@ name = "assumevalid"
 version = "0.1.0"
 edition = "2024_07"
 
-[[target.executable]]
-name = "agg"
-function = "assumevalid::agg"
-
-[[target.executable]]
-name = "main"
-function = "assumevalid::main"
-
-[[target.executable]]
-name = "fold"
-function = "assumevalid::fold"
+[executable]
 
 [dependencies]
 cairo_execute = "2.11.4"

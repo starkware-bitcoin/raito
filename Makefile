@@ -1,12 +1,4 @@
-install-cairo-prove:
-	RUSTFLAGS="-C target-cpu=native -C opt-level=3" \
-		cargo install \
-			--git https://github.com/starkware-libs/stwo-cairo \
-			--rev a9fd9934eabb5ca1a06a910ef04ed4c0dae9114c \
-			cairo-prove
-			
-install-cairo-execute:
-	cargo install --git https://github.com/m-kus/cairo --rev 9117214e4a3509870c6a6db8e61ddcdaf9ade561 cairo-execute
+########################################## CLIENT ##########################################
 
 client-build:
 	scarb --profile proving build --package client --target-kinds executable
@@ -16,37 +8,73 @@ client-build-with-shinigami:
 	scarb --profile proving build --package client --target-kinds executable
 	sed -i.bak 's/default = \["shinigami"\]/default = []/' packages/consensus/Scarb.toml && rm packages/consensus/Scarb.toml.bak
 
+########################################## BINARIES ##########################################
+
+install-cairo-execute:
+	cargo install --git https://github.com/m-kus/cairo --rev 9117214e4a3509870c6a6db8e61ddcdaf9ade561 cairo-execute
+
+install-cairo-bootloader:
+	cargo install --git https://github.com/m-kus/cairo-bootloader --rev 0861070b85cac2f4425cfed35fc2a401291bddd5 cairo-bootloader
+
+install-stwo:
+	RUSTFLAGS="-C target-cpu=native -C opt-level=3" \
+		cargo install \
+		--git https://github.com/starkware-libs/stwo-cairo \
+		--rev f8979ed82d86bd3408f9706a03a63c54bd221635 \
+		adapted_stwo
+
+########################################## ASSUMEVALID ##########################################
+
 assumevalid-build:
 	sed -i.bak 's/default = \["syscalls"\]/default = \[\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
-	scarb --profile proving build --package assumevalid --target-names main
+	scarb --profile proving build --package assumevalid
 	sed -i.bak 's/default = \[\]/default = \["syscalls"\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
 
-assumevalid-execute:
-	scripts/data/format_args.py --input_file packages/assumevalid/tests/data/batch_100.json > target/execute/assumevalid/args.json
+assumevalid-data:
+	./scripts/data/generate_data.py \
+		--mode light \
+		--height 0 \
+		--num_blocks 1 \
+		--output_file packages/assumevalid/tests/data/batch_1.json
+
+assumevalid-execute: assumevalid-clean
+	scripts/data/format_assumevalid_args.py \
+		--block-data packages/assumevalid/tests/data/batch_1.json \
+		--output-path target/execute/assumevalid/execution1/args.json
 	scarb --profile proving execute \
 		--no-build \
 		--package assumevalid \
-		--executable-name main \
-		--arguments-file target/execute/assumevalid/args.json \
+		--arguments-file target/execute/assumevalid/execution1/args.json \
 		--print-resource-usage
 
-assumevalid-pie:
+assumevalid-clean:
 	rm -rf target/execute/assumevalid/execution1
 	mkdir -p target/execute/assumevalid/execution1
-	scripts/data/format_args.py --input_file packages/assumevalid/tests/data/light_169.json > target/execute/assumevalid/args.json
+
+assumevalid-pie: assumevalid-clean
+	scripts/data/format_assumevalid_args.py \
+		--block-data packages/assumevalid/tests/data/batch_1.json \
+		--output-path target/execute/assumevalid/execution1/args.json
 	cairo-execute \
 		--layout all_cairo_stwo \
-		--args-file target/execute/assumevalid/args.json \
+		--args-file target/execute/assumevalid/execution1/args.json \
 		--prebuilt \
-		--output-path target/execute/assumevalid/execution1/raito_1.zip \
-		target/proving/main.executable.json
+		--output-path target/execute/assumevalid/execution1/cairo_pie.zip \
+		target/proving/assumevalid.executable.json
 
 assumevalid-bootload:
-	cairo-bootloader --cairo_pies target/execute/assumevalid/execution1/cairo_pie.zip \
-		--layout all_cairo \
-		--secure_run true \
-		--ignore_fact_topologies true \
-		--cairo_pie_output target/execute/assumevalid/boot.zip
+	stwo-bootloader \
+		--pie target/execute/assumevalid/execution1/cairo_pie.zip \
+		--output-path target/execute/assumevalid/execution1
+
+assumevalid-prove:
+	adapted_stwo \
+		--priv_json target/execute/assumevalid/execution1/priv.json \
+		--pub_json target/execute/assumevalid/execution1/pub.json \
+		--params_json packages/assumevalid/prover_params.json \
+		--proof_path target/execute/assumevalid/execution1/proof.json \
+		--proof-format cairo-serde \
+		--verify
 
 assumevalid-execute-rec:
 	scarb --profile proving execute \
@@ -56,28 +84,7 @@ assumevalid-execute-rec:
 		--arguments-file target/execute/assumevalid/proof.json \
 		--print-resource-usage
 
-assumevalid-prove:
-	rm -rf target/execute/assumevalid
-	mkdir -p target/execute/assumevalid
-	scripts/data/format_args.py --input_file packages/assumevalid/tests/data/light_169.json > target/execute/assumevalid/args.json
-	cairo-prove prove \
-		target/proving/main.executable.json \
-		target/execute/assumevalid/proof.json \
-		--arguments-file target/execute/assumevalid/args.json \
-		--proof-format cairo-serde
-
-assumevalid-prove-rec:
-	cairo-prove prove \
-		target/proving/agg.executable.json \
-		target/execute/assumevalid/proof-rec.json \
-		--arguments-file target/execute/assumevalid/proof.json \
-		--proof-format cairo-serde
-
-assumevalid:
-	$(MAKE) assumevalid-build
-	$(MAKE) assumevalid-prove
-	$(MAKE) assumevalid-execute-rec
-
+########################################## PIPELINE ##########################################
 
 setup: install-system-packages create-venv install-python-dependencies
 
