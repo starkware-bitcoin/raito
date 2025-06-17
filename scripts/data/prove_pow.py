@@ -10,6 +10,8 @@ from pathlib import Path
 from generate_data import generate_data
 from format_args import format_args
 from logging.handlers import TimedRotatingFileHandler
+import traceback
+import colorlog
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +39,20 @@ def setup_logging(verbose=False, log_filename="client.log"):
         logging.Formatter("%(asctime)s - %(name)-10.10s - %(levelname)s - %(message)s")
     )
 
-    # Console handler setup
-    console_handler = logging.StreamHandler()
+    # Console handler with colors
+    console_handler = colorlog.StreamHandler()
     console_handler.setLevel(logging.DEBUG)
     console_handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        colorlog.ColoredFormatter(
+            "%(asctime)s - %(log_color)s%(levelname)s%(reset)s - %(message)s",
+            log_colors={
+                'DEBUG':    'cyan',
+                'INFO':     'green',
+                'WARNING': 'yellow',
+                'ERROR':   'red',
+                'CRITICAL': 'red,bg_white',
+            }
+        )
     )
 
     # Root logger setup
@@ -59,39 +70,57 @@ def setup_logging(verbose=False, log_filename="client.log"):
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("generate_data").setLevel(logging.WARNING)
 
+
 def run(cmd, timeout=None):
-    """Run a subprocess"""
+    """Run a subprocess and measure execution time and memory usage (Linux only, using resource module)"""
+    import time
+    import resource
+    import platform
+    if platform.system() != "Linux":
+        raise RuntimeError("This script only supports Linux for timing and memory measurement.")
+    start_time = time.time()
+    usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
     try:
         result = subprocess.run(
-            cmd, 
+            cmd,
             capture_output=True,
             text=True,
+            check=True,
             timeout=timeout
         )
-        return result.stdout, result.stderr, result.returncode
-    
+        elapsed = time.time() - start_time
+        usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
+        # ru_maxrss is in kilobytes on Linux
+        max_memory = usage_after.ru_maxrss - usage_before.ru_maxrss
+        return result.stdout, result.stderr, result.returncode, elapsed, max_memory
     except subprocess.TimeoutExpired as e:
-        # Process was killed due to timeout
-        return "", f"Process timed out after {timeout} seconds", -1
+        elapsed = time.time() - start_time
+        usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
+        max_memory = usage_after.ru_maxrss - usage_before.ru_maxrss
+        return "", f"Process timed out after {timeout} seconds", -1, elapsed, max_memory
 
 def prove_batch(height, step):
 
     mode = "light"
-    job_info = f"Job(height='{height}', step={step}, up_to_height={height + step})"    
+    job_info = f"Job(height='{height}', step={step})"    
+
+    logger.info(f"Proving {job_info}")
 
     try:
         # Load previous proof
         if height == 0:
-            chain_state_proof = [0]
+            # Option::None
+            chain_state_proof = [hex(1)] 
         else:
             # load previous proof file
             previous_proof_file = PROOF_DIR / f"{mode}_{height}.proof.json"        
             
             if previous_proof_file.exists():
-                chain_state_proof = json.load(previous_proof_file)
-                chain_state_proof = [1] + chain_state_proof
+                chain_state_proof = json.loads(previous_proof_file.read_text())
+                # Option::Some(chain_state_proof)
+                chain_state_proof = [hex(0)] + chain_state_proof 
             else:
-                raise Exception(f"Previous proof file {previous_proof_file} does not exist")
+                raise Exception(f"Previous proof file {str(previous_proof_file)} does not exist")
 
         # Load batch data
         batch_file = TMP_DIR / f"{mode}_{height}_{step}.json"
@@ -99,81 +128,64 @@ def prove_batch(height, step):
         batch_data = generate_data(
             mode=mode, initial_height=height, num_blocks=step, fast=True
         )
-        
-        # store expected in a var and remove from batch_data
-        # expected_chain_state = batch_data.pop("expected")
 
+        # prepare args
         batch_args = {
             "chain_state": batch_data["chain_state"],
             "blocks": batch_data["blocks"],
-            "chain_state_proof": chain_state_proof,
         }
 
-        # serialize 
-        Path(batch_file).write_text(json.dumps(batch_args, indent=2))
-        
-        # Process the batch
+        Path(batch_file).write_text(json.dumps(batch_args, indent=2))        
         arguments_file = batch_file.as_posix().replace(".json", "-arguments.json")
-        
+        args = format_args(batch_file)        
+
+        # add chain state proof to arguments
+        args = json.loads(args)
+        args = args + chain_state_proof
+
         with open(arguments_file, "w") as af:
-            af.write(str(format_args(batch_file, False)))
+            af.write(json.dumps(args))
         
         proof_file = PROOF_DIR / f"{mode}_{height + step}.proof.json"
 
-        # Use cairo-prove to generate proof for the fold function
-        stdout, stderr, returncode = run(
-            [
-                "cairo-prove",
-                "prove",
-                "target/proving/fold.executable.json",  # Assuming fold executable exists
-                proof_file,
-                "--arguments-file",
-                str(arguments_file),
-                "--proof-format",
-                "cairo-serde",
-            ]
-        )
+        command = [
+            "cairo-prove",
+            "prove",
+            "../../target/proving/fold.executable.json", 
+            str(proof_file),
+            "--arguments-file",
+            str(arguments_file),
+            "--proof-format",
+            "cairo-serde",
+        ]
+
+        # command = [
+        #     "scarb", "--profile", "proving", "execute",
+        #     "--no-build",
+        #     "--package", "assumevalid",
+        #     "--executable-name", "fold",
+        #     "--arguments-file", str(arguments_file),
+        #     "--print-resource-usage"
+        # ]
+
+        logger.debug(f"With command:\n{' '.join(command)}")
+
+        stdout, stderr, returncode, elapsed_time, max_memory = run(command)
         
         if returncode != 0 or "FAIL" in stdout or "error" in stdout or "panicked" in stdout:
             error = stdout or stderr
-            # if returncode == -9:
-            #     match = re.search(r"gas_spent=(\d+)", stdout)
-            #     gas_info = (
-            #         f", gas spent: {int(match.group(1))}"
-            #         if match
-            #         else ", no gas info found"
-            #     )
-            #     error = f"Return code -9, killed by OOM?{gas_info}"
-            #     message = error
-            # else:
-            #     error_match = re.search(r"error='([^']*)'", error)
-            #     if error_match:
-            #         message = error_match.group(1)
-            #     else:
-            #         error_match = re.search(r"error: (.*)", error, re.DOTALL)
-            #         if error_match:
-            #             message = error_match.group(1)
-            #         else:
-            #             message = error
-            
-            # message = re.sub(r"\s+", " ", message)
-
-            # TODO: handle errors
             logger.error(f"{job_info} error: {error}")
-            # logger.debug(f"Full error while processing: {job_info}:\n{error}")
             return False
         else:
-            logger.info(f"{job_info} done")
-
-            # match = re.search(r"gas_spent=(\d+)", stdout)
-            # gas_info = f"gas spent: {int(match.group(1))}" if match else "no gas info found"
-            # logger.info(f"{job_info} done, {gas_info}")
-            # if not match:
-            #     logger.warning(f"{job_info}: no gas info found")
+            logger.info(
+                f"{job_info} done, execution time: {elapsed_time:.2f} seconds" + 
+                (f", max memory: {max_memory/1024:.1f} MB" if max_memory is not None else "")
+            )
             return True
             
     except Exception as e:
         logger.error(f"Error while processing: {job_info}:\n{e}")
+        logger.error(f"Stacktrace:\n{traceback.format_exc()}")
         return False
 
 
@@ -198,8 +210,6 @@ def main(start, blocks, step):
 
     # Process jobs sequentially
     for height in height_range:
-        logger.debug(f"Proving job {processed_count + 1}/{total_jobs}: height={height}, steps={processing_step}")
-
         try:
             # Process the height (generate and process in one step)
             success = prove_batch(height, processing_step)
@@ -207,8 +217,10 @@ def main(start, blocks, step):
                 processed_count += 1
         except subprocess.TimeoutExpired:
             logger.warning(f"Timeout while processing height {height}")
+            return
         except Exception as e:
             logger.error(f"Error while processing height {height}: {e}")
+            return
 
     logger.info(f"All {processed_count} jobs have been processed successfully.")
 
@@ -230,4 +242,4 @@ if __name__ == "__main__":
     # Setup logging using the extracted function
     setup_logging(verbose=args.verbose)
 
-    main(args.start, args.blocks, args.step) 
+    main(args.start, args.blocks, args.step)

@@ -6,3 +6,4 @@ poseidon_py==0.1.5
 tqdm==4.66.5
 google-cloud-storage==2.18.2
 google-api-python-client==2.149.0
+colorlog==6.8.2

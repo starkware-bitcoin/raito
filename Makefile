@@ -58,12 +58,33 @@ assumevalid:
 	$(MAKE) assumevalid-execute-rec
 
 
+setup: install-system-packages create-venv install-python-dependencies
+
+install-system-packages:
+	@echo ">>> Updating apt package list and installing system-level Python packages..."
+	sudo apt update
+	sudo apt install -y python3-pip python3.11-venv # Use -y for non-interactive install
+
+create-venv:
+	@echo ">>> Creating Python virtual environment 'venv'..."
+	python3 -m venv venv
+
+install-python-dependencies: create-venv
+	@echo "Installing Python dependencies into the 'venv' virtual environment..."
+
+	. venv/bin/activate && pip install google-cloud-storage
+	. venv/bin/activate && pip install -r scripts/data/requirements.txt
+
 data-generate-timestamp:
-	cd scripts/data && python generate_timestamp_data.py
+	@echo ">>> Generating timestamp data..."
+	# Ensure the venv is activated for this script as well
+	. venv/bin/activate && cd scripts/data && python generate_timestamp_data.py
 
 data-generate-utxo:
-	cd scripts/data && python generate_utxo_data.py
+	@echo ">>> Generating UTXO data..."
+	# Ensure the venv is activated for this script as well
+	. venv/bin/activate && cd scripts/data && python generate_utxo_data.py
 
-data-generate:
-	$(MAKE) data-generate-timestamp
-	$(MAKE) data-generate-utxo
+# Main data generation target, depending on specific data generation tasks
+data-generate: data-generate-timestamp data-generate-utxo
+	@echo "All data generation tasks completed."
