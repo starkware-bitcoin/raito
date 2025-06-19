@@ -9,7 +9,7 @@ edition = "2024_07"
 cairo_execute = "2.11.4"
 consensus = { path = "../consensus" }
 utils = { path = "../utils" }
-stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "a9d4ad392d0de4a83f2e176e6f9a6f81feb4ecf0" }
+stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "038e567301a87bbda94ff3dc8fe168f5d3444f1f" }
 
 [dev-dependencies]
 cairo_test.workspace = true

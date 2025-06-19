@@ -13,7 +13,7 @@ dependencies = [
 [[package]]
 name = "bounded_int"
 version = "0.1.0"
-source = "git+https://github.com/starkware-libs/stwo-cairo?rev=a9d4ad392d0de4a83f2e176e6f9a6f81feb4ecf0#a9d4ad392d0de4a83f2e176e6f9a6f81feb4ecf0"
+source = "git+https://github.com/starkware-libs/stwo-cairo?rev=038e567301a87bbda94ff3dc8fe168f5d3444f1f#038e567301a87bbda94ff3dc8fe168f5d3444f1f"
 
 [[package]]
 name = "client"
@@ -59,7 +59,7 @@ source = "git+https://github.com/keep-starknet-strange/shinigami.git?rev=1963116
 [[package]]
 name = "stwo_cairo_air"
 version = "0.1.0"
-source = "git+https://github.com/starkware-libs/stwo-cairo?rev=a9d4ad392d0de4a83f2e176e6f9a6f81feb4ecf0#a9d4ad392d0de4a83f2e176e6f9a6f81feb4ecf0"
+source = "git+https://github.com/starkware-libs/stwo-cairo?rev=038e567301a87bbda94ff3dc8fe168f5d3444f1f#038e567301a87bbda94ff3dc8fe168f5d3444f1f"
 dependencies = [
  "stwo_constraint_framework",
  "stwo_verifier_core",
@@ -68,7 +68,7 @@ dependencies = [
 [[package]]
 name = "stwo_constraint_framework"
 version = "0.1.0"
-source = "git+https://github.com/starkware-libs/stwo-cairo?rev=a9d4ad392d0de4a83f2e176e6f9a6f81feb4ecf0#a9d4ad392d0de4a83f2e176e6f9a6f81feb4ecf0"
+source = "git+https://github.com/starkware-libs/stwo-cairo?rev=038e567301a87bbda94ff3dc8fe168f5d3444f1f#038e567301a87bbda94ff3dc8fe168f5d3444f1f"
 dependencies = [
  "stwo_verifier_core",
 ]
@@ -76,7 +76,7 @@ dependencies = [
 [[package]]
 name = "stwo_verifier_core"
 version = "0.1.0"
-source = "git+https://github.com/starkware-libs/stwo-cairo?rev=a9d4ad392d0de4a83f2e176e6f9a6f81feb4ecf0#a9d4ad392d0de4a83f2e176e6f9a6f81feb4ecf0"
+source = "git+https://github.com/starkware-libs/stwo-cairo?rev=038e567301a87bbda94ff3dc8fe168f5d3444f1f#038e567301a87bbda94ff3dc8fe168f5d3444f1f"
 dependencies = [
  "bounded_int",
 ]
