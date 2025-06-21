@@ -4,9 +4,11 @@ use consensus::validation::header::validate_block_header;
 use stwo_cairo_air::{CairoProof, VerificationOutput, get_verification_output, verify_cairo};
 
 /// Hash of the bootloader program.
-/// See https://github.com/m-kus/cairo-bootloader/blob/main/resources/stwo-bootloader.json
+/// See 
+/// - https://github.com/m-kus/cairo-bootloader/blob/main/resources/stwo-bootloader.json
+/// - https://github.com/starkware-libs/stwo-cairo/blob/3ab588b1ee9b1a0070020dbe1f7e22896bf77fc3/stwo_cairo_verifier/crates/cairo_air/src/lib.cairo#L2474
 const BOOTLOADER_PROGRAM_HASH: felt252 =
-    2494357015748342749807586816445211447933813471303162239123730354369899819316;
+    1508204816702274677001361398045343133899352818378386792900525897962659240346;
 
 #[derive(Drop, Serde)]
 struct Args {
@@ -24,6 +26,8 @@ struct Result {
     /// Hash of the chain state after the blocks have been applied.
     chain_state_hash: felt252,
     /// Hash of the program that was recursively verified.
+    /// We cannot know the hash of the program from within the program, so we have to carry it over.
+    /// This also allows composing multiple programs (e.g. if we'd need to upgrade at a certain block height).
     prev_program_hash: felt252,
 }
 
@@ -73,6 +77,7 @@ fn get_prev_result(proof: CairoProof) -> Result {
     let VerificationOutput { program_hash, output } = get_verification_output(proof: @proof);
 
     // Check that the program hash is the bootloader program hash
+    // println!("bootloader hash: {}", program_hash);
     assert(program_hash == BOOTLOADER_PROGRAM_HASH, 'Unexpected bootloader');
 
     // Verify the proof
@@ -93,11 +98,9 @@ fn get_prev_result(proof: CairoProof) -> Result {
     ); // 1 felt for program hash, 2 for output, 1 for the size
 
     // Check that the task program hash is the same as the previous program hash
-    // In case of the genesis state, the previous program hash must be 0
-    if task_result.chain_state_hash != Default::default() {
+    // In case of the genesis state, the previous program hash is 0
+    if task_result.prev_program_hash != 0 {
         assert(task_result.prev_program_hash == task_program_hash, 'Program hash mismatch');
-    } else {
-        assert(task_result.prev_program_hash == 0, 'Invalid genesis program hash');
     }
 
     Result { chain_state_hash: task_result.chain_state_hash, prev_program_hash: task_program_hash }

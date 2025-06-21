@@ -35,11 +35,16 @@ assumevalid-data:
 		--mode light \
 		--height 0 \
 		--num_blocks 1 \
-		--output_file packages/assumevalid/tests/data/batch_1.json
+		--output_file packages/assumevalid/tests/data/blocks_0_1.json
+	./scripts/data/generate_data.py \
+		--mode light \
+		--height 1 \
+		--num_blocks 1 \
+		--output_file packages/assumevalid/tests/data/blocks_1_2.json
 
 assumevalid-execute: assumevalid-clean
 	scripts/data/format_assumevalid_args.py \
-		--block-data packages/assumevalid/tests/data/batch_1.json \
+		--block-data packages/assumevalid/tests/data/blocks_0_1.json \
 		--output-path target/execute/assumevalid/execution1/args.json
 	scarb --profile proving execute \
 		--no-build \
@@ -53,7 +58,7 @@ assumevalid-clean:
 
 assumevalid-pie: assumevalid-clean
 	scripts/data/format_assumevalid_args.py \
-		--block-data packages/assumevalid/tests/data/batch_1.json \
+		--block-data packages/assumevalid/tests/data/blocks_0_1.json \
 		--output-path target/execute/assumevalid/execution1/args.json
 	cairo-execute \
 		--layout all_cairo_stwo \
@@ -77,11 +82,15 @@ assumevalid-prove:
 		--verify
 
 assumevalid-execute-rec:
+	mkdir -p target/execute/assumevalid/execution2
+	scripts/data/format_assumevalid_args.py \
+		--block-data packages/assumevalid/tests/data/blocks_1_2.json \
+		--proof-path target/execute/assumevalid/execution1/proof.json \
+		--output-path target/execute/assumevalid/execution2/args.json
 	scarb --profile proving execute \
 		--no-build \
 		--package assumevalid \
-		--executable-name agg \
-		--arguments-file target/execute/assumevalid/proof.json \
+		--arguments-file target/execute/assumevalid/execution2/args.json \
 		--print-resource-usage
 
 ########################################## PIPELINE ##########################################

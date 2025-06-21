@@ -1,0 +1,27 @@
+{
+  "chain_state": {
+    "block_height": 1,
+    "total_work": "8590065666",
+    "best_block_hash": "00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048",
+    "current_target": "26959535291011309493156476344723991336010898738574164086137773096960",
+    "epoch_start_time": 1231006505,
+    "prev_timestamps": [
+      1231006505,
+      1231469665
+    ]
+  },
+  "blocks": [
+    {
+      "header": {
+        "version": 1,
+        "time": 1231469744,
+        "bits": 486604799,
+        "nonce": 1639830024
+      },
+      "data": {
+        "variant_id": 0,
+        "merkle_root": "9b0fc92260312ce44e74ef369f5c66bbb85848f2eddd5a7a1cde251e54ccfdd5"
+      }
+    }
+  ]
+}
