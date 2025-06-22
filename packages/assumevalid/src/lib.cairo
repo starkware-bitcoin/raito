@@ -4,9 +4,10 @@ use consensus::validation::header::validate_block_header;
 use stwo_cairo_air::{CairoProof, VerificationOutput, get_verification_output, verify_cairo};
 
 /// Hash of the bootloader program.
-/// See 
+/// See
 /// - https://github.com/m-kus/cairo-bootloader/blob/main/resources/stwo-bootloader.json
-/// - https://github.com/starkware-libs/stwo-cairo/blob/3ab588b1ee9b1a0070020dbe1f7e22896bf77fc3/stwo_cairo_verifier/crates/cairo_air/src/lib.cairo#L2474
+/// -
+/// https://github.com/starkware-libs/stwo-cairo/blob/3ab588b1ee9b1a0070020dbe1f7e22896bf77fc3/stwo_cairo_verifier/crates/cairo_air/src/lib.cairo#L2474
 const BOOTLOADER_PROGRAM_HASH: felt252 =
     1508204816702274677001361398045343133899352818378386792900525897962659240346;
 
@@ -27,7 +28,8 @@ struct Result {
     chain_state_hash: felt252,
     /// Hash of the program that was recursively verified.
     /// We cannot know the hash of the program from within the program, so we have to carry it over.
-    /// This also allows composing multiple programs (e.g. if we'd need to upgrade at a certain block height).
+    /// This also allows composing multiple programs (e.g. if we'd need to upgrade at a certain
+    /// block height).
     prev_program_hash: felt252,
 }
 

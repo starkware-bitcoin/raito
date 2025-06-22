@@ -93,6 +93,32 @@ assumevalid-execute-rec:
 		--arguments-file target/execute/assumevalid/execution2/args.json \
 		--print-resource-usage
 
+assumevalid-pie-rec:
+	scripts/data/format_assumevalid_args.py \
+		--block-data packages/assumevalid/tests/data/blocks_1_2.json \
+		--proof-path target/execute/assumevalid/execution1/proof.json \
+		--output-path target/execute/assumevalid/execution2/args.json
+	cairo-execute \
+		--layout all_cairo_stwo \
+		--args-file target/execute/assumevalid/execution2/args.json \
+		--prebuilt \
+		--output-path target/execute/assumevalid/execution2/cairo_pie.zip \
+		target/proving/assumevalid.executable.json
+
+assumevalid-bootload-rec:
+	stwo-bootloader \
+		--pie target/execute/assumevalid/execution2/cairo_pie.zip \
+		--output-path target/execute/assumevalid/execution2
+
+assumevalid-prove-rec:
+	adapted_stwo \
+		--priv_json target/execute/assumevalid/execution2/priv.json \
+		--pub_json target/execute/assumevalid/execution2/pub.json \
+		--params_json packages/assumevalid/prover_params.json \
+		--proof_path target/execute/assumevalid/execution2/proof.json \
+		--proof-format cairo-serde \
+		--verify
+
 ########################################## PIPELINE ##########################################
 
 setup: install-system-packages create-venv install-python-dependencies
