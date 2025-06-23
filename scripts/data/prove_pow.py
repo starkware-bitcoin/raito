@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 from generate_data import generate_data
 from format_args import format_args
+from format_assumevalid_args import generate_assumevalid_args
 from logging.handlers import TimedRotatingFileHandler
 import traceback
 import colorlog
@@ -147,44 +148,25 @@ def prove_batch(height, step):
     logger.info(f"{job_info} proving...")
 
     try:
-        # Load previous proof
-        if height == 0:
-            # Option::None
-            chain_state_proof = [hex(1)]
-        else:
-            # load previous proof file
-            previous_proof_file = PROOF_DIR / f"{mode}_{height}.proof.json"
+        # Previous Proof
+        previous_proof_file = (
+            PROOF_DIR / f"{mode}_{height}.proof.json" if height > 0 else None
+        )
 
-            if previous_proof_file.exists():
-                chain_state_proof = json.loads(previous_proof_file.read_text())
-                # Option::Some(chain_state_proof)
-                chain_state_proof = [hex(0)] + chain_state_proof
-            else:
-                raise Exception(
-                    f"{job_info} previous proof file {str(previous_proof_file)} does not exist"
-                )
-
-        # Load batch data
+        # Batch data
         batch_file = TMP_DIR / f"{mode}_{height}_{step}.json"
-
         batch_data = generate_data(
             mode=mode, initial_height=height, num_blocks=step, fast=True
         )
-
-        # prepare args
         batch_args = {
             "chain_state": batch_data["chain_state"],
             "blocks": batch_data["blocks"],
         }
-
         Path(batch_file).write_text(json.dumps(batch_args, indent=2))
+
+        # Arguments file
+        args = generate_assumevalid_args(batch_file, previous_proof_file)
         arguments_file = batch_file.as_posix().replace(".json", "-arguments.json")
-        args = format_args(batch_file)
-
-        # add chain state proof to arguments
-        args = json.loads(args)
-        args = args + chain_state_proof
-
         with open(arguments_file, "w") as af:
             af.write(json.dumps(args))
 
@@ -259,6 +241,19 @@ def main(start, blocks, step):
     logger.info(f"All {processed_count} jobs have been processed successfully")
 
 
+def auto_detect_start():
+    proof_files = list(PROOF_DIR.glob("light_*.proof.json"))
+    max_height = 0
+    pattern = re.compile(r"light_(\d+)\.proof\.json")
+    for pf in proof_files:
+        m = pattern.match(pf.name)
+        if m:
+            h = int(m.group(1))
+            if h > max_height:
+                max_height = h
+    return max_height
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run single-threaded client script")
     parser.add_argument(
@@ -282,21 +277,7 @@ if __name__ == "__main__":
 
     start = args.start
     if start is None:
-        # Find last available proof file in PROOF_DIR
-        import re
-
-        proof_files = list(PROOF_DIR.glob("light_*.proof.json"))
-        max_height = 0
-        pattern = re.compile(r"light_(\d+).proof.json")
-        for pf in proof_files:
-            logger.debug(f"Checking proof file: {pf.name}")
-            m = pattern.match(pf.name)
-            if m:
-                logger.debug(f"Matched proof file: {pf.name}")
-                h = int(m.group(1))
-                if h > max_height:
-                    max_height = h
-        start = max_height
-        logger.info(f"Auto-detected start height: {start}")
+        start = auto_detect_start()
+        logger.info(f"Auto-detected start: {start}")
 
     main(start, args.blocks, args.step)

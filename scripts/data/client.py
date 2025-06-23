@@ -138,7 +138,7 @@ def process_batch(job):
     arguments_file = job.batch_file.as_posix().replace(".json", "-arguments.json")
 
     with open(arguments_file, "w") as af:
-        af.write(str(format_args(job.batch_file, False)))
+        af.write(str(format_args(job.batch_file)))
 
     stdout, stderr, returncode = run(
         [
@@ -232,9 +232,6 @@ def job_producer(job_gen):
         # Signal end of jobs to consumers
         if not shutdown_requested:
             for _ in range(THREAD_POOL_SIZE):
-                logger.warning(
-                    f"Producer is putting None into the queue..., full: {job_queue.full()}"
-                )
                 job_queue.put(None, block=False)
 
         with weight_lock:
