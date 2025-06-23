@@ -123,21 +123,82 @@ def run(cmd, timeout=None):
 
 
 def run_prover(job_info, executable, proof, arguments):
+    """
+    Run the prover pipeline:
+    1. Generate a pie using cairo-execute
+    2. Bootload using stwo-bootloader
+    3. Prove using adapted_stwo
+    Aggregate elapsed time and max memory across all steps.
+    """
+    # Prepare intermediate file paths
+    pie_file = Path(proof).with_suffix(".cairo_pie.zip")
+    bootloader_dir = Path(proof).parent / (Path(proof).stem + "_bootload")
+    bootloader_dir.mkdir(exist_ok=True)
+    priv_json = bootloader_dir / "priv.json"
+    pub_json = bootloader_dir / "pub.json"
 
-    command = [
-        "cairo-prove",
-        "prove",
-        executable,
-        proof,
-        "--arguments-file",
+    total_elapsed = 0.0
+    max_mem = 0
+
+    # 1. Generate pie
+    pie_cmd = [
+        "cairo-execute",
+        "--layout",
+        "all_cairo_stwo",
+        "--args-file",
         arguments,
+        "--prebuilt",
+        "--output-path",
+        str(pie_file),
+        executable,
+    ]
+    logger.debug(f"{job_info} [PIE] command:\n{' '.join(map(str, pie_cmd))}")
+    stdout, stderr, returncode, elapsed, max_memory = run(pie_cmd)
+    total_elapsed += elapsed
+    if max_memory is not None:
+        max_mem = max(max_mem, max_memory)
+    if returncode != 0:
+        logger.error(f"{job_info} [PIE] error: {stdout or stderr}")
+        return stdout, stderr, returncode, total_elapsed, max_mem
+
+    # 2. Bootload
+    bootload_cmd = [
+        "stwo-bootloader",
+        "--pie",
+        str(pie_file),
+        "--output-path",
+        str(bootloader_dir),
+    ]
+    logger.debug(f"{job_info} [BOOTLOAD] command:\n{' '.join(map(str, bootload_cmd))}")
+    stdout, stderr, returncode, elapsed, max_memory = run(bootload_cmd)
+    total_elapsed += elapsed
+    if max_memory is not None:
+        max_mem = max(max_mem, max_memory)
+    if returncode != 0:
+        logger.error(f"{job_info} [BOOTLOAD] error: {stdout or stderr}")
+        return stdout, stderr, returncode, total_elapsed, max_mem
+
+    # 3. Prove
+    prove_cmd = [
+        "adapted_stwo",
+        "--priv_json",
+        str(priv_json),
+        "--pub_json",
+        str(pub_json),
+        "--params_json",
+        "../../packages/assumevalid/prover_params.json",
+        "--proof_path",
+        str(proof),
         "--proof-format",
         "cairo-serde",
+        "--verify",
     ]
-
-    logger.debug(f"{job_info} with command:\n{' '.join(command)}")
-
-    return run(command)
+    logger.debug(f"{job_info} [PROVE] command:\n{' '.join(map(str, prove_cmd))}")
+    stdout, stderr, returncode, elapsed, max_memory = run(prove_cmd)
+    total_elapsed += elapsed
+    if max_memory is not None:
+        max_mem = max(max_mem, max_memory)
+    return stdout, stderr, returncode, total_elapsed, max_mem
 
 
 def prove_batch(height, step):
@@ -175,7 +236,7 @@ def prove_batch(height, step):
         # run prover
         stdout, stderr, returncode, elapsed_time, max_memory = run_prover(
             job_info,
-            "../../target/proving/fold.executable.json",
+            "../../target/proving/assumevalid.executable.json",
             str(proof_file),
             str(arguments_file),
         )
@@ -203,7 +264,7 @@ def prove_batch(height, step):
 
     except Exception as e:
         logger.error(
-            f"{job_info} error while processing: {job_info}:\n{e}\nstacktrace:\n{traceback.format_exc()}"
+            f"{job_info} error while processing {job_info}:\n{e}\nstacktrace:\n{traceback.format_exc()}"
         )
         return False
 
