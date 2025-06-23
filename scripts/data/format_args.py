@@ -92,14 +92,29 @@ def flatten_tuples(src) -> list:
     return res
 
 
-def format_args(input_file):
-    """Reads arguments from JSON file and prints formatted result.
-    Expects a single CLI argument containing file path.
+def format_args_to_cairo_serde(input_file):
+    """Reads arguments from JSON file and returns formatted result as a list of hex values.
     Output is compatible with the Scarb runner arguments format.
+
+    Args:
+        input_file (str): Path to the input JSON file
+
+    Returns:
+        list: List of hex values representing the Cairo serde format
     """
     args = json.loads(Path(input_file).read_text())
     res = flatten_tuples(serialize(args))
-    return json.dumps(list(map(hex, res)))
+    return list(map(hex, res))
+
+
+def format_args(input_file):
+    """Reads arguments from JSON file and returns formatted result as a list of hex values.
+    Output is compatible with the Scarb runner arguments format.
+
+    Args:
+        input_file (str): Path to the input JSON file
+    """
+    return json.dumps(format_args_to_cairo_serde(input_file))
 
 
 if __name__ == "__main__":
