@@ -13,11 +13,23 @@ from format_assumevalid_args import generate_assumevalid_args
 from logging.handlers import TimedRotatingFileHandler
 import traceback
 import colorlog
+from dataclasses import dataclass
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 TMP_DIR = Path(".tmp")
 PROOF_DIR = Path(".proofs")
+
+
+@dataclass
+class StepInfo:
+    step: str
+    stdout: str
+    stderr: str
+    returncode: int
+    elapsed: float
+    max_memory: Optional[int]
 
 
 def setup_logging(verbose=False, log_filename="client.log"):
@@ -88,7 +100,7 @@ def run(cmd, timeout=None):
     start_time = time.time()
     try:
         result = subprocess.run(
-            time_cmd, capture_output=True, text=True, check=True, timeout=timeout
+            time_cmd, capture_output=True, text=True, check=False, timeout=timeout
         )
         elapsed = time.time() - start_time
         # /usr/bin/time -v outputs memory usage to stderr
@@ -96,7 +108,7 @@ def run(cmd, timeout=None):
             r"Maximum resident set size \(kbytes\): (\d+)", result.stderr
         )
         max_memory = int(max_mem_match.group(1)) if max_mem_match else None
-        # Remove the /usr/bin/time output from stderr for clarity
+        # Remove the /
         # Split stderr into time output and actual stderr
         time_lines = []
         actual_stderr = []
@@ -128,7 +140,8 @@ def run_prover(job_info, executable, proof, arguments):
     1. Generate a pie using cairo-execute
     2. Bootload using stwo-bootloader
     3. Prove using adapted_stwo
-    Aggregate elapsed time and max memory across all steps.
+    Returns a tuple: (steps_info, total_elapsed, max_mem)
+    steps_info is a list of dicts with keys: step, stdout, stderr, returncode, elapsed, max_memory
     """
     # Prepare intermediate file paths
     pie_file = Path(proof).with_suffix(".cairo_pie.zip")
@@ -139,6 +152,7 @@ def run_prover(job_info, executable, proof, arguments):
 
     total_elapsed = 0.0
     max_mem = 0
+    steps_info = []
 
     # 1. Generate pie
     pie_cmd = [
@@ -154,12 +168,18 @@ def run_prover(job_info, executable, proof, arguments):
     ]
     logger.debug(f"{job_info} [PIE] command:\n{' '.join(map(str, pie_cmd))}")
     stdout, stderr, returncode, elapsed, max_memory = run(pie_cmd)
-    total_elapsed += elapsed
-    if max_memory is not None:
-        max_mem = max(max_mem, max_memory)
+    steps_info.append(
+        StepInfo(
+            step="PIE",
+            stdout=stdout,
+            stderr=stderr,
+            returncode=returncode,
+            elapsed=elapsed,
+            max_memory=max_memory,
+        )
+    )
     if returncode != 0:
-        logger.error(f"{job_info} [PIE] error: {stdout or stderr}")
-        return stdout, stderr, returncode, total_elapsed, max_mem
+        return steps_info
 
     # 2. Bootload
     bootload_cmd = [
@@ -171,12 +191,19 @@ def run_prover(job_info, executable, proof, arguments):
     ]
     logger.debug(f"{job_info} [BOOTLOAD] command:\n{' '.join(map(str, bootload_cmd))}")
     stdout, stderr, returncode, elapsed, max_memory = run(bootload_cmd)
-    total_elapsed += elapsed
-    if max_memory is not None:
-        max_mem = max(max_mem, max_memory)
+    steps_info.append(
+        StepInfo(
+            step="BOOTLOAD",
+            stdout=stdout,
+            stderr=stderr,
+            returncode=returncode,
+            elapsed=elapsed,
+            max_memory=max_memory,
+        )
+    )
     if returncode != 0:
         logger.error(f"{job_info} [BOOTLOAD] error: {stdout or stderr}")
-        return stdout, stderr, returncode, total_elapsed, max_mem
+        return steps_info
 
     # 3. Prove
     prove_cmd = [
@@ -195,10 +222,18 @@ def run_prover(job_info, executable, proof, arguments):
     ]
     logger.debug(f"{job_info} [PROVE] command:\n{' '.join(map(str, prove_cmd))}")
     stdout, stderr, returncode, elapsed, max_memory = run(prove_cmd)
-    total_elapsed += elapsed
-    if max_memory is not None:
-        max_mem = max(max_mem, max_memory)
-    return stdout, stderr, returncode, total_elapsed, max_mem
+
+    steps_info.append(
+        StepInfo(
+            step="PROVE",
+            stdout=stdout,
+            stderr=stderr,
+            returncode=returncode,
+            elapsed=elapsed,
+            max_memory=max_memory,
+        )
+    )
+    return steps_info
 
 
 def prove_batch(height, step):
@@ -234,32 +269,45 @@ def prove_batch(height, step):
         proof_file = PROOF_DIR / f"{mode}_{height + step}.proof.json"
 
         # run prover
-        stdout, stderr, returncode, elapsed_time, max_memory = run_prover(
+        steps_info = run_prover(
             job_info,
             "../../target/proving/assumevalid.executable.json",
             str(proof_file),
             str(arguments_file),
         )
 
-        # TODO: probably needs improvement
-        if (
-            returncode != 0
-            or "FAIL" in stdout
-            or "error" in stdout
-            or "panicked" in stdout
-        ):
-            error = stdout or stderr
-            logger.error(f"{job_info} error: {error}")
+        total_elapsed = sum(step.elapsed for step in steps_info)
+
+        max_memory_candidates = [
+            step.max_memory for step in steps_info if step.max_memory is not None
+        ]
+        max_memory = max(max_memory_candidates) if max_memory_candidates else None
+
+        last_step = steps_info[-1]
+        final_return_code = last_step.returncode
+        if final_return_code != 0:
+            error = last_step.stderr or last_step.stdout
+            logger.error(f"{job_info} error:\n{error}")
             return False
         else:
+            for info in steps_info:
+                mem_usage = (
+                    f"{info.max_memory/1024:.1f} MB"
+                    if info.max_memory is not None
+                    else "N/A"
+                )
+                logger.debug(
+                    f"{job_info}, [{info.step}] time: {info.elapsed:.2f} s max memory: {mem_usage}"
+                )
             logger.info(
-                f"{job_info} done, execution time: {elapsed_time:.2f} seconds"
+                f"{job_info} done, total execution time: {total_elapsed:.2f} seconds"
                 + (
                     f", max memory: {max_memory/1024:.1f} MB"
                     if max_memory is not None
                     else ""
                 )
             )
+
             return True
 
     except Exception as e:
