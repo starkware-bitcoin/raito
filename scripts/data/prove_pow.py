@@ -249,6 +249,8 @@ def prove_batch(height, step):
             PROOF_DIR / f"{mode}_{height}.proof.json" if height > 0 else None
         )
 
+        logger.debug(f"{job_info} generating data...")
+
         # Batch data
         batch_file = TMP_DIR / f"{mode}_{height}_{step}.json"
         batch_data = generate_data(
@@ -259,6 +261,8 @@ def prove_batch(height, step):
             "blocks": batch_data["blocks"],
         }
         Path(batch_file).write_text(json.dumps(batch_args, indent=2))
+
+        logger.debug(f"{job_info} generating args...")
 
         # Arguments file
         args = generate_assumevalid_args(batch_file, previous_proof_file)

@@ -119,6 +119,25 @@ assumevalid-prove-rec:
 		--proof-format cairo-serde \
 		--verify
 
+replicate-invalid-logup-sum:
+	mkdir -p target/execute/assumevalid/invalid-logup-sum
+	cairo-execute \
+		--layout all_cairo_stwo \
+		--args-file  packages/assumevalid/tests/data/invalid-logup-sum-arguments.json \
+		--prebuilt \
+		--output-path target/execute/assumevalid/invalid-logup-sum/cairo_pie.zip \
+		target/proving/assumevalid.executable.json
+	stwo-bootloader \
+		--pie target/execute/assumevalid/invalid-logup-sum/cairo_pie.zip \
+		--output-path target/execute/assumevalid/invalid-logup-sum
+	adapted_stwo \
+		--priv_json target/execute/assumevalid/invalid-logup-sum/priv.json \
+		--pub_json target/execute/assumevalid/invalid-logup-sum/pub.json \
+		--params_json packages/assumevalid/prover_params.json \
+		--proof_path target/execute/assumevalid/invalid-logup-sum/proof.json \
+		--proof-format cairo-serde \
+		--verify
+
 ########################################## PIPELINE ##########################################
 
 setup: install-system-packages create-venv install-python-dependencies
