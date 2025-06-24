@@ -28,7 +28,7 @@ run_client() {
   fi
 
   echo -n "Running $mode client on blocks $first - $second "
-  python ../../scripts/data/format_args.py $batch_file > $arguments_file
+  python ../../scripts/data/format_args.py --input_file $batch_file > $arguments_file
   output=$(scarb --profile proving execute --no-build --package client --arguments-file $arguments_file)
   if [[ $? -ne 0 || "$output" == *"FAIL"* || "$output" == *error* || "$output" == *panicked* ]]; then
     echo "fail"
