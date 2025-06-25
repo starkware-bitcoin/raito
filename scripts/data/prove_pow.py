@@ -135,11 +135,13 @@ def run(cmd, timeout=None):
         return "", f"Process timed out after {timeout} seconds", -1, elapsed, None
 
 
-def save_prover_log(batch_dir, step_name, stdout, stderr, returncode, elapsed, max_memory):
+def save_prover_log(
+    batch_dir, step_name, stdout, stderr, returncode, elapsed, max_memory
+):
 
     log_file = batch_dir / f"{step_name.lower()}.log"
-    
-    with open(log_file, 'w', encoding='utf-8') as f:
+
+    with open(log_file, "w", encoding="utf-8") as f:
         f.write(f"=== {step_name} STEP LOG ===\n")
         f.write(f"Timestamp: {datetime.datetime.now().isoformat()}\n")
         f.write(f"Return Code: {returncode}\n")
@@ -147,12 +149,12 @@ def save_prover_log(batch_dir, step_name, stdout, stderr, returncode, elapsed, m
         if max_memory is not None:
             f.write(f"Max Memory Usage: {max_memory/1024:.1f} MB\n")
         f.write("\n")
-        
+
         if stdout:
             f.write("=== STDOUT ===\n")
             f.write(stdout)
             f.write("\n")
-        
+
         if stderr:
             f.write("=== STDERR ===\n")
             f.write(stderr)
@@ -170,7 +172,7 @@ def run_prover(job_info, executable, proof, arguments):
     """
     # Get the batch directory from the proof file path
     batch_dir = Path(proof).parent
-    
+
     # Prepare intermediate file paths within the batch directory
     pie_file = batch_dir / "pie.cairo_pie.zip"
     priv_json = batch_dir / "priv.json"
@@ -230,7 +232,9 @@ def run_prover(job_info, executable, proof, arguments):
         )
     )
     # Save BOOTLOAD step log
-    save_prover_log(batch_dir, "BOOTLOAD", stdout, stderr, returncode, elapsed, max_memory)
+    save_prover_log(
+        batch_dir, "BOOTLOAD", stdout, stderr, returncode, elapsed, max_memory
+    )
     if returncode != 0:
         logger.error(f"{job_info} [BOOTLOAD] error: {stdout or stderr}")
         return steps_info
@@ -280,7 +284,7 @@ def prove_batch(height, step):
         batch_name = f"{mode}_{height}_to_{height + step}"
         batch_dir = PROOF_DIR / batch_name
         batch_dir.mkdir(exist_ok=True)
-        
+
         # Previous Proof - look for it in the previous batch directory
         previous_proof_file = None
         if height > 0:
@@ -398,10 +402,10 @@ def auto_detect_start():
     """Auto-detect the starting height by finding the highest ending height from existing proof directories."""
     max_height = 0
     pattern = re.compile(r"light_\d+_to_(\d+)")
-    
+
     if not PROOF_DIR.exists():
         return max_height
-        
+
     for proof_dir in PROOF_DIR.iterdir():
         if proof_dir.is_dir():
             m = pattern.match(proof_dir.name)
