@@ -50,7 +50,7 @@ def setup_logging(verbose=False, log_filename="proving.log"):
     )
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(name)-10.10s - %(levelname)s - %(message)s")
+        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     )
 
     # Console handler with colors
@@ -148,10 +148,8 @@ def run_prover(job_info, executable, proof, arguments):
     
     # Prepare intermediate file paths within the batch directory
     pie_file = batch_dir / "pie.cairo_pie.zip"
-    bootloader_dir = batch_dir / "bootload"
-    bootloader_dir.mkdir(exist_ok=True)
-    priv_json = bootloader_dir / "priv.json"
-    pub_json = bootloader_dir / "pub.json"
+    priv_json = batch_dir / "priv.json"
+    pub_json = batch_dir / "pub.json"
 
     total_elapsed = 0.0
     max_mem = 0
@@ -190,7 +188,7 @@ def run_prover(job_info, executable, proof, arguments):
         "--pie",
         str(pie_file),
         "--output-path",
-        str(bootloader_dir),
+        str(batch_dir),
     ]
     logger.debug(f"{job_info} [BOOTLOAD] command:\n{' '.join(map(str, bootload_cmd))}")
     stdout, stderr, returncode, elapsed, max_memory = run(bootload_cmd)
