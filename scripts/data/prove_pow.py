@@ -15,6 +15,7 @@ import traceback
 import colorlog
 from dataclasses import dataclass
 from typing import Optional
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class StepInfo:
     max_memory: Optional[int]
 
 
-def setup_logging(verbose=False, log_filename="client.log"):
+def setup_logging(verbose=False, log_filename="proving.log"):
     """
     Set up logging configuration with both file and console handlers.
 
@@ -50,7 +51,7 @@ def setup_logging(verbose=False, log_filename="client.log"):
     )
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(name)-10.10s - %(levelname)s - %(message)s")
+        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     )
 
     # Console handler with colors
@@ -134,6 +135,32 @@ def run(cmd, timeout=None):
         return "", f"Process timed out after {timeout} seconds", -1, elapsed, None
 
 
+def save_prover_log(
+    batch_dir, step_name, stdout, stderr, returncode, elapsed, max_memory
+):
+
+    log_file = batch_dir / f"{step_name.lower()}.log"
+
+    with open(log_file, "w", encoding="utf-8") as f:
+        f.write(f"=== {step_name} STEP LOG ===\n")
+        f.write(f"Timestamp: {datetime.datetime.now().isoformat()}\n")
+        f.write(f"Return Code: {returncode}\n")
+        f.write(f"Execution Time: {elapsed:.2f} seconds\n")
+        if max_memory is not None:
+            f.write(f"Max Memory Usage: {max_memory/1024:.1f} MB\n")
+        f.write("\n")
+
+        if stdout:
+            f.write("=== STDOUT ===\n")
+            f.write(stdout)
+            f.write("\n")
+
+        if stderr:
+            f.write("=== STDERR ===\n")
+            f.write(stderr)
+            f.write("\n")
+
+
 def run_prover(job_info, executable, proof, arguments):
     """
     Run the prover pipeline:
@@ -143,12 +170,13 @@ def run_prover(job_info, executable, proof, arguments):
     Returns a tuple: (steps_info, total_elapsed, max_mem)
     steps_info is a list of dicts with keys: step, stdout, stderr, returncode, elapsed, max_memory
     """
-    # Prepare intermediate file paths
-    pie_file = Path(proof).with_suffix(".cairo_pie.zip")
-    bootloader_dir = Path(proof).parent / (Path(proof).stem + "_bootload")
-    bootloader_dir.mkdir(exist_ok=True)
-    priv_json = bootloader_dir / "priv.json"
-    pub_json = bootloader_dir / "pub.json"
+    # Get the batch directory from the proof file path
+    batch_dir = Path(proof).parent
+
+    # Prepare intermediate file paths within the batch directory
+    pie_file = batch_dir / "pie.cairo_pie.zip"
+    priv_json = batch_dir / "priv.json"
+    pub_json = batch_dir / "pub.json"
 
     total_elapsed = 0.0
     max_mem = 0
@@ -178,6 +206,8 @@ def run_prover(job_info, executable, proof, arguments):
             max_memory=max_memory,
         )
     )
+    # Save PIE step log
+    save_prover_log(batch_dir, "PIE", stdout, stderr, returncode, elapsed, max_memory)
     if returncode != 0:
         return steps_info
 
@@ -187,7 +217,7 @@ def run_prover(job_info, executable, proof, arguments):
         "--pie",
         str(pie_file),
         "--output-path",
-        str(bootloader_dir),
+        str(batch_dir),
     ]
     logger.debug(f"{job_info} [BOOTLOAD] command:\n{' '.join(map(str, bootload_cmd))}")
     stdout, stderr, returncode, elapsed, max_memory = run(bootload_cmd)
@@ -200,6 +230,10 @@ def run_prover(job_info, executable, proof, arguments):
             elapsed=elapsed,
             max_memory=max_memory,
         )
+    )
+    # Save BOOTLOAD step log
+    save_prover_log(
+        batch_dir, "BOOTLOAD", stdout, stderr, returncode, elapsed, max_memory
     )
     if returncode != 0:
         logger.error(f"{job_info} [BOOTLOAD] error: {stdout or stderr}")
@@ -233,6 +267,8 @@ def run_prover(job_info, executable, proof, arguments):
             max_memory=max_memory,
         )
     )
+    # Save PROVE step log (stwo prover output)
+    save_prover_log(batch_dir, "PROVE", stdout, stderr, returncode, elapsed, max_memory)
     return steps_info
 
 
@@ -241,16 +277,27 @@ def prove_batch(height, step):
     mode = "light"
     job_info = f"Job(height='{height}', blocks={step})"
 
-    logger.info(f"{job_info} proving...")
+    logger.debug(f"{job_info} proving...")
 
     try:
-        # Previous Proof
-        previous_proof_file = (
-            PROOF_DIR / f"{mode}_{height}.proof.json" if height > 0 else None
-        )
+        # Create dedicated directory for this proof batch
+        batch_name = f"{mode}_{height}_to_{height + step}"
+        batch_dir = PROOF_DIR / batch_name
+        batch_dir.mkdir(exist_ok=True)
 
-        # Batch data
-        batch_file = TMP_DIR / f"{mode}_{height}_{step}.json"
+        # Previous Proof - look for it in the previous batch directory
+        previous_proof_file = None
+        if height > 0:
+            # Find the previous proof by looking for the directory that ends at current height
+            for proof_dir in PROOF_DIR.glob(f"{mode}_*_to_{height}"):
+                previous_proof_file = proof_dir / "proof.json"
+                if previous_proof_file.exists():
+                    break
+
+        logger.debug(f"{job_info} generating data...")
+
+        # Batch data - store in the batch directory
+        batch_file = batch_dir / "batch.json"
         batch_data = generate_data(
             mode=mode, initial_height=height, num_blocks=step, fast=True
         )
@@ -258,15 +305,17 @@ def prove_batch(height, step):
             "chain_state": batch_data["chain_state"],
             "blocks": batch_data["blocks"],
         }
-        Path(batch_file).write_text(json.dumps(batch_args, indent=2))
+        batch_file.write_text(json.dumps(batch_args, indent=2))
 
-        # Arguments file
+        logger.debug(f"{job_info} generating args...")
+
+        # Arguments file - store in the batch directory
+        arguments_file = batch_dir / "arguments.json"
         args = generate_assumevalid_args(batch_file, previous_proof_file)
-        arguments_file = batch_file.as_posix().replace(".json", "-arguments.json")
-        with open(arguments_file, "w") as af:
-            af.write(json.dumps(args))
+        arguments_file.write_text(json.dumps(args))
 
-        proof_file = PROOF_DIR / f"{mode}_{height + step}.proof.json"
+        # Final proof file - store in the batch directory
+        proof_file = batch_dir / "proof.json"
 
         # run prover
         steps_info = run_prover(
@@ -326,7 +375,6 @@ def main(start, blocks, step):
         step,
     )
 
-    TMP_DIR.mkdir(exist_ok=True)
     PROOF_DIR.mkdir(exist_ok=True)
 
     end = start + blocks
@@ -351,15 +399,23 @@ def main(start, blocks, step):
 
 
 def auto_detect_start():
-    proof_files = list(PROOF_DIR.glob("light_*.proof.json"))
+    """Auto-detect the starting height by finding the highest ending height from existing proof directories."""
     max_height = 0
-    pattern = re.compile(r"light_(\d+)\.proof\.json")
-    for pf in proof_files:
-        m = pattern.match(pf.name)
-        if m:
-            h = int(m.group(1))
-            if h > max_height:
-                max_height = h
+    pattern = re.compile(r"light_\d+_to_(\d+)")
+
+    if not PROOF_DIR.exists():
+        return max_height
+
+    for proof_dir in PROOF_DIR.iterdir():
+        if proof_dir.is_dir():
+            m = pattern.match(proof_dir.name)
+            if m:
+                # Check if the proof file actually exists
+                proof_file = proof_dir / "proof.json"
+                if proof_file.exists():
+                    end_height = int(m.group(1))
+                    if end_height > max_height:
+                        max_height = end_height
     return max_height
 
 

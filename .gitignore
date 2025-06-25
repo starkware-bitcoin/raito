@@ -32,6 +32,8 @@ __pycache__
 .utreexo_data
 .timestamps_data/
 .arguments*.json
+.proofs
+proving.log*
 
 corelib
 *.txt
