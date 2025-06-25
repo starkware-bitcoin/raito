@@ -15,6 +15,7 @@ import traceback
 import colorlog
 from dataclasses import dataclass
 from typing import Optional
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +135,30 @@ def run(cmd, timeout=None):
         return "", f"Process timed out after {timeout} seconds", -1, elapsed, None
 
 
+def save_prover_log(batch_dir, step_name, stdout, stderr, returncode, elapsed, max_memory):
+
+    log_file = batch_dir / f"{step_name.lower()}.log"
+    
+    with open(log_file, 'w', encoding='utf-8') as f:
+        f.write(f"=== {step_name} STEP LOG ===\n")
+        f.write(f"Timestamp: {datetime.datetime.now().isoformat()}\n")
+        f.write(f"Return Code: {returncode}\n")
+        f.write(f"Execution Time: {elapsed:.2f} seconds\n")
+        if max_memory is not None:
+            f.write(f"Max Memory Usage: {max_memory/1024:.1f} MB\n")
+        f.write("\n")
+        
+        if stdout:
+            f.write("=== STDOUT ===\n")
+            f.write(stdout)
+            f.write("\n")
+        
+        if stderr:
+            f.write("=== STDERR ===\n")
+            f.write(stderr)
+            f.write("\n")
+
+
 def run_prover(job_info, executable, proof, arguments):
     """
     Run the prover pipeline:
@@ -179,6 +204,8 @@ def run_prover(job_info, executable, proof, arguments):
             max_memory=max_memory,
         )
     )
+    # Save PIE step log
+    save_prover_log(batch_dir, "PIE", stdout, stderr, returncode, elapsed, max_memory)
     if returncode != 0:
         return steps_info
 
@@ -202,6 +229,8 @@ def run_prover(job_info, executable, proof, arguments):
             max_memory=max_memory,
         )
     )
+    # Save BOOTLOAD step log
+    save_prover_log(batch_dir, "BOOTLOAD", stdout, stderr, returncode, elapsed, max_memory)
     if returncode != 0:
         logger.error(f"{job_info} [BOOTLOAD] error: {stdout or stderr}")
         return steps_info
@@ -234,6 +263,8 @@ def run_prover(job_info, executable, proof, arguments):
             max_memory=max_memory,
         )
     )
+    # Save PROVE step log (stwo prover output)
+    save_prover_log(batch_dir, "PROVE", stdout, stderr, returncode, elapsed, max_memory)
     return steps_info
 
 
