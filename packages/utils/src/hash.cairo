@@ -5,6 +5,7 @@ use core::hash::{Hash, HashStateTrait};
 use core::integer::u128_byte_reverse;
 use core::num::traits::zero::Zero;
 use core::to_byte_array::AppendFormattedToByteArray;
+use crate::numeric::{u256_to_u32x8, u32x8_to_u256};
 
 /// 256-bit hash digest.
 /// Represented as an array of 4-byte words.
@@ -63,36 +64,14 @@ pub impl DigestIntoByteArray of Into<Digest, ByteArray> {
     }
 }
 
-const POW_2_32: u128 = 0x100000000;
-const POW_2_64: u128 = 0x10000000000000000;
-const POW_2_96: u128 = 0x1000000000000000000000000;
-const NZ_POW2_32_128: NonZero<u128> = 0x100000000;
-const NZ_POW2_32_64: NonZero<u64> = 0x100000000;
-
 /// Converts a `u256` value into a `Digest` type and reverses bytes order.
 /// `u256` is big-endian like in explorer, while `Digest` is little-endian order.
 pub impl U256IntoDigest of Into<u256, Digest> {
     fn into(self: u256) -> Digest {
-        let low: u128 = u128_byte_reverse(self.high);
-        let high: u128 = u128_byte_reverse(self.low);
-
-        let (q_96, high_32_0) = DivRem::div_rem(high, NZ_POW2_32_128);
-        let (q_64, high_64_32) = DivRem::div_rem(q_96, NZ_POW2_32_128);
-        let q_64_t: u64 = q_64.try_into().unwrap();
-        let (high_128_96, high_96_64) = DivRem::div_rem(q_64_t, NZ_POW2_32_64);
-
-        let (q_96, low_32_0) = DivRem::div_rem(low, NZ_POW2_32_128);
-        let (q_64, low_64_32) = DivRem::div_rem(q_96, NZ_POW2_32_128);
-        let q_64_t: u64 = q_64.try_into().unwrap();
-        let (low_128_96, low_96_64) = DivRem::div_rem(q_64_t, NZ_POW2_32_64);
-
         Digest {
-            value: [
-                high_128_96.try_into().unwrap(), high_96_64.try_into().unwrap(),
-                high_64_32.try_into().unwrap(), high_32_0.try_into().unwrap(),
-                low_128_96.try_into().unwrap(), low_96_64.try_into().unwrap(),
-                low_64_32.try_into().unwrap(), low_32_0.try_into().unwrap(),
-            ],
+            value: u256_to_u32x8(
+                u256 { low: u128_byte_reverse(self.high), high: u128_byte_reverse(self.low) },
+            ),
         }
     }
 }
@@ -102,11 +81,7 @@ pub impl U256IntoDigest of Into<u256, Digest> {
 /// `Digest` is little-endian order, while `u256` is big-endian like in explorer.
 pub impl DigestIntoU256 of Into<Digest, u256> {
     fn into(self: Digest) -> u256 {
-        let [a, b, c, d, e, f, g, h] = self.value;
-
-        let low: u128 = h.into() + g.into() * POW_2_32 + f.into() * POW_2_64 + e.into() * POW_2_96;
-        let high: u128 = d.into() + c.into() * POW_2_32 + b.into() * POW_2_64 + a.into() * POW_2_96;
-
+        let u256 { low, high } = u32x8_to_u256(self.value);
         u256 { low: u128_byte_reverse(high), high: u128_byte_reverse(low) }
     }
 }

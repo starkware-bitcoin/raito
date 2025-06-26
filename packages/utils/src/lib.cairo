@@ -1,4 +1,5 @@
 pub mod bit_shifts;
+pub mod blake2s_hasher;
 pub mod bytearray;
 pub mod double_sha256;
 pub mod hash;
