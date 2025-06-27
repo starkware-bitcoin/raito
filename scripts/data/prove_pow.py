@@ -269,6 +269,34 @@ def run_prover(job_info, executable, proof, arguments):
     )
     # Save PROVE step log (stwo prover output)
     save_prover_log(batch_dir, "PROVE", stdout, stderr, returncode, elapsed, max_memory)
+
+    if returncode == 0:
+        temp_files = [pie_file, pub_json]
+
+        # Parse priv.json to get trace and memory file paths
+        if priv_json.exists():
+            try:
+                with open(priv_json, "r") as f:
+                    priv_data = json.load(f)
+                    if "trace_path" in priv_data:
+                        temp_files.append(Path(priv_data["trace_path"]))
+                    if "memory_path" in priv_data:
+                        temp_files.append(Path(priv_data["memory_path"]))
+                temp_files.append(
+                    priv_json
+                )  # Add priv.json itself after extracting paths
+            except Exception as e:
+                logger.warning(f"Failed to parse {priv_json} for cleanup: {e}")
+                temp_files.append(priv_json)  # Still try to clean up priv.json
+
+        for temp_file in temp_files:
+            try:
+                if temp_file.exists():
+                    temp_file.unlink()
+                    logger.debug(f"Cleaned up temporary file: {temp_file}")
+            except Exception as e:
+                logger.warning(f"Failed to clean up {temp_file}: {e}")
+
     return steps_info
 
 
