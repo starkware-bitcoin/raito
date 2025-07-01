@@ -10,17 +10,17 @@ client-build-with-shinigami:
 
 ########################################## BINARIES ##########################################
 
-install-cairo-execute:
-	cargo install --git https://github.com/m-kus/cairo --rev 9117214e4a3509870c6a6db8e61ddcdaf9ade561 cairo-execute
-
-install-cairo-bootloader:
-	cargo install --git https://github.com/m-kus/cairo-bootloader --rev 5aa40dc5f084c6406ae9d76b19a115e3a3832b97 cairo-bootloader
+install-bootloader-hints:
+	cargo install \
+		--git ssh://git@github.com/starkware-libs/bootloader-hints.git \
+		--rev a0b20e8ac527d3591455743b88f60bc6df2c1c28 \
+		cairo-program-runner
 
 install-stwo:
 	RUSTFLAGS="-C target-cpu=native -C opt-level=3" \
 		cargo install \
 		--git https://github.com/starkware-libs/stwo-cairo \
-		--rev f8979ed82d86bd3408f9706a03a63c54bd221635 \
+		--rev 671e94dac5d13dbc2059f9dd10d9802c705ffaef \
 		adapted_stwo
 
 ########################################## ASSUMEVALID ##########################################
@@ -55,6 +55,77 @@ assumevalid-execute: assumevalid-clean
 assumevalid-clean:
 	rm -rf target/execute/assumevalid/execution1
 	mkdir -p target/execute/assumevalid/execution1
+
+generate-program-input:
+	@echo "Generating program-input.json..."
+	@echo '{' > program-input.json
+	@echo '    "single_page": true,' >> program-input.json
+	@echo '    "tasks": [' >> program-input.json
+	@echo '      {' >> program-input.json
+	@echo '        "type": "Cairo1Executable",' >> program-input.json
+	@echo '        "path": "$(CURDIR)/target/proving/assumevalid.executable.json",' >> program-input.json
+	@echo '        "program_hash_function": "blake",' >> program-input.json
+	@echo '        "user_args_file": "$(CURDIR)/target/execute/assumevalid/execution1/args.json"' >> program-input.json
+	@echo '      }' >> program-input.json
+	@echo '    ]' >> program-input.json
+	@echo '}' >> program-input.json
+
+# Generic target to generate program-input.json for any executable and args file
+generate-program-input-generic:
+	@echo "Generating program-input.json with custom parameters..."
+	@if [ -z "$(EXECUTABLE_PATH)" ] || [ -z "$(ARGS_FILE)" ]; then \
+		echo "Error: EXECUTABLE_PATH and ARGS_FILE must be set"; \
+		echo "Usage: make generate-program-input-generic EXECUTABLE_PATH=/path/to/executable.json ARGS_FILE=/path/to/args.json"; \
+		exit 1; \
+	fi
+	@echo '{' > program-input.json
+	@echo '    "single_page": true,' >> program-input.json
+	@echo '    "tasks": [' >> program-input.json
+	@echo '      {' >> program-input.json
+	@echo '        "type": "Cairo1Executable",' >> program-input.json
+	@echo '        "path": "$(EXECUTABLE_PATH)",' >> program-input.json
+	@echo '        "program_hash_function": "blake",' >> program-input.json
+	@echo '        "user_args_file": "$(ARGS_FILE)"' >> program-input.json
+	@echo '      }' >> program-input.json
+	@echo '    ]' >> program-input.json
+	@echo '}' >> program-input.json
+
+# Python-based target to generate program-input.json (more flexible)
+generate-program-input-python:
+	@echo "Generating program-input.json using Python script..."
+	@if [ -z "$(EXECUTABLE_PATH)" ] || [ -z "$(ARGS_FILE)" ]; then \
+		echo "Error: EXECUTABLE_PATH and ARGS_FILE must be set"; \
+		echo "Usage: make generate-program-input-python EXECUTABLE_PATH=/path/to/executable.json ARGS_FILE=/path/to/args.json"; \
+		exit 1; \
+	fi
+	python3 scripts/data/generate_program_input.py \
+		--executable "$(EXECUTABLE_PATH)" \
+		--args-file "$(ARGS_FILE)" \
+		--output program-input.json
+
+assumevalid-prim-bootload: generate-program-input
+	scripts/data/format_assumevalid_args.py \
+		--block-data packages/assumevalid/tests/data/blocks_0_1.json \
+		--output-path target/execute/assumevalid/execution1/args.json
+	cairo_program_runner \
+		--program bootloaders/simple_bootloader_compiled.json \
+		--program_input program-input.json \
+		--air_public_input target/execute/assumevalid/execution1/pub.json \
+		--air_private_input target/execute/assumevalid/execution1/priv.json \
+		--trace_file $(CURDIR)/target/execute/assumevalid/execution1/trace.json \
+		--memory_file $(CURDIR)/target/execute/assumevalid/execution1/memory.json \
+		--layout all_cairo_stwo \
+		--proof_mode \
+		--execution_resources_file target/execute/assumevalid/execution1/resources.json
+
+assumevalid-print-prove:
+	../dovki/work_dir/adapted_stwo \
+		--priv_json target/execute/assumevalid/execution1/priv.json \
+		--pub_json target/execute/assumevalid/execution1/pub.json \
+		--params_json packages/assumevalid/prover_params.json \
+		--proof_path target/execute/assumevalid/execution1/proof.json \
+		--proof-format cairo-serde \
+		--verify
 
 assumevalid-pie: assumevalid-clean
 	scripts/data/format_assumevalid_args.py \
