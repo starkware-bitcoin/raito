@@ -1,3 +1,6 @@
+# Default program hash function
+PROGRAM_HASH_FUNCTION ?= blake
+
 ########################################## CLIENT ##########################################
 
 client-build:
@@ -56,60 +59,18 @@ assumevalid-clean:
 	rm -rf target/execute/assumevalid/execution1
 	mkdir -p target/execute/assumevalid/execution1
 
-generate-program-input:
-	@echo "Generating program-input.json..."
-	@echo '{' > program-input.json
-	@echo '    "single_page": true,' >> program-input.json
-	@echo '    "tasks": [' >> program-input.json
-	@echo '      {' >> program-input.json
-	@echo '        "type": "Cairo1Executable",' >> program-input.json
-	@echo '        "path": "$(CURDIR)/target/proving/assumevalid.executable.json",' >> program-input.json
-	@echo '        "program_hash_function": "blake",' >> program-input.json
-	@echo '        "user_args_file": "$(CURDIR)/target/execute/assumevalid/execution1/args.json"' >> program-input.json
-	@echo '      }' >> program-input.json
-	@echo '    ]' >> program-input.json
-	@echo '}' >> program-input.json
-
-# Generic target to generate program-input.json for any executable and args file
-generate-program-input-generic:
-	@echo "Generating program-input.json with custom parameters..."
-	@if [ -z "$(EXECUTABLE_PATH)" ] || [ -z "$(ARGS_FILE)" ]; then \
-		echo "Error: EXECUTABLE_PATH and ARGS_FILE must be set"; \
-		echo "Usage: make generate-program-input-generic EXECUTABLE_PATH=/path/to/executable.json ARGS_FILE=/path/to/args.json"; \
-		exit 1; \
-	fi
-	@echo '{' > program-input.json
-	@echo '    "single_page": true,' >> program-input.json
-	@echo '    "tasks": [' >> program-input.json
-	@echo '      {' >> program-input.json
-	@echo '        "type": "Cairo1Executable",' >> program-input.json
-	@echo '        "path": "$(EXECUTABLE_PATH)",' >> program-input.json
-	@echo '        "program_hash_function": "blake",' >> program-input.json
-	@echo '        "user_args_file": "$(ARGS_FILE)"' >> program-input.json
-	@echo '      }' >> program-input.json
-	@echo '    ]' >> program-input.json
-	@echo '}' >> program-input.json
-
-# Python-based target to generate program-input.json (more flexible)
-generate-program-input-python:
-	@echo "Generating program-input.json using Python script..."
-	@if [ -z "$(EXECUTABLE_PATH)" ] || [ -z "$(ARGS_FILE)" ]; then \
-		echo "Error: EXECUTABLE_PATH and ARGS_FILE must be set"; \
-		echo "Usage: make generate-program-input-python EXECUTABLE_PATH=/path/to/executable.json ARGS_FILE=/path/to/args.json"; \
-		exit 1; \
-	fi
-	python3 scripts/data/generate_program_input.py \
-		--executable "$(EXECUTABLE_PATH)" \
-		--args-file "$(ARGS_FILE)" \
-		--output program-input.json
-
-assumevalid-prim-bootload: generate-program-input
+assumevalid-prim-bootload: assumevalid-clean
 	scripts/data/format_assumevalid_args.py \
 		--block-data packages/assumevalid/tests/data/blocks_0_1.json \
 		--output-path target/execute/assumevalid/execution1/args.json
+	scripts/data/generate_program_input.py \
+		--executable $(CURDIR)/target/proving/assumevalid.executable.json \
+		--args-file $(CURDIR)/target/execute/assumevalid/execution1/args.json \
+		--program-hash-function blake \
+		--output $(CURDIR)/target/execute/assumevalid/execution1/program-input.json
 	cairo_program_runner \
 		--program bootloaders/simple_bootloader_compiled.json \
-		--program_input program-input.json \
+		--program_input $(CURDIR)/target/execute/assumevalid/execution1/program-input.json \
 		--air_public_input target/execute/assumevalid/execution1/pub.json \
 		--air_private_input target/execute/assumevalid/execution1/priv.json \
 		--trace_file $(CURDIR)/target/execute/assumevalid/execution1/trace.json \
@@ -118,7 +79,7 @@ assumevalid-prim-bootload: generate-program-input
 		--proof_mode \
 		--execution_resources_file target/execute/assumevalid/execution1/resources.json
 
-assumevalid-print-prove:
+assumevalid-prim-prove:
 	../dovki/work_dir/adapted_stwo \
 		--priv_json target/execute/assumevalid/execution1/priv.json \
 		--pub_json target/execute/assumevalid/execution1/pub.json \
