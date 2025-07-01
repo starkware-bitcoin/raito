@@ -1,3 +1,6 @@
+# Default program hash function
+PROGRAM_HASH_FUNCTION ?= blake
+
 ########################################## CLIENT ##########################################
 
 client-build:
@@ -10,17 +13,17 @@ client-build-with-shinigami:
 
 ########################################## BINARIES ##########################################
 
-install-cairo-execute:
-	cargo install --git https://github.com/m-kus/cairo --rev 9117214e4a3509870c6a6db8e61ddcdaf9ade561 cairo-execute
-
-install-cairo-bootloader:
-	cargo install --git https://github.com/m-kus/cairo-bootloader --rev 5aa40dc5f084c6406ae9d76b19a115e3a3832b97 cairo-bootloader
+install-bootloader-hints:
+	cargo install \
+		--git ssh://git@github.com/starkware-libs/bootloader-hints.git \
+		--rev a0b20e8ac527d3591455743b88f60bc6df2c1c28 \
+		cairo-program-runner
 
 install-stwo:
 	RUSTFLAGS="-C target-cpu=native -C opt-level=3" \
 		cargo install \
 		--git https://github.com/starkware-libs/stwo-cairo \
-		--rev f8979ed82d86bd3408f9706a03a63c54bd221635 \
+		--rev 671e94dac5d13dbc2059f9dd10d9802c705ffaef \
 		adapted_stwo
 
 ########################################## ASSUMEVALID ##########################################
@@ -55,6 +58,35 @@ assumevalid-execute: assumevalid-clean
 assumevalid-clean:
 	rm -rf target/execute/assumevalid/execution1
 	mkdir -p target/execute/assumevalid/execution1
+
+assumevalid-prim-bootload: assumevalid-clean
+	scripts/data/format_assumevalid_args.py \
+		--block-data packages/assumevalid/tests/data/blocks_0_1.json \
+		--output-path target/execute/assumevalid/execution1/args.json
+	scripts/data/generate_program_input.py \
+		--executable $(CURDIR)/target/proving/assumevalid.executable.json \
+		--args-file $(CURDIR)/target/execute/assumevalid/execution1/args.json \
+		--program-hash-function blake \
+		--output $(CURDIR)/target/execute/assumevalid/execution1/program-input.json
+	cairo_program_runner \
+		--program bootloaders/simple_bootloader_compiled.json \
+		--program_input $(CURDIR)/target/execute/assumevalid/execution1/program-input.json \
+		--air_public_input target/execute/assumevalid/execution1/pub.json \
+		--air_private_input target/execute/assumevalid/execution1/priv.json \
+		--trace_file $(CURDIR)/target/execute/assumevalid/execution1/trace.json \
+		--memory_file $(CURDIR)/target/execute/assumevalid/execution1/memory.json \
+		--layout all_cairo_stwo \
+		--proof_mode \
+		--execution_resources_file target/execute/assumevalid/execution1/resources.json
+
+assumevalid-prim-prove:
+	../dovki/work_dir/adapted_stwo \
+		--priv_json target/execute/assumevalid/execution1/priv.json \
+		--pub_json target/execute/assumevalid/execution1/pub.json \
+		--params_json packages/assumevalid/prover_params.json \
+		--proof_path target/execute/assumevalid/execution1/proof.json \
+		--proof-format cairo-serde \
+		--verify
 
 assumevalid-pie: assumevalid-clean
 	scripts/data/format_assumevalid_args.py \
