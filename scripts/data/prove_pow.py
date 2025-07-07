@@ -215,6 +215,8 @@ def run_prover(job_info, executable, proof, arguments):
         "--proof_mode",
         "--execution_resources_file",
         str(resources_file),
+        "--disable_trace_padding",
+        "--merge_extra_segments",
     ]
     logger.debug(
         f"{job_info} [CAIRO_RUNNER] command:\n{' '.join(map(str, cairo_runner_cmd))}"
