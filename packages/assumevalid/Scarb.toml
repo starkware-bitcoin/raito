@@ -9,7 +9,7 @@ edition = "2024_07"
 cairo_execute = "2.11.4"
 consensus = { path = "../consensus" }
 utils = { path = "../utils" }
-stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "038e567301a87bbda94ff3dc8fe168f5d3444f1f" }
+stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "03bdf6519f3b454801aaef95cd25c1b09bb57410" }
 
 [features]
 qm31_opcode = ["stwo_cairo_air/qm31_opcode"]
