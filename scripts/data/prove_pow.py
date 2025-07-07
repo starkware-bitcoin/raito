@@ -216,7 +216,9 @@ def run_prover(job_info, executable, proof, arguments):
         "--execution_resources_file",
         str(resources_file),
     ]
-    logger.debug(f"{job_info} [CAIRO_RUNNER] command:\n{' '.join(map(str, cairo_runner_cmd))}")
+    logger.debug(
+        f"{job_info} [CAIRO_RUNNER] command:\n{' '.join(map(str, cairo_runner_cmd))}"
+    )
     stdout, stderr, returncode, elapsed, max_memory = run(cairo_runner_cmd)
     steps_info.append(
         StepInfo(
@@ -267,7 +269,13 @@ def run_prover(job_info, executable, proof, arguments):
     save_prover_log(batch_dir, "PROVE", stdout, stderr, returncode, elapsed, max_memory)
 
     if returncode == 0:
-        temp_files = [program_input_file, pub_json, trace_file, memory_file, resources_file]
+        temp_files = [
+            program_input_file,
+            pub_json,
+            trace_file,
+            memory_file,
+            resources_file,
+        ]
 
         if priv_json.exists():
             try:
@@ -276,10 +284,10 @@ def run_prover(job_info, executable, proof, arguments):
                     for key in ["trace_path", "memory_path"]:
                         if key in priv_data:
                             temp_files.append(Path(priv_data[key]))
-                temp_files.append(priv_json) 
+                temp_files.append(priv_json)
             except Exception as e:
                 logger.warning(f"Failed to parse {priv_json} for cleanup: {e}")
-                temp_files.append(priv_json)  
+                temp_files.append(priv_json)
 
         for temp_file in temp_files:
             try:
