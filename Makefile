@@ -1,5 +1,6 @@
-# Default program hash function
-PROGRAM_HASH_FUNCTION ?= blake
+# Git revisions for external dependencies
+BOOTLOADER_HINTS_REV ?= 7c7863b2a15de9e316281c70eb487ea9b2a66c9f
+STWO_REV ?= 03bdf6519f3b454801aaef95cd25c1b09bb57410
 
 ########################################## CLIENT ##########################################
 
@@ -16,21 +17,30 @@ client-build-with-shinigami:
 install-bootloader-hints:
 	cargo install \
 		--git ssh://git@github.com/starkware-libs/bootloader-hints.git \
-		--rev a0b20e8ac527d3591455743b88f60bc6df2c1c28 \
+		--rev $(BOOTLOADER_HINTS_REV) \
 		cairo-program-runner
 
 install-stwo:
 	RUSTFLAGS="-C target-cpu=native -C opt-level=3" \
 		cargo install \
 		--git https://github.com/starkware-libs/stwo-cairo \
-		--rev 671e94dac5d13dbc2059f9dd10d9802c705ffaef \
+		--rev $(STWO_REV) \
 		adapted_stwo
+
+install-cairo-prove:
+	RUSTFLAGS="-C target-cpu=native -C opt-level=3" \
+		cargo install \
+		--git https://github.com/starkware-libs/stwo-cairo \
+		--rev $(STWO_REV) \
+		cairo-prove
+
+install: install-bootloader-hints install-stwo install-cairo-prove
 
 ########################################## ASSUMEVALID ##########################################
 
 assumevalid-build:
 	sed -i.bak 's/default = \["syscalls"\]/default = \[\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
-	scarb --profile proving build --package assumevalid
+	scarb --profile proving build --package assumevalid --features qm31_opcode
 	sed -i.bak 's/default = \[\]/default = \["syscalls"\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
 
 assumevalid-data:
@@ -45,19 +55,11 @@ assumevalid-data:
 		--num_blocks 1 \
 		--output_file packages/assumevalid/tests/data/blocks_1_2.json
 
-assumevalid-execute: assumevalid-clean
-	scripts/data/format_assumevalid_args.py \
-		--block-data packages/assumevalid/tests/data/blocks_0_1.json \
-		--output-path target/execute/assumevalid/execution1/args.json
-	scarb --profile proving execute \
-		--no-build \
-		--package assumevalid \
-		--arguments-file target/execute/assumevalid/execution1/args.json \
-		--print-resource-usage
-
 assumevalid-clean:
 	rm -rf target/execute/assumevalid/execution1
 	mkdir -p target/execute/assumevalid/execution1
+	rm -rf target/execute/assumevalid/execution2
+	mkdir -p target/execute/assumevalid/execution2
 
 assumevalid-prim-bootload: assumevalid-clean
 	scripts/data/format_assumevalid_args.py \
@@ -80,31 +82,6 @@ assumevalid-prim-bootload: assumevalid-clean
 		--execution_resources_file target/execute/assumevalid/execution1/resources.json
 
 assumevalid-prim-prove:
-	../dovki/work_dir/adapted_stwo \
-		--priv_json target/execute/assumevalid/execution1/priv.json \
-		--pub_json target/execute/assumevalid/execution1/pub.json \
-		--params_json packages/assumevalid/prover_params.json \
-		--proof_path target/execute/assumevalid/execution1/proof.json \
-		--proof-format cairo-serde \
-		--verify
-
-assumevalid-pie: assumevalid-clean
-	scripts/data/format_assumevalid_args.py \
-		--block-data packages/assumevalid/tests/data/blocks_0_1.json \
-		--output-path target/execute/assumevalid/execution1/args.json
-	cairo-execute \
-		--layout all_cairo_stwo \
-		--args-file target/execute/assumevalid/execution1/args.json \
-		--prebuilt \
-		--output-path target/execute/assumevalid/execution1/cairo_pie.zip \
-		target/proving/assumevalid.executable.json
-
-assumevalid-bootload:
-	stwo-bootloader \
-		--pie target/execute/assumevalid/execution1/cairo_pie.zip \
-		--output-path target/execute/assumevalid/execution1
-
-assumevalid-prove:
 	adapted_stwo \
 		--priv_json target/execute/assumevalid/execution1/priv.json \
 		--pub_json target/execute/assumevalid/execution1/pub.json \
@@ -113,7 +90,16 @@ assumevalid-prove:
 		--proof-format cairo-serde \
 		--verify
 
-assumevalid-execute-rec:
+assumevalid-prim-prove-verify:
+	adapted_stwo \
+		--priv_json target/execute/assumevalid/execution1/priv.json \
+		--pub_json target/execute/assumevalid/execution1/pub.json \
+		--params_json packages/assumevalid/prover_params.json \
+		--proof_path target/execute/assumevalid/execution1/proof.json \
+		--verify
+	cairo-prove verify target/execute/assumevalid/execution1/proof.json
+
+assumevalid-bis-execute:
 	mkdir -p target/execute/assumevalid/execution2
 	scripts/data/format_assumevalid_args.py \
 		--block-data packages/assumevalid/tests/data/blocks_1_2.json \
@@ -125,48 +111,33 @@ assumevalid-execute-rec:
 		--arguments-file target/execute/assumevalid/execution2/args.json \
 		--print-resource-usage
 
-assumevalid-pie-rec:
+assumevalid-bis-bootload:
 	scripts/data/format_assumevalid_args.py \
 		--block-data packages/assumevalid/tests/data/blocks_1_2.json \
 		--proof-path target/execute/assumevalid/execution1/proof.json \
 		--output-path target/execute/assumevalid/execution2/args.json
-	cairo-execute \
-		--layout all_cairo_stwo \
+	scripts/data/generate_program_input.py \
+		--executable target/proving/assumevalid.executable.json \
 		--args-file target/execute/assumevalid/execution2/args.json \
-		--prebuilt \
-		--output-path target/execute/assumevalid/execution2/cairo_pie.zip \
-		target/proving/assumevalid.executable.json
+		--program-hash-function blake \
+		--output target/execute/assumevalid/execution2/program-input.json
+	cairo_program_runner \
+		--program bootloaders/simple_bootloader_compiled.json \
+		--program_input target/execute/assumevalid/execution2/program-input.json \
+		--air_public_input target/execute/assumevalid/execution2/pub.json \
+		--air_private_input target/execute/assumevalid/execution2/priv.json \
+		--trace_file $(CURDIR)/target/execute/assumevalid/execution2/trace.json \
+		--memory_file $(CURDIR)/target/execute/assumevalid/execution2/memory.json \
+		--layout all_cairo_stwo \
+		--proof_mode \
+		--execution_resources_file target/execute/assumevalid/execution2/resources.json
 
-assumevalid-bootload-rec:
-	stwo-bootloader \
-		--pie target/execute/assumevalid/execution2/cairo_pie.zip \
-		--output-path target/execute/assumevalid/execution2
-
-assumevalid-prove-rec:
+assumevalid-bis-prove:
 	adapted_stwo \
-		--priv_json target/execute/assumevalid/execution2/priv.json \
-		--pub_json target/execute/assumevalid/execution2/pub.json \
+		--priv_json target/execute/assumevalid/execution1/priv.json \
+		--pub_json target/execute/assumevalid/execution1/pub.json \
 		--params_json packages/assumevalid/prover_params.json \
 		--proof_path target/execute/assumevalid/execution2/proof.json \
-		--proof-format cairo-serde \
-		--verify
-
-replicate-invalid-logup-sum:
-	mkdir -p target/execute/assumevalid/invalid-logup-sum
-	cairo-execute \
-		--layout all_cairo_stwo \
-		--args-file  packages/assumevalid/tests/data/invalid-logup-sum-arguments.json \
-		--prebuilt \
-		--output-path target/execute/assumevalid/invalid-logup-sum/cairo_pie.zip \
-		target/proving/assumevalid.executable.json
-	stwo-bootloader \
-		--pie target/execute/assumevalid/invalid-logup-sum/cairo_pie.zip \
-		--output-path target/execute/assumevalid/invalid-logup-sum
-	adapted_stwo \
-		--priv_json target/execute/assumevalid/invalid-logup-sum/priv.json \
-		--pub_json target/execute/assumevalid/invalid-logup-sum/pub.json \
-		--params_json packages/assumevalid/prover_params.json \
-		--proof_path target/execute/assumevalid/invalid-logup-sum/proof.json \
 		--proof-format cairo-serde \
 		--verify
 

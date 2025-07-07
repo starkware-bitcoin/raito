@@ -9,7 +9,7 @@ use stwo_cairo_air::{CairoProof, VerificationOutput, get_verification_output, ve
 /// -
 /// https://github.com/starkware-libs/stwo-cairo/blob/3ab588b1ee9b1a0070020dbe1f7e22896bf77fc3/stwo_cairo_verifier/crates/cairo_air/src/lib.cairo#L2474
 const BOOTLOADER_PROGRAM_HASH: felt252 =
-    1508204816702274677001361398045343133899352818378386792900525897962659240346;
+    798263568670028351589833113774896473410271980022654161799558222973584974642;
 
 #[derive(Drop, Serde)]
 struct Args {
