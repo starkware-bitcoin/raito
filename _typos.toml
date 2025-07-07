@@ -1,7 +1,8 @@
 [files]
 extend-exclude = [
     "docs/img/*.svg",      
-    "docs/img/*.excalidraw"
+    "docs/img/*.excalidraw",
+    "bootloaders/simple_bootloader_compiled.json"
 ]
 
 [default.extend-words]

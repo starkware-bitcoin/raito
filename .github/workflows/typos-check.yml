@@ -17,5 +17,3 @@ jobs:
 
       - name: Check spelling
         uses: crate-ci/typos@master
-        with:
-          exclude: bootloaders/simple_bootloader_compiled.json
