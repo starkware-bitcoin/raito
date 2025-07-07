@@ -1,6 +1,6 @@
 # Git revisions for external dependencies
 BOOTLOADER_HINTS_REV ?= 7c7863b2a15de9e316281c70eb487ea9b2a66c9f
-STWO_REV ?= 03bdf6519f3b454801aaef95cd25c1b09bb57410
+STWO_REV ?= f8979ed82d86bd3408f9706a03a63c54bd221635
 
 ########################################## CLIENT ##########################################
 
