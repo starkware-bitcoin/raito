@@ -41,12 +41,6 @@ def generate_program_input(
     with open(output_file, "w") as f:
         json.dump(program_input, f, indent=2)
 
-    print(f"Generated {output_file} with:")
-    print(f"  Executable: {executable_path}")
-    print(f"  Args file: {args_file}")
-    print(f"  Program hash function: {program_hash_function}")
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Generate program-input.json for Cairo program execution"

@@ -6,10 +6,12 @@ import os
 import argparse
 import subprocess
 import logging
+import time
 from pathlib import Path
 from generate_data import generate_data
 from format_args import format_args
 from format_assumevalid_args import generate_assumevalid_args
+from generate_program_input import generate_program_input
 from logging.handlers import TimedRotatingFileHandler
 import traceback
 import colorlog
@@ -164,41 +166,61 @@ def save_prover_log(
 def run_prover(job_info, executable, proof, arguments):
     """
     Run the prover pipeline:
-    1. Generate a pie using cairo-execute
-    2. Bootload using stwo-bootloader
+    1. Generate program input using generate_program_input.py
+    2. Run cairo_program_runner with bootloader
     3. Prove using adapted_stwo
     Returns a tuple: (steps_info, total_elapsed, max_mem)
     steps_info is a list of dicts with keys: step, stdout, stderr, returncode, elapsed, max_memory
     """
-    # Get the batch directory from the proof file path
     batch_dir = Path(proof).parent
 
-    # Prepare intermediate file paths within the batch directory
-    pie_file = batch_dir / "pie.cairo_pie.zip"
+    program_input_file = batch_dir / "program-input.json"
     priv_json = batch_dir / "priv.json"
     pub_json = batch_dir / "pub.json"
+    trace_file = batch_dir / "trace.json"
+    memory_file = batch_dir / "memory.json"
+    resources_file = batch_dir / "resources.json"
 
     total_elapsed = 0.0
     max_mem = 0
     steps_info = []
 
-    # 1. Generate pie
-    pie_cmd = [
-        "cairo-execute",
+    try:
+        generate_program_input(
+            executable_path=executable,
+            args_file=arguments,
+            program_hash_function="blake",
+            output_file=str(program_input_file),
+        )
+    except Exception as e:
+        logger.error(f"{job_info} failed to generate program input: {e}")
+        return steps_info
+
+    cairo_runner_cmd = [
+        "cairo_program_runner",
+        "--program",
+        "../../bootloaders/simple_bootloader_compiled.json",
+        "--program_input",
+        str(program_input_file),
+        "--air_public_input",
+        str(pub_json),
+        "--air_private_input",
+        str(priv_json),
+        "--trace_file",
+        str(trace_file.resolve()),
+        "--memory_file",
+        str(memory_file.resolve()),
         "--layout",
         "all_cairo_stwo",
-        "--args-file",
-        arguments,
-        "--prebuilt",
-        "--output-path",
-        str(pie_file),
-        executable,
+        "--proof_mode",
+        "--execution_resources_file",
+        str(resources_file),
     ]
-    logger.debug(f"{job_info} [PIE] command:\n{' '.join(map(str, pie_cmd))}")
-    stdout, stderr, returncode, elapsed, max_memory = run(pie_cmd)
+    logger.debug(f"{job_info} [CAIRO_RUNNER] command:\n{' '.join(map(str, cairo_runner_cmd))}")
+    stdout, stderr, returncode, elapsed, max_memory = run(cairo_runner_cmd)
     steps_info.append(
         StepInfo(
-            step="PIE",
+            step="CAIRO_RUNNER",
             stdout=stdout,
             stderr=stderr,
             returncode=returncode,
@@ -206,40 +228,14 @@ def run_prover(job_info, executable, proof, arguments):
             max_memory=max_memory,
         )
     )
-    # Save PIE step log
-    save_prover_log(batch_dir, "PIE", stdout, stderr, returncode, elapsed, max_memory)
-    if returncode != 0:
-        return steps_info
 
-    # 2. Bootload
-    bootload_cmd = [
-        "stwo-bootloader",
-        "--pie",
-        str(pie_file),
-        "--output-path",
-        str(batch_dir),
-    ]
-    logger.debug(f"{job_info} [BOOTLOAD] command:\n{' '.join(map(str, bootload_cmd))}")
-    stdout, stderr, returncode, elapsed, max_memory = run(bootload_cmd)
-    steps_info.append(
-        StepInfo(
-            step="BOOTLOAD",
-            stdout=stdout,
-            stderr=stderr,
-            returncode=returncode,
-            elapsed=elapsed,
-            max_memory=max_memory,
-        )
-    )
-    # Save BOOTLOAD step log
     save_prover_log(
-        batch_dir, "BOOTLOAD", stdout, stderr, returncode, elapsed, max_memory
+        batch_dir, "CAIRO_RUNNER", stdout, stderr, returncode, elapsed, max_memory
     )
     if returncode != 0:
-        logger.error(f"{job_info} [BOOTLOAD] error: {stdout or stderr}")
+        logger.error(f"{job_info} [CAIRO_RUNNER] error: {stdout or stderr}")
         return steps_info
 
-    # 3. Prove
     prove_cmd = [
         "adapted_stwo",
         "--priv_json",
@@ -267,27 +263,23 @@ def run_prover(job_info, executable, proof, arguments):
             max_memory=max_memory,
         )
     )
-    # Save PROVE step log (stwo prover output)
+
     save_prover_log(batch_dir, "PROVE", stdout, stderr, returncode, elapsed, max_memory)
 
     if returncode == 0:
-        temp_files = [pie_file, pub_json]
+        temp_files = [program_input_file, pub_json, trace_file, memory_file, resources_file]
 
-        # Parse priv.json to get trace and memory file paths
         if priv_json.exists():
             try:
                 with open(priv_json, "r") as f:
                     priv_data = json.load(f)
-                    if "trace_path" in priv_data:
-                        temp_files.append(Path(priv_data["trace_path"]))
-                    if "memory_path" in priv_data:
-                        temp_files.append(Path(priv_data["memory_path"]))
-                temp_files.append(
-                    priv_json
-                )  # Add priv.json itself after extracting paths
+                    for key in ["trace_path", "memory_path"]:
+                        if key in priv_data:
+                            temp_files.append(Path(priv_data[key]))
+                temp_files.append(priv_json) 
             except Exception as e:
                 logger.warning(f"Failed to parse {priv_json} for cleanup: {e}")
-                temp_files.append(priv_json)  # Still try to clean up priv.json
+                temp_files.append(priv_json)  
 
         for temp_file in temp_files:
             try:
