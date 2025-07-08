@@ -47,7 +47,6 @@ struct BootloaderOutput {
 
 #[executable]
 fn main(args: Args) -> Result {
-
     let Args { chain_state, blocks, chain_state_proof } = args;
 
     let mut prev_result = if let Some(proof) = chain_state_proof {
