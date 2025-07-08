@@ -16,3 +16,6 @@ qm31_opcode = ["stwo_cairo_air/qm31_opcode"]
 
 [dev-dependencies]
 cairo_test.workspace = true
+
+[cairo]
+unsafe-panic = true
