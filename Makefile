@@ -39,9 +39,9 @@ install: install-bootloader-hints install-stwo install-cairo-prove
 ########################################## ASSUMEVALID ##########################################
 
 assumevalid-build:
-	sed -i.bak 's/default = \["syscalls"\]/default = \[\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
+	# sed -i.bak 's/default = \["syscalls"\]/default = \[\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
 	scarb --profile proving build --package assumevalid --features qm31_opcode
-	sed -i.bak 's/default = \[\]/default = \["syscalls"\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
+	# sed -i.bak 's/default = \[\]/default = \["syscalls"\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
 
 assumevalid-data:
 	./scripts/data/generate_data.py \
@@ -60,6 +60,18 @@ assumevalid-clean:
 	mkdir -p target/execute/assumevalid/execution1
 	rm -rf target/execute/assumevalid/execution2
 	mkdir -p target/execute/assumevalid/execution2
+
+
+assumevalid-prim-execute:
+	mkdir -p target/execute/assumevalid/execution1
+	scripts/data/format_assumevalid_args.py \
+		--block-data packages/assumevalid/tests/data/blocks_0_1.json \
+		--output-path target/execute/assumevalid/execution1/args.json
+	scarb --profile proving execute \
+		--no-build \
+		--package assumevalid \
+		--arguments-file target/execute/assumevalid/execution1/args.json \
+		--print-resource-usage
 
 assumevalid-prim-bootload: assumevalid-clean
 	scripts/data/format_assumevalid_args.py \

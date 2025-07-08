@@ -19,3 +19,4 @@ inherits = "release"
 [profile.proving.cairo]
 enable-gas = false
 unsafe-panic = true
+allow-syscalls = true
