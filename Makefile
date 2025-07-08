@@ -141,6 +141,33 @@ assumevalid-bis-prove:
 		--proof-format cairo-serde \
 		--verify
 
+replicate-invalid-logup-sum:
+	mkdir -p target/execute/assumevalid/invalid-logup-sum
+	scripts/data/generate_program_input.py \
+		--executable target/proving/assumevalid.executable.json \
+		--args-file packages/assumevalid/tests/data/invalid-logup-sum-arguments.json \
+		--program-hash-function blake \
+		--output target/execute/assumevalid/invalid-logup-sum/program-input.json
+	cairo_program_runner \
+		--program bootloaders/simple_bootloader_compiled.json \
+		--program_input target/execute/assumevalid/invalid-logup-sum/program-input.json \
+		--air_public_input target/execute/assumevalid/invalid-logup-sum/pub.json \
+		--air_private_input target/execute/assumevalid/invalid-logup-sum/priv.json \
+		--trace_file $(CURDIR)/target/execute/assumevalid/invalid-logup-sum/trace.json \
+		--memory_file $(CURDIR)/target/execute/assumevalid/invalid-logup-sum/memory.json \
+		--layout all_cairo_stwo \
+		--proof_mode \
+		--execution_resources_file target/execute/assumevalid/invalid-logup-sum/resources.json \
+		--disable_trace_padding --merge_extra_segments
+
+	adapted_stwo \
+		--priv_json target/execute/assumevalid/invalid-logup-sum/priv.json \
+		--pub_json target/execute/assumevalid/invalid-logup-sum/pub.json \
+		--params_json packages/assumevalid/prover_params.json \
+		--proof_path target/execute/assumevalid/invalid-logup-sum/proof.json \
+		--proof-format cairo-serde \
+		--verify
+
 ########################################## PIPELINE ##########################################
 
 setup: install-system-packages create-venv install-python-dependencies
