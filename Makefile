@@ -39,9 +39,9 @@ install: install-bootloader-hints install-stwo install-cairo-prove
 ########################################## ASSUMEVALID ##########################################
 
 assumevalid-build:
-	# sed -i.bak 's/default = \["syscalls"\]/default = \[\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
-	scarb --profile proving build --package assumevalid --features qm31_opcode
-	# sed -i.bak 's/default = \[\]/default = \["syscalls"\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
+	sed -i.bak 's/default = \["syscalls"\]/default = \[\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
+	scarb --profile proving build --package assumevalid --features qm31_opcode --verbosity verbose
+	sed -i.bak 's/default = \[\]/default = \["syscalls"\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
 
 assumevalid-data:
 	./scripts/data/generate_data.py \
