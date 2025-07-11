@@ -8,5 +8,5 @@
             "n_queries": 70
         }
     },
-    "preprocessed_trace": "canonical_without_pedersen"
+    "preprocessed_trace": "canonical_without_pedersen_and_poseidon"
 }
