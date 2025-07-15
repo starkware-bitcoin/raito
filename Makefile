@@ -1,6 +1,6 @@
 # Git revisions for external dependencies
 BOOTLOADER_HINTS_REV ?= 7c7863b2a15de9e316281c70eb487ea9b2a66c9f
-STWO_REV ?= f8979ed82d86bd3408f9706a03a63c54bd221635
+STWO_REV ?= 67741af89e5830cdd9ae55c0824a54be6b1967d9
 
 ########################################## CLIENT ##########################################
 
@@ -123,6 +123,8 @@ assumevalid-bis-execute:
 		--arguments-file target/execute/assumevalid/execution2/args.json \
 		--print-resource-usage
 
+assumevalid-bis-upto-execute: assumevalid-prim-bootload assumevalid-prim-prove assumevalid-bis-execute
+
 assumevalid-bis-bootload:
 	scripts/data/format_assumevalid_args.py \
 		--block-data packages/assumevalid/tests/data/blocks_1_2.json \
@@ -190,28 +192,28 @@ install-system-packages:
 	sudo apt install -y python3-pip python3.11-venv # Use -y for non-interactive install
 
 create-venv:
-	@echo ">>> Creating Python virtual environment 'venv'..."
-	python3 -m venv venv
+	@echo ">>> Creating Python virtual environment '.venv'..."
+	python3 -m venv .venv
 
 install-python-dependencies: create-venv
 	@echo "Installing Python dependencies into the 'venv' virtual environment..."
 
-	. venv/bin/activate && pip install google-cloud-storage
-	. venv/bin/activate && pip install -r scripts/data/requirements.txt
+	. .venv/bin/activate && pip install google-cloud-storage
+	. .venv/bin/activate && pip install -r scripts/data/requirements.txt
 
 data-generate-timestamp:
 	@echo ">>> Generating timestamp data..."
 	# Ensure the venv is activated for this script as well
-	. venv/bin/activate && cd scripts/data && python generate_timestamp_data.py
+	. .venv/bin/activate && cd scripts/data && python generate_timestamp_data.py
 
 data-generate-utxo:
 	@echo ">>> Generating UTXO data..."
 	# Ensure the venv is activated for this script as well
-	. venv/bin/activate && cd scripts/data && python generate_utxo_data.py
+	. .venv/bin/activate && cd scripts/data && python generate_utxo_data.py
 
 prove-pow:
 	@echo ">>> Prove POW..."
-	. venv/bin/activate && cd scripts/data && python prove_pow.py --blocks 100
+	. .venv/bin/activate && cd scripts/data && python prove_pow.py $(if $(START),--start $(START)) --blocks $(or $(BLOCKS),100) --step $(or $(STEP),10) $(if $(VERBOSE),--verbose)
 
 # Main data generation target, depending on specific data generation tasks
 data-generate: data-generate-timestamp data-generate-utxo

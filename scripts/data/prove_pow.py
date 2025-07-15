@@ -328,7 +328,7 @@ def run_prover(job_info, executable, proof, arguments):
             pub_json,
             trace_file,
             memory_file,
-            resources_file,
+            # resources_file,
         ]
 
         if priv_json.exists():
