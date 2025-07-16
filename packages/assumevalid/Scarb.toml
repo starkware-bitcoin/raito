@@ -4,12 +4,17 @@ version = "0.1.0"
 edition = "2024_07"
 
 [executable]
+allow-syscalls = true
 
 [dependencies]
 cairo_execute = "2.11.4"
 consensus = { path = "../consensus" }
 utils = { path = "../utils" }
-stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "ebecc7ec14a32afda329df8757850cede4d8ef50", features = ["minimal_verifier", "qm31_opcode"] }
+stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "d09a2cfd2b308b6210906f26320f767cf279abef", features = ["minimal_verifier", "qm31_opcode"] }
 
 [dev-dependencies]
 cairo_test.workspace = true
+
+[features]
+default = []
+syscalls = ["consensus/syscalls", "utils/syscalls"]

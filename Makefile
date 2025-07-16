@@ -11,7 +11,7 @@ client-build-with-shinigami:
 ########################################## BINARIES ##########################################
 
 install-cairo-execute:
-	cargo install --git https://github.com/m-kus/cairo --rev 9117214e4a3509870c6a6db8e61ddcdaf9ade561 cairo-execute
+	cargo install --git https://github.com/m-kus/cairo --rev 7fbbd0112b5a926403c17fa95ad831c1715fd1b1 cairo-execute
 
 install-cairo-bootloader:
 	cargo install --git https://github.com/m-kus/cairo-bootloader --rev 5aa40dc5f084c6406ae9d76b19a115e3a3832b97 cairo-bootloader
@@ -20,15 +20,22 @@ install-stwo:
 	RUSTFLAGS="-C target-cpu=native -C opt-level=3" \
 		cargo install \
 		--git https://github.com/starkware-libs/stwo-cairo \
-		--rev f8979ed82d86bd3408f9706a03a63c54bd221635 \
+		--rev d09a2cfd2b308b6210906f26320f767cf279abef \
 		adapted_stwo
 
 ########################################## ASSUMEVALID ##########################################
 
 assumevalid-build:
-	sed -i.bak 's/default = \["syscalls"\]/default = \[\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
 	scarb --profile proving build --package assumevalid
-	sed -i.bak 's/default = \[\]/default = \["syscalls"\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
+
+assumevalid-build-with-syscalls:
+	cd packages/assumevalid && \
+	cairo-execute \
+		--build-only \
+		--output-path ../../target/proving/assumevalid.executable.json \
+		--executable assumevalid::main \
+		--ignore-warnings \
+		--allow-syscalls .
 
 assumevalid-data:
 	./scripts/data/generate_data.py \
@@ -52,9 +59,17 @@ assumevalid-execute: assumevalid-clean
 		--arguments-file target/execute/assumevalid/execution1/args.json \
 		--print-resource-usage
 
+assumevalid-execute-with-syscalls:
+	cairo-execute \
+		--layout all_cairo_stwo \
+		--args-file target/execute/assumevalid/execution1/args.json \
+		--prebuilt \
+		--output-path target/execute/assumevalid/execution1/cairo_pie.zip \
+		target/proving/assumevalid.executable.json
+
 assumevalid-clean:
-	rm -rf target/execute/assumevalid/execution1
-	mkdir -p target/execute/assumevalid/execution1
+	#rm -rf target/execute/assumevalid/execution1
+	#mkdir -p target/execute/assumevalid/execution1
 
 assumevalid-pie: assumevalid-clean
 	scripts/data/format_assumevalid_args.py \
@@ -92,6 +107,14 @@ assumevalid-execute-rec:
 		--package assumevalid \
 		--arguments-file target/execute/assumevalid/execution2/args.json \
 		--print-resource-usage
+
+assumevalid-burn:
+	scarb --profile proving burn \
+		--no-build \
+		--package assumevalid \
+		--arguments-file target/execute/assumevalid/execution2/args.json \
+		--output-file target/execute/assumevalid/execution2/burn.svg \
+		--open-in-browser
 
 assumevalid-pie-rec:
 	scripts/data/format_assumevalid_args.py \

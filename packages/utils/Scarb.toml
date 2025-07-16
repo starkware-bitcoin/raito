@@ -10,5 +10,5 @@ cairo_test.workspace = true
 lint = "scarb fmt"
 
 [features]
-default = ["syscalls"]
+default = []
 syscalls = []

@@ -9,9 +9,15 @@ use crate::numeric::{u256_to_u32x8, u32x8_to_u256};
 
 /// 256-bit hash digest.
 /// Represented as an array of 4-byte words.
-#[derive(Copy, Drop, Debug, Default, Serde)]
+#[derive(Copy, Drop, Debug, Serde)]
 pub struct Digest {
     pub value: [u32; 8],
+}
+
+pub impl DigestDefault of Default<Digest> {
+    fn default() -> Digest {
+        Digest { value: [0_u32; 8] }
+    }
 }
 
 #[generate_trait]
