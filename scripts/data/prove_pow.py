@@ -140,7 +140,6 @@ def run(cmd, timeout=None):
 def save_prover_log(
     batch_dir, step_name, stdout, stderr, returncode, elapsed, max_memory
 ):
-
     log_file = batch_dir / f"{step_name.lower()}.log"
 
     with open(log_file, "w", encoding="utf-8") as f:
@@ -236,61 +235,62 @@ def run_prover(job_info, executable, proof, arguments):
     save_prover_log(
         batch_dir, "CAIRO_RUNNER", stdout, stderr, returncode, elapsed, max_memory
     )
-    if returncode != 0:
-        logger.error(f"{job_info} [CAIRO_RUNNER] error: {stdout or stderr}")
 
-        # Try to get more meaningful error message using scarb execute
-        logger.info(
-            f"{job_info} [CAIRO_RUNNER] failed, trying scarb execute for better error messages..."
-        )
-        scarb_cmd = [
-            "scarb",
-            "--profile",
-            "proving",
-            "execute",
-            "--no-build",
-            "--package",
-            "assumevalid",
-            "--arguments-file",
-            str(arguments),
-            "--print-resource-usage",
-        ]
-        logger.debug(
-            f"{job_info} [SCARB_EXECUTE] command:\n{' '.join(map(str, scarb_cmd))}"
-        )
-        (
-            scarb_stdout,
-            scarb_stderr,
-            scarb_returncode,
-            scarb_elapsed,
-            scarb_max_memory,
-        ) = run(scarb_cmd)
+    # if returncode != 0:
+    #     logger.error(f"{job_info} [CAIRO_RUNNER] error: {stdout or stderr}")
 
-        steps_info.append(
-            StepInfo(
-                step="SCARB_EXECUTE",
-                stdout=scarb_stdout,
-                stderr=scarb_stderr,
-                returncode=scarb_returncode,
-                elapsed=scarb_elapsed,
-                max_memory=scarb_max_memory,
-            )
-        )
+    #     # Try to get more meaningful error message using scarb execute
+    #     logger.info(
+    #         f"{job_info} [CAIRO_RUNNER] failed, trying scarb execute for better error messages..."
+    #     )
+    #     scarb_cmd = [
+    #         "scarb",
+    #         "--profile",
+    #         "proving",
+    #         "execute",
+    #         "--no-build",
+    #         "--package",
+    #         "assumevalid",
+    #         "--arguments-file",
+    #         str(arguments),
+    #         "--print-resource-usage",
+    #     ]
+    #     logger.debug(
+    #         f"{job_info} [SCARB_EXECUTE] command:\n{' '.join(map(str, scarb_cmd))}"
+    #     )
+    #     (
+    #         scarb_stdout,
+    #         scarb_stderr,
+    #         scarb_returncode,
+    #         scarb_elapsed,
+    #         scarb_max_memory,
+    #     ) = run(scarb_cmd)
 
-        save_prover_log(
-            batch_dir,
-            "SCARB_EXECUTE",
-            scarb_stdout,
-            scarb_stderr,
-            scarb_returncode,
-            scarb_elapsed,
-            scarb_max_memory,
-        )
+    #     steps_info.append(
+    #         StepInfo(
+    #             step="SCARB_EXECUTE",
+    #             stdout=scarb_stdout,
+    #             stderr=scarb_stderr,
+    #             returncode=scarb_returncode,
+    #             elapsed=scarb_elapsed,
+    #             max_memory=scarb_max_memory,
+    #         )
+    #     )
 
-        logger.error(
-            f"{job_info} [SCARB_EXECUTE] output:\n{scarb_stdout or scarb_stderr}"
-        )
-        return steps_info
+    #     save_prover_log(
+    #         batch_dir,
+    #         "SCARB_EXECUTE",
+    #         scarb_stdout,
+    #         scarb_stderr,
+    #         scarb_returncode,
+    #         scarb_elapsed,
+    #         scarb_max_memory,
+    #     )
+
+    #     logger.error(
+    #         f"{job_info} [SCARB_EXECUTE] output:\n{scarb_stdout or scarb_stderr}"
+    #     )
+    #     return steps_info
 
     prove_cmd = [
         "adapted_stwo",
@@ -325,7 +325,7 @@ def run_prover(job_info, executable, proof, arguments):
     if returncode == 0:
         temp_files = [
             program_input_file,
-            pub_json,
+            # pub_json,
             trace_file,
             memory_file,
             # resources_file,
@@ -355,7 +355,6 @@ def run_prover(job_info, executable, proof, arguments):
 
 
 def prove_batch(height, step):
-
     mode = "light"
     job_info = f"Job(height='{height}', blocks={step})"
 
@@ -378,6 +377,8 @@ def prove_batch(height, step):
 
         logger.debug(f"{job_info} generating data...")
 
+        args_start_time = time.time()
+
         # Batch data - store in the batch directory
         batch_file = batch_dir / "batch.json"
         batch_data = generate_data(
@@ -396,6 +397,8 @@ def prove_batch(height, step):
         args = generate_assumevalid_args(batch_file, previous_proof_file)
         arguments_file.write_text(json.dumps(args))
 
+        args_elapsed = time.time() - args_start_time
+
         # Final proof file - store in the batch directory
         proof_file = batch_dir / "proof.json"
 
@@ -407,7 +410,7 @@ def prove_batch(height, step):
             str(arguments_file),
         )
 
-        total_elapsed = sum(step.elapsed for step in steps_info)
+        total_elapsed = sum(step.elapsed for step in steps_info) + args_elapsed
 
         max_memory_candidates = [
             step.max_memory for step in steps_info if step.max_memory is not None
@@ -421,6 +424,7 @@ def prove_batch(height, step):
             logger.error(f"{job_info} error:\n{error}")
             return False
         else:
+            logger.debug(f"{job_info} [GENERATE_ARGS] time: {args_elapsed:.2f} s")
             for info in steps_info:
                 mem_usage = (
                     f"{info.max_memory/1024:.1f} MB"
@@ -428,7 +432,7 @@ def prove_batch(height, step):
                     else "N/A"
                 )
                 logger.debug(
-                    f"{job_info}, [{info.step}] time: {info.elapsed:.2f} s max memory: {mem_usage}"
+                    f"{job_info} [{info.step}] time: {info.elapsed:.2f} s max memory: {mem_usage}"
                 )
             logger.info(
                 f"{job_info} done, total execution time: {total_elapsed:.2f} seconds"
@@ -437,6 +441,9 @@ def prove_batch(height, step):
                     if max_memory is not None
                     else ""
                 )
+            )
+            logger.debug(
+                f"{job_info} expected time to complete proving the whole chain: {900000 / step * total_elapsed / 3600:.2f} hours"
             )
 
             return True
@@ -449,7 +456,6 @@ def prove_batch(height, step):
 
 
 def main(start, blocks, step):
-
     logger.info(
         "Initial height: %d, blocks: %d, step: %d",
         start,

@@ -4,12 +4,13 @@ version = "0.1.0"
 edition = "2024_07"
 
 [executable]
+allow-syscalls=true
 
 [dependencies]
 cairo_execute = "2.11.4"
 consensus = { path = "../consensus" }
 utils = { path = "../utils" }
-stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "67741af89e5830cdd9ae55c0824a54be6b1967d9" }
+stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "d09a2cfd2b308b6210906f26320f767cf279abef" }
 
 [features]
 qm31_opcode = ["stwo_cairo_air/qm31_opcode"]

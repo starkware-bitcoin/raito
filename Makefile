@@ -1,7 +1,7 @@
 # Git revisions for external dependencies
 BOOTLOADER_HINTS_REV ?= 7c7863b2a15de9e316281c70eb487ea9b2a66c9f
-STWO_REV ?= 67741af89e5830cdd9ae55c0824a54be6b1967d9
-
+STWO_REV ?= d09a2cfd2b308b6210906f26320f767cf279abef
+CAIRO_EXECUTE_REV ?= 7fbbd0112b5a926403c17fa95ad831c1715fd1b1
 ########################################## CLIENT ##########################################
 
 client-build:
@@ -22,7 +22,7 @@ install-bootloader-hints:
 
 install-stwo:
 	RUSTFLAGS="-C target-cpu=native -C opt-level=3" \
-		cargo install \
+		cargo install --force \
 		--git https://github.com/starkware-libs/stwo-cairo \
 		--rev $(STWO_REV) \
 		adapted_stwo
@@ -34,7 +34,10 @@ install-cairo-prove:
 		--rev $(STWO_REV) \
 		cairo-prove
 
-install: install-bootloader-hints install-stwo install-cairo-prove
+install-cairo-execute:
+	cargo install --git https://github.com/m-kus/cairo --rev $(CAIRO_EXECUTE_REV) cairo-execute
+
+install: install-bootloader-hints install-stwo install-cairo-prove install-cairo-execute
 
 ########################################## ASSUMEVALID ##########################################
 
@@ -42,6 +45,19 @@ assumevalid-build:
 	sed -i.bak 's/default = \["syscalls"\]/default = \[\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
 	scarb --profile proving build --package assumevalid --features qm31_opcode --verbosity verbose
 	sed -i.bak 's/default = \[\]/default = \["syscalls"\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
+
+# assumevalid-build-with-syscalls:
+# 	scarb --profile proving build --package assumevalid --features qm31_opcode --verbosity verbose
+
+assumevalid-build-with-syscalls:
+	cd packages/assumevalid && \
+	cairo-execute \
+		--build-only \
+		--output-path ../../target/proving/assumevalid.executable.json \
+		--executable assumevalid::main \
+		--ignore-warnings \
+		--allow-syscalls .
+
 
 assumevalid-data:
 	./scripts/data/generate_data.py \

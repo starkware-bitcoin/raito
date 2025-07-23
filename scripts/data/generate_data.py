@@ -415,7 +415,6 @@ def str2bool(value):
 # Example: generate_data.py --mode 'full' --height 0 --num_blocks 10 --output_file full_0_10.json --fast
 # Example: generate_data.py --mode 'utreexo' --height 0 --num_blocks 10 --output_file utreexo_0_10.json --fast
 if __name__ == "__main__":
-
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.DEBUG)
     console_handler.setFormatter(
