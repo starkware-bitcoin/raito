@@ -1,5 +1,5 @@
 # Git revisions for external dependencies
-BOOTLOADER_HINTS_REV ?= 7c7863b2a15de9e316281c70eb487ea9b2a66c9f
+BOOTLOADER_HINTS_REV ?= 5648cf0a5a2574c2870151cd178ff3ae4b141824
 STWO_REV ?= d09a2cfd2b308b6210906f26320f767cf279abef
 CAIRO_EXECUTE_REV ?= 7fbbd0112b5a926403c17fa95ad831c1715fd1b1
 ########################################## CLIENT ##########################################
