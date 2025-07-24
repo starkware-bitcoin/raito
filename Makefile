@@ -8,9 +8,8 @@ client-build:
 	scarb --profile proving build --package client --target-kinds executable
 
 client-build-with-shinigami:
-	sed -i.bak 's/default = \[\]/default = ["shinigami"]/' packages/consensus/Scarb.toml && rm packages/consensus/Scarb.toml.bak
-	scarb --profile proving build --package client --target-kinds executable
-	sed -i.bak 's/default = \["shinigami"\]/default = []/' packages/consensus/Scarb.toml && rm packages/consensus/Scarb.toml.bak
+	scarb --profile proving build --package client --target-kinds executable --features shinigami
+
 
 ########################################## BINARIES ##########################################
 
@@ -27,37 +26,22 @@ install-stwo:
 		--rev $(STWO_REV) \
 		adapted_stwo
 
-install-cairo-prove:
-	RUSTFLAGS="-C target-cpu=native -C opt-level=3" \
-		cargo install \
-		--git https://github.com/starkware-libs/stwo-cairo \
-		--rev $(STWO_REV) \
-		cairo-prove
-
 install-cairo-execute:
 	cargo install --git https://github.com/m-kus/cairo --rev $(CAIRO_EXECUTE_REV) cairo-execute
 
-install: install-bootloader-hints install-stwo install-cairo-prove install-cairo-execute
+install-scarb-eject:
+	cargo install --git https://github.com/software-mansion-labs/scarb-eject
+
+install-corelib:
+	mkdir -p vendor
+	rm -rf vendor/cairo
+	git clone --single-branch --branch m-kus/system-builtin https://github.com/m-kus/cairo vendor/cairo
+	(cd vendor/cairo && git checkout $(CAIRO_EXECUTE_REV))
+	ln -s "$(CURDIR)/vendor/cairo/corelib" packages/assumevalid/corelib
+
+install: install-bootloader-hints install-stwo install-cairo-execute
 
 ########################################## ASSUMEVALID ##########################################
-
-assumevalid-build:
-	sed -i.bak 's/default = \["syscalls"\]/default = \[\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
-	scarb --profile proving build --package assumevalid --features qm31_opcode --verbosity verbose
-	sed -i.bak 's/default = \[\]/default = \["syscalls"\]/' packages/utils/Scarb.toml && rm packages/utils/Scarb.toml.bak
-
-# assumevalid-build-with-syscalls:
-# 	scarb --profile proving build --package assumevalid --features qm31_opcode --verbosity verbose
-
-assumevalid-build-with-syscalls:
-	cd packages/assumevalid && \
-	cairo-execute \
-		--build-only \
-		--output-path ../../target/proving/assumevalid.executable.json \
-		--executable assumevalid::main \
-		--ignore-warnings \
-		--allow-syscalls .
-
 
 assumevalid-data:
 	./scripts/data/generate_data.py \
@@ -71,12 +55,8 @@ assumevalid-data:
 		--num_blocks 1 \
 		--output_file packages/assumevalid/tests/data/blocks_1_2.json
 
-assumevalid-clean:
-	rm -rf target/execute/assumevalid/execution1
-	mkdir -p target/execute/assumevalid/execution1
-	rm -rf target/execute/assumevalid/execution2
-	mkdir -p target/execute/assumevalid/execution2
-
+assumevalid-build:
+	scarb --profile proving build --package assumevalid --no-default-features
 
 assumevalid-prim-execute:
 	mkdir -p target/execute/assumevalid/execution1
@@ -88,6 +68,38 @@ assumevalid-prim-execute:
 		--package assumevalid \
 		--arguments-file target/execute/assumevalid/execution1/args.json \
 		--print-resource-usage
+
+assumevalid-bis-execute:
+	mkdir -p target/execute/assumevalid/execution2
+	scripts/data/format_assumevalid_args.py \
+		--block-data packages/assumevalid/tests/data/blocks_1_2.json \
+		--proof-path target/execute/assumevalid/execution1/proof.json \
+		--output-path target/execute/assumevalid/execution2/args.json
+	scarb --profile proving execute \
+		--no-build \
+		--package assumevalid \
+		--arguments-file target/execute/assumevalid/execution2/args.json \
+		--print-resource-usage
+
+########################################## ASSUMEVALID WITH SYSCALLS ##########################################
+
+assumevalid-eject:
+	scarb-eject --package assumevalid --output packages/assumevalid/cairo_project.toml
+
+assumevalid-build-with-syscalls:
+	cd packages/assumevalid && \
+	cairo-execute \
+		--build-only \
+		--output-path ../../target/proving/assumevalid.executable.json \
+		--executable assumevalid::main \
+		--ignore-warnings \
+		--allow-syscalls .
+
+assumevalid-clean:
+	rm -rf target/execute/assumevalid/execution1
+	mkdir -p target/execute/assumevalid/execution1
+	rm -rf target/execute/assumevalid/execution2
+	mkdir -p target/execute/assumevalid/execution2
 
 assumevalid-prim-bootload: assumevalid-clean
 	scripts/data/format_assumevalid_args.py \
@@ -118,29 +130,6 @@ assumevalid-prim-prove:
 		--proof-format cairo-serde \
 		--verify
 
-assumevalid-prim-prove-verify:
-	adapted_stwo \
-		--priv_json target/execute/assumevalid/execution1/priv.json \
-		--pub_json target/execute/assumevalid/execution1/pub.json \
-		--params_json packages/assumevalid/prover_params.json \
-		--proof_path target/execute/assumevalid/execution1/proof.json \
-		--verify
-	cairo-prove verify target/execute/assumevalid/execution1/proof.json
-
-assumevalid-bis-execute:
-	mkdir -p target/execute/assumevalid/execution2
-	scripts/data/format_assumevalid_args.py \
-		--block-data packages/assumevalid/tests/data/blocks_1_2.json \
-		--proof-path target/execute/assumevalid/execution1/proof.json \
-		--output-path target/execute/assumevalid/execution2/args.json
-	scarb --profile proving execute \
-		--no-build \
-		--package assumevalid \
-		--arguments-file target/execute/assumevalid/execution2/args.json \
-		--print-resource-usage
-
-assumevalid-bis-upto-execute: assumevalid-prim-bootload assumevalid-prim-prove assumevalid-bis-execute
-
 assumevalid-bis-bootload:
 	scripts/data/format_assumevalid_args.py \
 		--block-data packages/assumevalid/tests/data/blocks_1_2.json \
@@ -168,33 +157,6 @@ assumevalid-bis-prove:
 		--pub_json target/execute/assumevalid/execution1/pub.json \
 		--params_json packages/assumevalid/prover_params.json \
 		--proof_path target/execute/assumevalid/execution2/proof.json \
-		--proof-format cairo-serde \
-		--verify
-
-replicate-invalid-logup-sum:
-	mkdir -p target/execute/assumevalid/invalid-logup-sum
-	scripts/data/generate_program_input.py \
-		--executable target/proving/assumevalid.executable.json \
-		--args-file packages/assumevalid/tests/data/invalid-logup-sum-arguments.json \
-		--program-hash-function blake \
-		--output target/execute/assumevalid/invalid-logup-sum/program-input.json
-	cairo_program_runner \
-		--program bootloaders/simple_bootloader_compiled.json \
-		--program_input target/execute/assumevalid/invalid-logup-sum/program-input.json \
-		--air_public_input target/execute/assumevalid/invalid-logup-sum/pub.json \
-		--air_private_input target/execute/assumevalid/invalid-logup-sum/priv.json \
-		--trace_file $(CURDIR)/target/execute/assumevalid/invalid-logup-sum/trace.json \
-		--memory_file $(CURDIR)/target/execute/assumevalid/invalid-logup-sum/memory.json \
-		--layout all_cairo_stwo \
-		--proof_mode \
-		--execution_resources_file target/execute/assumevalid/invalid-logup-sum/resources.json \
-		--disable_trace_padding --merge_extra_segments
-
-	adapted_stwo \
-		--priv_json target/execute/assumevalid/invalid-logup-sum/priv.json \
-		--pub_json target/execute/assumevalid/invalid-logup-sum/pub.json \
-		--params_json packages/assumevalid/prover_params.json \
-		--proof_path target/execute/assumevalid/invalid-logup-sum/proof.json \
 		--proof-format cairo-serde \
 		--verify
 

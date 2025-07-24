@@ -16,3 +16,4 @@ lint = "scarb fmt"
 [features]
 default = []
 shinigami = []
+syscalls = ["utils/syscalls"]
