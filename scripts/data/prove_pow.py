@@ -354,7 +354,7 @@ def run_prover(job_info, executable, proof, arguments):
     return steps_info
 
 
-def prove_batch(height, step):
+def prove_batch(height, step, slow=False):
     mode = "light"
     job_info = f"Job(height='{height}', blocks={step})"
 
@@ -382,7 +382,7 @@ def prove_batch(height, step):
         # Batch data - store in the batch directory
         batch_file = batch_dir / "batch.json"
         batch_data = generate_data(
-            mode=mode, initial_height=height, num_blocks=step, fast=True
+            mode=mode, initial_height=height, num_blocks=step, fast=not slow
         )
         batch_args = {
             "chain_state": batch_data["chain_state"],
@@ -455,7 +455,7 @@ def prove_batch(height, step):
         return False
 
 
-def main(start, blocks, step):
+def main(start, blocks, step, slow=False):
     logger.info(
         "Initial height: %d, blocks: %d, step: %d",
         start,
@@ -476,7 +476,7 @@ def main(start, blocks, step):
 
     # Process jobs sequentially
     for height in height_range:
-        success = prove_batch(height, processing_step)
+        success = prove_batch(height, processing_step, slow)
         if success:
             processed_count += 1
         else:
@@ -522,6 +522,7 @@ if __name__ == "__main__":
         "--step", type=int, default=10, help="Step size for block processing"
     )
     parser.add_argument("--verbose", action="store_true", help="Verbose logging")
+    parser.add_argument("--slow", action="store_true", help="Use slow mode for data generation (not fast)")
 
     args = parser.parse_args()
 
@@ -533,4 +534,4 @@ if __name__ == "__main__":
         start = auto_detect_start()
         logger.info(f"Auto-detected start: {start}")
 
-    main(start, args.blocks, args.step)
+    main(start, args.blocks, args.step, args.slow)

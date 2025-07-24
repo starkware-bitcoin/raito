@@ -229,7 +229,7 @@ data-generate-utxo:
 
 prove-pow:
 	@echo ">>> Prove POW..."
-	. .venv/bin/activate && cd scripts/data && python prove_pow.py $(if $(START),--start $(START)) --blocks $(or $(BLOCKS),100) --step $(or $(STEP),10) $(if $(VERBOSE),--verbose)
+	. .venv/bin/activate && cd scripts/data && python prove_pow.py $(if $(START),--start $(START)) --blocks $(or $(BLOCKS),100) --step $(or $(STEP),10) $(if $(SLOW),--slow) $(if $(VERBOSE),--verbose)
 
 # Main data generation target, depending on specific data generation tasks
 data-generate: data-generate-timestamp data-generate-utxo
