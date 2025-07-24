@@ -9,7 +9,7 @@ use stwo_cairo_air::{CairoProof, VerificationOutput, get_verification_output, ve
 /// -
 /// https://github.com/starkware-libs/stwo-cairo/blob/3ab588b1ee9b1a0070020dbe1f7e22896bf77fc3/stwo_cairo_verifier/crates/cairo_air/src/lib.cairo#L2474
 const BOOTLOADER_PROGRAM_HASH: felt252 =
-    1065192848982862431374225859020057993766036344957569157226488194348663523788;
+    2674360517196449694956552942274105361570126537305198542284292462433974515;
 
 #[derive(Drop, Serde)]
 struct Args {
@@ -84,7 +84,10 @@ fn get_prev_result(proof: CairoProof) -> Result {
     assert(program_hash == BOOTLOADER_PROGRAM_HASH, 'Unexpected bootloader');
 
     // Verify the proof
-    verify_cairo(proof);
+    match verify_cairo(proof) {
+        Ok(_) => {},
+        Err(e) => panic!("Invalid proof: {:?}", e),
+    }
 
     // Deserialize the bootloader output
     let mut serialized_bootloader_output = output.span();

@@ -19,3 +19,8 @@ test = "scarb --profile proving build && ../../scripts/data/integration_tests.sh
 regenerate_tests= "../../scripts/data/regenerate_tests.sh"
 client = "scarb build && ../../scripts/data/client.sh"
 lint = "black ../../scripts/data && flake8 ../../scripts/data --max-complexity=10 --max-line-length=88 && scarb fmt"
+
+[features]
+default = ["syscalls"]
+shinigami = ["consensus/shinigami"]
+syscalls = ["consensus/syscalls"]

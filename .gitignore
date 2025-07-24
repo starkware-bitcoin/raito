@@ -35,6 +35,7 @@ __pycache__
 .proofs
 proving.log*
 
+vendor
 corelib
 *.txt
 client.errors.log
