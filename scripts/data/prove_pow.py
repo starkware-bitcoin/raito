@@ -522,7 +522,11 @@ if __name__ == "__main__":
         "--step", type=int, default=10, help="Step size for block processing"
     )
     parser.add_argument("--verbose", action="store_true", help="Verbose logging")
-    parser.add_argument("--slow", action="store_true", help="Use slow mode for data generation (not fast)")
+    parser.add_argument(
+        "--slow",
+        action="store_true",
+        help="Use slow mode for data generation (not fast)",
+    )
 
     args = parser.parse_args()
 
