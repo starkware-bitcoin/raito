@@ -25,7 +25,7 @@ struct Args {
 #[derive(Drop, Serde)]
 struct Result {
     /// Hash of the chain state after the blocks have been applied.
-    chain_state_hash: felt252,
+    chain_state_hash: u256,
     /// Hash of the program that was recursively verified.
     /// We cannot know the hash of the program from within the program, so we have to carry it over.
     /// This also allows composing multiple programs (e.g. if we'd need to upgrade at a certain
@@ -50,14 +50,15 @@ fn main(args: Args) -> Result {
     let Args { chain_state, blocks, chain_state_proof } = args;
 
     let mut prev_result = if let Some(proof) = chain_state_proof {
-        get_prev_result(proof)
+        let res = get_prev_result(proof);
+        // Check that the provided chain state matches the final state hash of the previous run.
+        assert(res.chain_state_hash == chain_state.blake2s_digest(), 'Invalid initial state');
+        res
     } else {
         assert(chain_state == Default::default(), 'Invalid genesis state');
-        Result { chain_state_hash: chain_state.hash(), prev_program_hash: 0 }
+        Result { chain_state_hash: chain_state.blake2s_digest(), prev_program_hash: 0 }
     };
 
-    // Check that the provided chain state matches the final state hash of the previous run.
-    assert(prev_result.chain_state_hash == chain_state.hash(), 'Invalid initial state');
     let mut current_chain_state = chain_state;
 
     // Validate the blocks and update the current chain state
@@ -69,7 +70,7 @@ fn main(args: Args) -> Result {
     }
 
     Result {
-        chain_state_hash: current_chain_state.hash(),
+        chain_state_hash: current_chain_state.blake2s_digest(),
         prev_program_hash: prev_result.prev_program_hash,
     }
 }
@@ -96,8 +97,8 @@ fn get_prev_result(proof: CairoProof) -> Result {
     assert(serialized_bootloader_output.is_empty(), 'Output too long');
     assert(n_tasks == 1, 'Unexpected number of tasks');
     assert(
-        task_output_size == 4, 'Unexpected task output size',
-    ); // 1 felt for program hash, 2 for output, 1 for the size
+        task_output_size == 5, 'Unexpected task output size',
+    ); // 1 felt for program hash, 3 for output, 1 for the size
 
     // Check that the task program hash is the same as the previous program hash
     // In case of the genesis state, the previous program hash is 0

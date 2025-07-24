@@ -6,11 +6,12 @@
 
 use core::fmt::{Display, Error, Formatter};
 use core::hash::{Hash, HashStateExTrait, HashStateTrait};
-use core::poseidon::PoseidonTrait;
+use utils::blake2s_hasher::{Blake2sHasher, blake2s_digest_to_u256_le};
 use utils::hash::Digest;
+use utils::numeric::u256_to_u32x8;
 
 /// Represents the state of the blockchain.
-#[derive(Drop, Copy, Debug, PartialEq, Serde, Hash)]
+#[derive(Drop, Copy, Debug, PartialEq, Serde)]
 pub struct ChainState {
     /// Height of the current block.
     pub block_height: u32,
@@ -33,8 +34,41 @@ pub struct ChainState {
 /// `ChainState` Poseidon hash implementation.
 #[generate_trait]
 pub impl ChainStateHashImpl of ChainStateHashTrait {
-    fn hash(self: @ChainState) -> felt252 {
-        PoseidonTrait::new().update_with(*self).finalize()
+    /// Returns the Blake2s digest of the chain state.
+    /// NOTE: returned u256 value is little-endian.
+    fn blake2s_digest(self: @ChainState) -> u256 {
+        let mut hasher = Blake2sHasher::new();
+
+        // TODO(m-kus): reorder the fields to make the structure more aligned?
+        let a0 = *self.block_height;
+        let [a1, a2, a3, a4, a5, a6, a7, a8] = u256_to_u32x8(*self.total_work);
+        let [a9, a10, a11, a12, a13, a14, a15, b0] = *self.best_block_hash.value;
+
+        // Compress the first block
+        hasher
+            .compress_block([a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15]);
+
+        let [b1, b2, b3, b4, b5, b6, b7, b8] = u256_to_u32x8(*self.current_target);
+        let b9 = *self.epoch_start_time;
+
+        let mut prev_timestamps = *self.prev_timestamps;
+        let res = if let Some(tail) = prev_timestamps.multi_pop_front::<6>() {
+            let [b10, b11, b12, b13, b14, b15] = tail.unbox();
+            // Compress the second block
+            hasher
+                .compress_block(
+                    [b0, b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14, b15],
+                );
+            // Finalize the hash digest
+            hasher.finalize_block(prev_timestamps)
+        } else {
+            let mut buffer = array![b0, b1, b2, b3, b4, b5, b6, b7, b8, b9];
+            buffer.append_span(prev_timestamps);
+            // Finalize the hash digest
+            hasher.finalize_block(buffer.span())
+        };
+
+        blake2s_digest_to_u256_le(res)
     }
 }
 

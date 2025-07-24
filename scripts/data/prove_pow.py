@@ -354,7 +354,7 @@ def run_prover(job_info, executable, proof, arguments):
     return steps_info
 
 
-def prove_batch(height, step, slow=False):
+def prove_batch(height, step, fast_data_generation=True):
     mode = "light"
     job_info = f"Job(height='{height}', blocks={step})"
 
@@ -382,7 +382,7 @@ def prove_batch(height, step, slow=False):
         # Batch data - store in the batch directory
         batch_file = batch_dir / "batch.json"
         batch_data = generate_data(
-            mode=mode, initial_height=height, num_blocks=step, fast=not slow
+            mode=mode, initial_height=height, num_blocks=step, fast=fast_data_generation
         )
         batch_args = {
             "chain_state": batch_data["chain_state"],
@@ -455,12 +455,13 @@ def prove_batch(height, step, slow=False):
         return False
 
 
-def main(start, blocks, step, slow=False):
+def main(start, blocks, step, fast_data_generation=True):
     logger.info(
-        "Initial height: %d, blocks: %d, step: %d",
+        "Initial height: %d, blocks: %d, step: %d, fast_data_generation: %s",
         start,
         blocks,
         step,
+        fast_data_generation,
     )
 
     PROOF_DIR.mkdir(exist_ok=True)
@@ -476,7 +477,7 @@ def main(start, blocks, step, slow=False):
 
     # Process jobs sequentially
     for height in height_range:
-        success = prove_batch(height, processing_step, slow)
+        success = prove_batch(height, processing_step, fast_data_generation)
         if success:
             processed_count += 1
         else:
@@ -523,9 +524,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--verbose", action="store_true", help="Verbose logging")
     parser.add_argument(
-        "--slow",
+        "--slow-data-generation",
         action="store_true",
-        help="Use slow mode for data generation (not fast)",
+        help="Use slow data generation mode (default is fast mode)",
     )
 
     args = parser.parse_args()
@@ -538,4 +539,7 @@ if __name__ == "__main__":
         start = auto_detect_start()
         logger.info(f"Auto-detected start: {start}")
 
-    main(start, args.blocks, args.step, args.slow)
+    # Convert slow_data_generation flag to fast_data_generation parameter
+    fast_data_generation = not args.slow_data_generation
+
+    main(start, args.blocks, args.step, fast_data_generation)
