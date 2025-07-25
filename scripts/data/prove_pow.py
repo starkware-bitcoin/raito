@@ -236,8 +236,8 @@ def run_prover(job_info, executable, proof, arguments):
         batch_dir, "CAIRO_RUNNER", stdout, stderr, returncode, elapsed, max_memory
     )
 
-    # if returncode != 0:
-    #     logger.error(f"{job_info} [CAIRO_RUNNER] error: {stdout or stderr}")
+    if returncode != 0:
+        logger.error(f"{job_info} [CAIRO_RUNNER] error: {stdout or stderr}")
 
     #     # Try to get more meaningful error message using scarb execute
     #     logger.info(
@@ -290,7 +290,7 @@ def run_prover(job_info, executable, proof, arguments):
     #     logger.error(
     #         f"{job_info} [SCARB_EXECUTE] output:\n{scarb_stdout or scarb_stderr}"
     #     )
-    #     return steps_info
+        return steps_info
 
     prove_cmd = [
         "adapted_stwo",

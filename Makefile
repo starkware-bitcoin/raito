@@ -162,6 +162,11 @@ assumevalid-bis-prove:
 
 ########################################## PIPELINE ##########################################
 
+build-simple-bootloader:
+	. .venv/bin/activate && cd ../starkware && cairo-compile --proof_mode \
+		src/starkware/cairo/bootloaders/simple_bootloader/simple_bootloader.cairo \
+		--cairo_path src --output $(CURDIR)/bootloaders/simple_bootloader_compiled.json
+
 setup: install-system-packages create-venv install-python-dependencies
 
 install-system-packages:
@@ -173,10 +178,9 @@ create-venv:
 	@echo ">>> Creating Python virtual environment '.venv'..."
 	python3 -m venv .venv
 
-install-python-dependencies: create-venv
+install-python-dependencies:
 	@echo "Installing Python dependencies into the 'venv' virtual environment..."
 
-	. .venv/bin/activate && pip install google-cloud-storage
 	. .venv/bin/activate && pip install -r scripts/data/requirements.txt
 
 data-generate-timestamp:
