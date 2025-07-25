@@ -6,7 +6,7 @@
 
 use core::fmt::{Display, Error, Formatter};
 use core::hash::{Hash, HashStateExTrait, HashStateTrait};
-use utils::blake2s_hasher::{Blake2sHasher, Blake2sDigestIntoU256};
+use utils::blake2s_hasher::{Blake2sDigest, Blake2sHasher};
 use utils::hash::Digest;
 use utils::numeric::u256_to_u32x8;
 
@@ -36,7 +36,7 @@ pub struct ChainState {
 pub impl ChainStateHashImpl of ChainStateHashTrait {
     /// Returns the Blake2s digest of the chain state.
     /// NOTE: returned u256 value is little-endian.
-    fn blake2s_digest(self: @ChainState) -> u256 {
+    fn blake2s_digest(self: @ChainState) -> Blake2sDigest {
         let mut hasher = Blake2sHasher::new();
 
         // TODO(m-kus): reorder the fields to make the structure more aligned?
@@ -52,7 +52,7 @@ pub impl ChainStateHashImpl of ChainStateHashTrait {
         let b9 = *self.epoch_start_time;
 
         let mut prev_timestamps = *self.prev_timestamps;
-        let res = if let Some(tail) = prev_timestamps.multi_pop_front::<6>() {
+        if let Some(tail) = prev_timestamps.multi_pop_front::<6>() {
             let [b10, b11, b12, b13, b14, b15] = tail.unbox();
             // Compress the second block
             hasher
@@ -66,9 +66,9 @@ pub impl ChainStateHashImpl of ChainStateHashTrait {
             buffer.append_span(prev_timestamps);
             // Finalize the hash digest
             hasher.finalize(buffer.span())
-        };
+        }
 
-        res.into()
+        hasher.digest()
     }
 }
 

@@ -3,6 +3,7 @@
 //! The data is expected to be prepared in advance and passed as program arguments.
 
 use core::fmt::{Display, Error, Formatter};
+use utils::blake2s_hasher::{Blake2sDigest, Blake2sHasher};
 use utils::double_sha256::double_sha256_word_array;
 use utils::hash::Digest;
 use utils::word_array::{WordArray, WordArrayTrait};
@@ -67,6 +68,25 @@ pub impl BlockHashImpl of BlockHash {
         words.append_u32_le(*self.nonce);
 
         double_sha256_word_array(words)
+    }
+
+    /// Computes the Blake2s digest of the block header.
+    fn blake2s_digest(
+        self: @Header, prev_block_hash: Digest, merkle_root: Digest,
+    ) -> Blake2sDigest {
+        let mut hasher = Blake2sHasher::new();
+        // NOTE: we change the order of the fields here
+        let [a, b, c, d, e, f, g, h] = prev_block_hash.value;
+        let [i, j, k, l, m, n, o, p] = merkle_root.value;
+        hasher.compress_block([a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p]);
+        hasher
+            .finalize_block(
+                [
+                    *self.version, *self.time, *self.bits, *self.nonce, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0,
+                ],
+                16,
+            )
     }
 }
 

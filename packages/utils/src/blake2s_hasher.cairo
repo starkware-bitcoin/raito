@@ -45,12 +45,18 @@ pub impl Blake2sHasherImpl of Blake2sHasher {
         }
         // If the passed data was larger than 16 words, we will fail here
         let block = buffer.span().try_into().expect('Cast to @Blake2sInput failed');
-        blake2s_finalize(self.h, byte_len, *block)
+        self.h = blake2s_finalize(self.h, byte_len, *block);
+        self.h
     }
 
     /// Finalizes without padding.
-    fn finalize_block(ref self: Blake2sState, data: [u32; 16]) -> Blake2sDigest {
-        blake2s_finalize(self.h, self.byte_len + 64, BoxImpl::new(data))
+    fn finalize_block(ref self: Blake2sState, data: [u32; 16], byte_len: u32) -> Blake2sDigest {
+        blake2s_finalize(self.h, self.byte_len + byte_len, BoxImpl::new(data))
+    }
+
+    /// Consumes the hasher and returns the final state (digest).
+    fn digest(self: Blake2sState) -> Blake2sDigest {
+        self.h
     }
 }
 
@@ -59,7 +65,7 @@ pub fn blake2s_hash_pair(left: Blake2sDigest, right: Blake2sDigest) -> Blake2sDi
     let mut state = Blake2sHasher::new();
     let [a, b, c, d, e, f, g, h] = left.unbox();
     let [i, j, k, l, m, n, o, p] = right.unbox();
-    state.finalize_block([a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p])
+    state.finalize_block([a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p], 64)
 }
 
 /// `Into` implementation that converts a `Blake2sDigest` value into a `u256` integer.

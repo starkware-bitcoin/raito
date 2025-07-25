@@ -3,7 +3,8 @@
 
 use core::fmt::{Display, Error, Formatter};
 use crate::blake2s_hasher::{
-    Blake2sDigest, Blake2sDigestFromU256, Blake2sDigestPartialEq, blake2s_hash_pair,
+    Blake2sDigest, Blake2sDigestFromU256, Blake2sDigestIntoU256, Blake2sDigestPartialEq,
+    Blake2sHasher, blake2s_hash_pair,
 };
 
 /// MMR accumulator state.
@@ -55,12 +56,12 @@ pub impl MaybeBlake2sDigestSerde of Serde<Option<Blake2sDigest>> {
 #[generate_trait]
 pub impl MMRImpl of MMRTrait {
     /// Adds an element to the accumulator.
-    fn add(self: @MMR, leaf: Blake2sDigest) -> MMR {
+    fn add(ref self: MMR, leaf: Blake2sDigest) {
         let mut new_roots: Array<Option<Blake2sDigest>> = Default::default();
         let mut first_none_found: bool = false;
         let mut node = leaf;
 
-        for root in *self.roots {
+        for root in self.roots {
             if !first_none_found {
                 if let Some(root) = root {
                     node = blake2s_hash_pair(*root, node);
@@ -79,7 +80,32 @@ pub impl MMRImpl of MMRTrait {
             new_roots.append(None);
         }
 
-        MMR { roots: new_roots.span() }
+        self.roots = new_roots.span();
+    }
+
+    /// Squash MMR roots into a single digest.
+    fn blake2s_digest(self: @MMR) -> Blake2sDigest {
+        let mut hasher = Blake2sHasher::new();
+        let mut roots = *self.roots;
+
+        while let Some(pair) = roots.multi_pop_front::<2>() {
+            let [r0, r1] = pair.unbox();
+            let [a, b, c, d, e, f, g, h] = r0.map_or([0; 8], |r| r.unbox());
+            let [i, j, k, l, m, n, o, p] = r1.map_or([0; 8], |r| r.unbox());
+            let block = [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p];
+            if roots.is_empty() {
+                hasher.finalize_block(block, 64);
+            } else {
+                hasher.compress_block(block);
+            }
+        }
+
+        if !roots.is_empty() {
+            // NOTE that last root is always None
+            hasher.finalize_block([0; 16], 32);
+        }
+
+        hasher.digest()
     }
 }
 
@@ -89,13 +115,13 @@ mod tests {
 
     #[test]
     fn test_mmr_add() {
-        let mmr: MMR = Default::default();
+        let mut mmr: MMR = Default::default();
         let leaf: Blake2sDigest =
             0xc713e33d89122b85e2f646cc518c2e6ef88b06d3b016104faa95f84f878dab66_u256
             .into();
 
         // Add first leave to empty accumulator
-        let mmr = mmr.add(leaf);
+        mmr.add(leaf);
 
         let expected: Span<Option<Blake2sDigest>> = array![
             Some(0xc713e33d89122b85e2f646cc518c2e6ef88b06d3b016104faa95f84f878dab66_u256.into()),
@@ -105,7 +131,7 @@ mod tests {
         assert_eq!(mmr.roots, expected, "cannot add first leave");
 
         // Add second leave
-        let mmr = mmr.add(leaf);
+        mmr.add(leaf);
 
         let expected: Span<Option<Blake2sDigest>> = array![
             Option::None,
@@ -118,7 +144,7 @@ mod tests {
         assert_eq!(mmr.roots, expected, "cannot add second leave");
 
         // Add thirdth leave
-        let mmr = mmr.add(leaf);
+        mmr.add(leaf);
 
         let expected: Span<Option<Blake2sDigest>> = array![
             Some(0xc713e33d89122b85e2f646cc518c2e6ef88b06d3b016104faa95f84f878dab66_u256.into()),
@@ -129,7 +155,7 @@ mod tests {
         assert_eq!(mmr.roots, expected, "cannot add thirdth leave");
 
         // Add fourth leave
-        let mmr = mmr.add(leaf);
+        mmr.add(leaf);
 
         let expected: Span<Option<Blake2sDigest>> = array![
             None, None,
@@ -140,7 +166,7 @@ mod tests {
         assert_eq!(mmr.roots, expected, "cannot add fourth leave");
 
         // Add fifth leave
-        let mmr = mmr.add(leaf);
+        mmr.add(leaf);
 
         let expected: Span<Option<Blake2sDigest>> = array![
             Some(0xc713e33d89122b85e2f646cc518c2e6ef88b06d3b016104faa95f84f878dab66_u256.into()),
