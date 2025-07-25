@@ -4,6 +4,7 @@ pub mod bytearray;
 pub mod double_sha256;
 pub mod hash;
 pub mod merkle_tree;
+pub mod mmr;
 pub mod numeric;
 pub mod sort;
 pub mod word_array;

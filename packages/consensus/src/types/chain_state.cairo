@@ -60,12 +60,12 @@ pub impl ChainStateHashImpl of ChainStateHashTrait {
                     [b0, b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14, b15],
                 );
             // Finalize the hash digest
-            hasher.finalize_block(prev_timestamps)
+            hasher.finalize(prev_timestamps)
         } else {
             let mut buffer = array![b0, b1, b2, b3, b4, b5, b6, b7, b8, b9];
             buffer.append_span(prev_timestamps);
             // Finalize the hash digest
-            hasher.finalize_block(buffer.span())
+            hasher.finalize(buffer.span())
         };
 
         res.into()
