@@ -4810,5 +4810,9 @@
         "merkle_root": "ec2ba1a3784dacd6962d53e9266d08d6cca40cce60240954bb3448c6acdf568f"
       }
     }
-  ]
+  ],
+  "block_mmr": {
+    "roots": [{"hi": 0, "lo": 0}]
+  },
+  "chain_state_proof": null
 }

@@ -61,7 +61,7 @@ for test_file in "${test_files[@]}"; do
             output=$($SCARB --profile proving execute --no-build --print-resource-usage --arguments-file $arguments_file)
             # See https://github.com/software-mansion/scarb/pull/2276
             rm -rf ../../target/execute
-            steps=$(echo $output | grep -o 'steps: [0-9]*' | sed 's/steps: //')
+            steps=$(echo $output | grep -o 'steps: [0-9,]*' | sed 's/steps: //')
 
             if [[ "$nocapture" -eq 1 ]]; then
                 echo -e "\n$output"

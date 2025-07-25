@@ -23,5 +23,9 @@
         "merkle_root": "9b0fc92260312ce44e74ef369f5c66bbb85848f2eddd5a7a1cde251e54ccfdd5"
       }
     }
-  ]
+  ],
+  "block_mmr": {
+    "roots": [{"hi": 0, "lo": 0}]
+  },
+  "chain_state_proof": null
 }

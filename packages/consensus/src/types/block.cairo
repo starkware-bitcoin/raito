@@ -75,17 +75,15 @@ pub impl BlockHashImpl of BlockHash {
         self: @Header, prev_block_hash: Digest, merkle_root: Digest,
     ) -> Blake2sDigest {
         let mut hasher = Blake2sHasher::new();
-        // NOTE: we change the order of the fields here
-        let [a, b, c, d, e, f, g, h] = prev_block_hash.value;
-        let [i, j, k, l, m, n, o, p] = merkle_root.value;
-        hasher.compress_block([a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p]);
+        let [v1, v2, v3, v4, v5, v6, v7, v8] = prev_block_hash.value;
+        let [v9, v10, v11, v12, v13, v14, v15, v16] = merkle_root.value;
+        hasher
+            .compress_block(
+                [*self.version, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15],
+            );
         hasher
             .finalize_block(
-                [
-                    *self.version, *self.time, *self.bits, *self.nonce, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0,
-                ],
-                16,
+                [v16, *self.time, *self.bits, *self.nonce, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 16,
             )
     }
 }

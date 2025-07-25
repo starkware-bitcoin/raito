@@ -55,7 +55,10 @@ def serialize(obj):
         arr = list(map(serialize, obj))
         return tuple([len(arr)] + arr)
     elif isinstance(obj, dict):
-        return tuple(map(serialize, obj.values()))
+        # Inline dict properties that have keys starting with "_"
+        return tuple(
+            tuple(v) if k.startswith("_") else serialize(v) for k, v in obj.items()
+        )
     elif isinstance(obj, tuple):
         return obj
     elif obj is None:

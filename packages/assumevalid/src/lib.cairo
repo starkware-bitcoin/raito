@@ -7,7 +7,7 @@ use utils::mmr::{MMR, MMRTrait};
 
 /// Hash of the bootloader program.
 /// See
-/// - https://github.com/m-kus/cairo-bootloader/blob/main/resources/stwo-bootloader.json
+/// - https://github.com/starkware-industries/starkware/pull/38618
 /// -
 /// https://github.com/starkware-libs/stwo-cairo/blob/3ab588b1ee9b1a0070020dbe1f7e22896bf77fc3/stwo_cairo_verifier/crates/cairo_air/src/lib.cairo#L2474
 const BOOTLOADER_PROGRAM_HASH: felt252 =
@@ -19,11 +19,11 @@ struct Args {
     chain_state: ChainState,
     /// Batch of blocks that have to be applied to the current chain state.
     blocks: Array<Block>,
+    /// Merkle Mountain Range of the block hashes.
+    block_mmr: MMR,
     /// Proof of the previous chain state transition.
     /// If set to None, the chain state is assumed to be the genesis state.
     chain_state_proof: Option<CairoProof>,
-    /// Merkle Mountain Range of the block hashes.
-    block_mmr: MMR,
 }
 
 #[derive(Drop, Serde)]
@@ -90,9 +90,11 @@ fn main(args: Args) -> Result {
         // Validate the block header
         match validate_block_header(current_chain_state, block) {
             Ok(new_chain_state) => { current_chain_state = new_chain_state; },
-            Err(err) => panic!("Error: '{}'", err),
+            Err(err) => panic!("FAIL: error='{}'", err),
         };
     }
+
+    println!("OK");
 
     Result {
         chain_state_hash: current_chain_state.blake2s_digest().into(),

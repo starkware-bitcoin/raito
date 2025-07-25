@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024_07"
 
 [executable]
-allow-syscalls=true
+allow-syscalls = true
 
 [dependencies]
 cairo_execute = "2.11.4"
@@ -18,3 +18,6 @@ syscalls = ["consensus/syscalls", "utils/syscalls"]
 
 [dev-dependencies]
 cairo_test.workspace = true
+
+[scripts]
+test = "scarb --profile proving build --target-kinds executable && ../../scripts/data/integration_tests.sh"
