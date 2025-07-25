@@ -1,6 +1,6 @@
 use core::blake::{blake2s_compress, blake2s_finalize};
 use core::box::BoxImpl;
-use utils::numeric::u32x8_to_u256;
+use utils::numeric::{u256_to_u32x8, u32x8_to_u256};
 
 /// BLAKE2s IV is the same as SHA-256 IV
 /// We modify the first word to pre-configure:
@@ -8,6 +8,9 @@ use utils::numeric::u32x8_to_u256;
 const BLAKE2S_256_INITIAL_STATE: [u32; 8] = [
     0x6B08E647, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19,
 ];
+
+/// Alias for the Blake2s digest.
+pub type Blake2sDigest = Box<[u32; 8]>;
 
 /// Blake2s incremental state.
 #[derive(Debug, Drop, Copy)]
@@ -33,7 +36,7 @@ pub impl Blake2sHasherImpl of Blake2sHasher {
     /// Pads the data to 16 words and finalizes the hash.
     /// Data must contain no more than 16 words.
     /// NOTE: u32 words are little-endian (both for input and digest).
-    fn finalize_block(ref self: Blake2sState, data: Span<u32>) -> Box<[u32; 8]> {
+    fn finalize_block(ref self: Blake2sState, data: Span<u32>) -> Blake2sDigest {
         let mut buffer: Array<u32> = data.into();
         let byte_len = self.byte_len + buffer.len() * 4;
         // Pad the buffer to 16 words.
@@ -46,12 +49,29 @@ pub impl Blake2sHasherImpl of Blake2sHasher {
     }
 }
 
-/// Converts a Blake2s digest to a u256.
-/// Takes the words in the reversed order.
-/// If you use Rust/Python implementation, reinterpet reference digest as LE integer to compare.
-pub fn blake2s_digest_to_u256_le(digest: Box<[u32; 8]>) -> u256 {
-    let [a, b, c, d, e, f, g, h] = digest.unbox();
-    u32x8_to_u256([h, g, f, e, d, c, b, a])
+/// Computes the parent hash of two Blake2s digests.
+pub fn blake2s_hash_pair(left: Blake2sDigest, right: Blake2sDigest) -> Blake2sDigest {
+    let [a, b, c, d, e, f, g, h] = left.unbox();
+    let [i, j, k, l, m, n, o, p] = right.unbox();
+    let msg = BoxImpl::new([a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p]);
+    let state = BoxImpl::new(BLAKE2S_256_INITIAL_STATE);
+    blake2s_finalize(state, 64, msg)
+}
+
+/// `Into` implementation that converts a `Blake2sDigest` value into a `u256` integer.
+/// NOTE: digest words remain in little-endian byte order. 
+pub impl Blake2sDigestIntoU256 of Into<Blake2sDigest, u256> {
+    fn into(self: Blake2sDigest) -> u256 {
+        u32x8_to_u256(self.unbox())
+    }
+}
+
+/// `Into` implementation that converts a `u256` integer into a `Blake2sDigest`.
+/// NOTE: digest words are expected to be in little-endian byte order. 
+pub impl Blake2sDigestFromU256 of Into<u256, Blake2sDigest> {
+    fn into(self: u256) -> Blake2sDigest {
+        BoxImpl::new(u256_to_u32x8(self))
+    }
 }
 
 #[cfg(test)]
@@ -62,9 +82,9 @@ mod tests {
     fn test_blake2s_hasher_empty() {
         let mut hasher = Blake2sHasher::new();
         let digest = hasher.finalize_block(array![].span());
-        let res = blake2s_digest_to_u256_le(digest);
+        let res: u256 = digest.into();
         assert_eq!(
-            res, 113047845297338535936082629575907534931834714830939814641088356107939732922729,
+            res, 0x307a216994809079d02111e17c4a354248b6551f1ea5a12cfd0d251bf9eed01e,
         );
     }
 
@@ -73,9 +93,9 @@ mod tests {
         let mut hasher = Blake2sHasher::new();
         hasher.compress_block([1; 16]);
         let digest = hasher.finalize_block(array![2, 3, 4, 5, 6, 7].span());
-        let res = blake2s_digest_to_u256_le(digest);
+        let res: u256 = digest.into();
         assert_eq!(
-            res, 46893214958280054196873295526662987612846164852081208338716593733223283895883,
+            res, 0xdc1f2e4b6ff53e2d0bbeb04629cb7012c61ff734360024087cd333cf67ac9e7d,
         );
     }
 }

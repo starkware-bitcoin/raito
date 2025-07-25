@@ -6,7 +6,7 @@
 
 use core::fmt::{Display, Error, Formatter};
 use core::hash::{Hash, HashStateExTrait, HashStateTrait};
-use utils::blake2s_hasher::{Blake2sHasher, blake2s_digest_to_u256_le};
+use utils::blake2s_hasher::{Blake2sHasher, Blake2sDigestIntoU256};
 use utils::hash::Digest;
 use utils::numeric::u256_to_u32x8;
 
@@ -68,7 +68,7 @@ pub impl ChainStateHashImpl of ChainStateHashTrait {
             hasher.finalize_block(buffer.span())
         };
 
-        blake2s_digest_to_u256_le(res)
+        res.into()
     }
 }
 

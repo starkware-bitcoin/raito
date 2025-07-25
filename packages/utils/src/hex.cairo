@@ -74,7 +74,7 @@ pub fn hex_char_to_nibble(hex_char: u8) -> u8 {
         // a-f
         hex_char - 87
     } else {
-        panic!("Invalid hex character: {hex_char}");
+        assert!(false, "Invalid hex character: {hex_char}");
         0
     }
 }
