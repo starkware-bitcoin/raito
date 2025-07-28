@@ -197,6 +197,10 @@ prove-pow:
 	@echo ">>> Prove POW..."
 	. .venv/bin/activate && cd scripts/data && python prove_pow.py $(if $(START),--start $(START)) --blocks $(or $(BLOCKS),100) --step $(or $(STEP),10) $(if $(SLOW),--slow) $(if $(VERBOSE),--verbose)
 
+collect-resources-all:
+	@echo ">>> Collecting resource usage data (all tests)..."
+	cd packages/client && python ../../scripts/data/collect_resources.py $(if $(NOCAPTURE),--nocapture) $(if $(FORCEALL),--forceall)
+
 # Main data generation target, depending on specific data generation tasks
 data-generate: data-generate-timestamp data-generate-utxo
 	@echo "All data generation tasks completed."

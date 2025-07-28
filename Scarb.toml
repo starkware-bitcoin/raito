@@ -19,4 +19,4 @@ inherits = "release"
 [profile.proving.cairo]
 enable-gas = false
 sierra-replace-ids = true
-unsafe-panic = false
+unsafe-panic = true

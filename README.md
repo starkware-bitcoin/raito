@@ -202,6 +202,7 @@ pip install -r scripts/data/requirements.txt
 
 - [Data processing notes](./docs/data.md)
 - [Utreexo implementation notes](./docs/utreexo.md)
+- [Resource usage](./docs/resource_usage_report.csv) (without sha2 steps!)
 - [ZeroSync](https://github.com/ZeroSync/ZeroSync)
 - [Bitcoin VM in Cairo](https://github.com/keep-starknet-strange/shinigami)
 - [STWO](https://github.com/starkware-libs/stwo)
