@@ -239,57 +239,56 @@ def run_prover(job_info, executable, proof, arguments):
     if returncode != 0:
         logger.error(f"{job_info} [CAIRO_RUNNER] error: {stdout or stderr}")
 
-        #     # Try to get more meaningful error message using scarb execute
-        #     logger.info(
-        #         f"{job_info} [CAIRO_RUNNER] failed, trying scarb execute for better error messages..."
-        #     )
-        #     scarb_cmd = [
-        #         "scarb",
-        #         "--profile",
-        #         "proving",
-        #         "execute",
-        #         "--no-build",
-        #         "--package",
-        #         "assumevalid",
-        #         "--arguments-file",
-        #         str(arguments),
-        #         "--print-resource-usage",
-        #     ]
-        #     logger.debug(
-        #         f"{job_info} [SCARB_EXECUTE] command:\n{' '.join(map(str, scarb_cmd))}"
-        #     )
-        #     (
-        #         scarb_stdout,
-        #         scarb_stderr,
-        #         scarb_returncode,
-        #         scarb_elapsed,
-        #         scarb_max_memory,
-        #     ) = run(scarb_cmd)
+        # Try to get more meaningful error message using scarb execute
+        logger.info(
+            f"{job_info} [CAIRO_RUNNER] failed, trying cairo-execute for better error messages..."
+        )
+        scarb_cmd = [
+            "cairo-execute",
+            "--prebuilt",
+            "--args-file",
+            str(arguments),
+            "--output-path",
+            str(batch_dir / "output.txt"),
+            "--layout",
+            "all_cairo_stwo",
+            executable,
+        ]
+        logger.debug(
+            f"{job_info} [CAIRO_EXECUTE] command:\n{' '.join(map(str, scarb_cmd))}"
+        )
+        (
+            scarb_stdout,
+            scarb_stderr,
+            scarb_returncode,
+            scarb_elapsed,
+            scarb_max_memory,
+        ) = run(scarb_cmd)
 
-        #     steps_info.append(
-        #         StepInfo(
-        #             step="SCARB_EXECUTE",
-        #             stdout=scarb_stdout,
-        #             stderr=scarb_stderr,
-        #             returncode=scarb_returncode,
-        #             elapsed=scarb_elapsed,
-        #             max_memory=scarb_max_memory,
-        #         )
-        #     )
+        steps_info.append(
+            StepInfo(
+                step="CAIRO_EXECUTE",
+                stdout=scarb_stdout,
+                stderr=scarb_stderr,
+                returncode=scarb_returncode,
+                elapsed=scarb_elapsed,
+                max_memory=scarb_max_memory,
+            )
+        )
 
-        #     save_prover_log(
-        #         batch_dir,
-        #         "SCARB_EXECUTE",
-        #         scarb_stdout,
-        #         scarb_stderr,
-        #         scarb_returncode,
-        #         scarb_elapsed,
-        #         scarb_max_memory,
-        #     )
+        save_prover_log(
+            batch_dir,
+            "CAIRO_EXECUTE",
+            scarb_stdout,
+            scarb_stderr,
+            scarb_returncode,
+            scarb_elapsed,
+            scarb_max_memory,
+        )
 
-        #     logger.error(
-        #         f"{job_info} [SCARB_EXECUTE] output:\n{scarb_stdout or scarb_stderr}"
-        #     )
+        logger.error(
+            f"{job_info} [CAIRO_EXECUTE] output:\n{scarb_stdout or scarb_stderr}"
+        )
         return steps_info
 
     prove_cmd = [
@@ -357,8 +356,6 @@ def run_prover(job_info, executable, proof, arguments):
 def prove_batch(height, step, fast_data_generation=True):
     mode = "light"
     job_info = f"Job(height='{height}', blocks={step})"
-
-    logger.debug(f"{job_info} proving...")
 
     try:
         # Create dedicated directory for this proof batch

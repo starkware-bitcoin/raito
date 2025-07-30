@@ -84,10 +84,7 @@ fn get_prev_result(proof: CairoProof) -> Result {
     assert(program_hash == BOOTLOADER_PROGRAM_HASH, 'Unexpected bootloader');
 
     // Verify the proof
-    match verify_cairo(proof) {
-        Ok(_) => {},
-        Err(e) => panic!("Invalid proof: {:?}", e),
-    }
+    verify_cairo(proof);
 
     // Deserialize the bootloader output
     let mut serialized_bootloader_output = output.span();
