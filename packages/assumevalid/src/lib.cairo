@@ -1,6 +1,7 @@
 use consensus::types::block::{Block, BlockHash, TransactionData};
 use consensus::types::chain_state::{ChainState, ChainStateHashTrait};
 use consensus::validation::header::validate_block_header;
+use core::box::BoxImpl;
 use stwo_cairo_air::{CairoProof, VerificationOutput, get_verification_output, verify_cairo};
 use utils::blake2s_hasher::Blake2sDigestIntoU256;
 use utils::mmr::{MMR, MMRTrait};
@@ -75,7 +76,7 @@ fn main(args: Args) -> Result {
     };
 
     let mut current_chain_state = chain_state;
-    let mut current_block_mmr = block_mmr;
+    let mut current_block_mmr = BoxImpl::new(block_mmr);
 
     // Validate the blocks and update the current chain state
     for block in blocks {
@@ -85,7 +86,10 @@ fn main(args: Args) -> Result {
             TransactionData::MerkleRoot(root) => root,
             TransactionData::Transactions(_) => panic!("Expected Merkle root"),
         };
-        current_block_mmr.add(block.header.blake2s_digest(prev_block_hash, merkle_root));
+        current_block_mmr =
+            BoxImpl::new(
+                current_block_mmr.add(block.header.blake2s_digest(prev_block_hash, merkle_root)),
+            );
 
         // Validate the block header
         match validate_block_header(current_chain_state, block) {

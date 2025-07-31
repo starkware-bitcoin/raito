@@ -138,7 +138,9 @@ impl TransactionDataDisplay of Display<TransactionData> {
 
 #[cfg(test)]
 mod tests {
-    use utils::hash::Digest;
+    use utils::blake2s_hasher::Blake2sDigestIntoU256;
+    use utils::hash::{Digest, DigestTrait};
+    use utils::numeric::u256_to_u32x8;
     use crate::types::chain_state::ChainState;
     use super::{BlockHash, Header};
 
@@ -213,5 +215,23 @@ mod tests {
             .into();
 
         assert_ne!(expected_block_hash, block_hash_result);
+    }
+
+    #[test]
+    fn test_block_hash_blake2s() {
+        let header = Header {
+            version: 1_u32, time: 1231731025_u32, bits: 0x1d00ffff_u32, nonce: 1889418792_u32,
+        };
+        let merkle_root = DigestTrait::new(
+            u256_to_u32x8(0x7dac2c5666815c17a3b36427de37bb9d2e2c5ccec3f8633eb91a4205cb4c10ff_u256),
+        );
+        let best_block_hash = DigestTrait::new(
+            u256_to_u32x8(0x000000002a22cfee1f2c846adbd12b3e183d4f97683f85dad08a79780a84bd55_u256),
+        );
+        let block_hash_result: u256 = header.blake2s_digest(best_block_hash, merkle_root).into();
+
+        let expected_block_hash =
+            0x0fcf8d89df790c8b0626b1ce495e22aca80b9332760b3c7bf9f46b7dd3b35556_u256;
+        assert_eq!(expected_block_hash, block_hash_result);
     }
 }

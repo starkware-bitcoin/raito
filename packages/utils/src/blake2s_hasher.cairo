@@ -51,7 +51,8 @@ pub impl Blake2sHasherImpl of Blake2sHasher {
 
     /// Finalizes without padding.
     fn finalize_block(ref self: Blake2sState, data: [u32; 16], byte_len: u32) -> Blake2sDigest {
-        blake2s_finalize(self.h, self.byte_len + byte_len, BoxImpl::new(data))
+        self.h = blake2s_finalize(self.h, self.byte_len + byte_len, BoxImpl::new(data));
+        self.h
     }
 
     /// Consumes the hasher and returns the final state (digest).

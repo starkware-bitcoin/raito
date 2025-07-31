@@ -55,8 +55,8 @@ pub impl MaybeBlake2sDigestSerde of Serde<Option<Blake2sDigest>> {
 
 #[generate_trait]
 pub impl MMRImpl of MMRTrait {
-    /// Adds an element to the accumulator.
-    fn add(ref self: MMR, leaf: Blake2sDigest) {
+    /// Adds an element to the accumulator, return the new MMR.
+    fn add(self: @MMR, leaf: Blake2sDigest) -> MMR {
         let mut new_roots: Array<Option<Blake2sDigest>> = Default::default();
         let mut first_none_found: bool = false;
         let mut node = leaf;
@@ -80,7 +80,7 @@ pub impl MMRImpl of MMRTrait {
             new_roots.append(None);
         }
 
-        self.roots = new_roots.span();
+        MMR { roots: new_roots.span() }
     }
 
     /// Squash MMR roots into a single digest.
@@ -115,13 +115,13 @@ mod tests {
 
     #[test]
     fn test_mmr_add() {
-        let mut mmr: MMR = Default::default();
+        let mmr: MMR = Default::default();
         let leaf: Blake2sDigest =
             0xc713e33d89122b85e2f646cc518c2e6ef88b06d3b016104faa95f84f878dab66_u256
             .into();
 
         // Add first leave to empty accumulator
-        mmr.add(leaf);
+        let mmr = mmr.add(leaf);
 
         let expected: Span<Option<Blake2sDigest>> = array![
             Some(0xc713e33d89122b85e2f646cc518c2e6ef88b06d3b016104faa95f84f878dab66_u256.into()),
@@ -131,7 +131,7 @@ mod tests {
         assert_eq!(mmr.roots, expected, "cannot add first leave");
 
         // Add second leave
-        mmr.add(leaf);
+        let mmr = mmr.add(leaf);
 
         let expected: Span<Option<Blake2sDigest>> = array![
             Option::None,
@@ -144,7 +144,7 @@ mod tests {
         assert_eq!(mmr.roots, expected, "cannot add second leave");
 
         // Add thirdth leave
-        mmr.add(leaf);
+        let mmr = mmr.add(leaf);
 
         let expected: Span<Option<Blake2sDigest>> = array![
             Some(0xc713e33d89122b85e2f646cc518c2e6ef88b06d3b016104faa95f84f878dab66_u256.into()),
@@ -155,7 +155,7 @@ mod tests {
         assert_eq!(mmr.roots, expected, "cannot add thirdth leave");
 
         // Add fourth leave
-        mmr.add(leaf);
+        let mmr = mmr.add(leaf);
 
         let expected: Span<Option<Blake2sDigest>> = array![
             None, None,
@@ -166,7 +166,7 @@ mod tests {
         assert_eq!(mmr.roots, expected, "cannot add fourth leave");
 
         // Add fifth leave
-        mmr.add(leaf);
+        let mmr = mmr.add(leaf);
 
         let expected: Span<Option<Blake2sDigest>> = array![
             Some(0xc713e33d89122b85e2f646cc518c2e6ef88b06d3b016104faa95f84f878dab66_u256.into()),
