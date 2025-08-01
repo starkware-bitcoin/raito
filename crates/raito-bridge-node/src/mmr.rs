@@ -1,5 +1,6 @@
 use std::path::Path;
 use std::sync::Arc;
+use tokio::fs;
 
 use accumulators::hasher::stark_blake::StarkBlakeHasher;
 use accumulators::hasher::Hasher;
@@ -8,6 +9,7 @@ use accumulators::store::memory::InMemoryStore;
 use accumulators::store::sqlite::SQLiteStore;
 use accumulators::store::Store;
 use bitcoin::block::Header as BlockHeader;
+use bitcoin::hashes::Hash;
 
 /// MMR accumulator state
 #[derive(Debug)]
@@ -35,6 +37,10 @@ impl Accumulator {
 
     /// Create MMR from file
     pub async fn from_file(path: &Path, mmr_id: &str) -> Result<Self, anyhow::Error> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).await?;
+        }
+
         let store =
             Arc::new(SQLiteStore::new(path.to_str().unwrap(), Some(true), Some(mmr_id)).await?);
         let hasher = Arc::new(StarkBlakeHasher::default());
@@ -107,8 +113,8 @@ pub fn block_header_digest(
 ) -> anyhow::Result<String> {
     let data = vec![
         hex::encode(&block_header.version.to_consensus().to_be_bytes()),
-        block_header.prev_blockhash.to_string(),
-        block_header.merkle_root.to_string(),
+        hex::encode(&block_header.prev_blockhash.to_byte_array()),
+        hex::encode(&block_header.merkle_root.to_byte_array()),
         hex::encode(&block_header.time.to_be_bytes()),
         hex::encode(&block_header.bits.to_consensus().to_be_bytes()),
         hex::encode(&block_header.nonce.to_be_bytes()),
@@ -239,7 +245,30 @@ mod tests {
         let digest = block_header_digest(hasher, block_header).unwrap();
         assert_eq!(
             digest,
-            "0x0fcf8d89df790c8b0626b1ce495e22aca80b9332760b3c7bf9f46b7dd3b35556"
+            "0x50b005dd2964720fcd066875bc1cf13a06703a5c8efe8b02a1fd7ea902050f09"
+        );
+    }
+
+    #[test]
+    fn test_block_header_blake_digest_genesis() {
+        let hasher = Arc::new(StarkBlakeHasher::default());
+        let block_header: BlockHeader = serde_json::from_str(
+            r#"
+            {
+                "version": 1,
+                "prev_blockhash": "0000000000000000000000000000000000000000000000000000000000000000",
+                "merkle_root": "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",
+                "time": 1231006505,
+                "bits": 486604799,
+                "nonce": 2083236893
+            }
+            "#,
+        )
+        .unwrap();
+        let digest = block_header_digest(hasher, block_header).unwrap();
+        assert_eq!(
+            digest,
+            "0x5fd720d341e64d17d3b8624b17979b0d0dad4fc17d891796a3a51a99d3f41599"
         );
     }
 }

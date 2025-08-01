@@ -1,9 +1,9 @@
-use consensus::types::block::{Block, BlockHash, TransactionData};
+use consensus::types::block::{Block, BlockHash, Header, TransactionData};
 use consensus::types::chain_state::{ChainState, ChainStateHashTrait};
 use consensus::validation::header::validate_block_header;
 use core::box::BoxImpl;
 use stwo_cairo_air::{CairoProof, VerificationOutput, get_verification_output, verify_cairo};
-use utils::blake2s_hasher::Blake2sDigestIntoU256;
+use utils::blake2s_hasher::{Blake2sDigestFromU256, Blake2sDigestIntoU256};
 use utils::mmr::{MMR, MMRTrait};
 
 /// Hash of the bootloader program.
@@ -67,7 +67,7 @@ fn main(args: Args) -> Result {
         res
     } else {
         assert(chain_state == Default::default(), 'Invalid genesis state');
-        assert(block_mmr == Default::default(), 'Invalid genesis block MMR');
+        assert(block_mmr == genesis_block_mmr(), 'Invalid genesis block MMR');
         Result {
             chain_state_hash: chain_state.blake2s_digest().into(),
             block_mmr_hash: block_mmr.blake2s_digest().into(),
@@ -145,5 +145,34 @@ fn get_prev_result(proof: CairoProof) -> Result {
         chain_state_hash: task_result.chain_state_hash,
         block_mmr_hash: task_result.block_mmr_hash,
         prev_program_hash: task_program_hash,
+    }
+}
+
+/// Create MMR at height 0 (after adding genesis block to the accumulator).
+fn genesis_block_mmr() -> MMR {
+    let genesis_block_header = Header {
+        version: 1, time: 1231006505, bits: 486604799, nonce: 2083236893,
+    };
+    let merkle_root = 0x4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b_u256
+        .into();
+    let prev_block_hash = 0_u256.into();
+    let root = genesis_block_header.blake2s_digest(prev_block_hash, merkle_root);
+    MMRTrait::new(array![Some(root)])
+}
+
+#[cfg(test)]
+mod tests {
+    use utils::blake2s_hasher::{Blake2sDigest, Blake2sDigestIntoU256, Blake2sDigestPartialEq};
+    use super::*;
+
+    #[test]
+    fn test_genesis_block_mmr() {
+        let mmr = genesis_block_mmr();
+        let expected: Span<Option<Blake2sDigest>> = array![
+            Some(0x5fd720d341e64d17d3b8624b17979b0d0dad4fc17d891796a3a51a99d3f41599_u256.into()),
+            None,
+        ]
+            .span();
+        assert_eq!(mmr.roots, expected, "genesis block MMR is not correct");
     }
 }

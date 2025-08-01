@@ -55,6 +55,15 @@ pub impl MaybeBlake2sDigestSerde of Serde<Option<Blake2sDigest>> {
 
 #[generate_trait]
 pub impl MMRImpl of MMRTrait {
+    /// Construct MMR from an array of roots.
+    fn new(mut roots: Array<Option<Blake2sDigest>>) -> MMR {
+        // Check if terminates with `None`
+        if (roots[roots.len() - 1].is_some()) {
+            roots.append(None);
+        }
+        MMR { roots: roots.span() }
+    }
+
     /// Adds an element to the accumulator, return the new MMR.
     fn add(self: @MMR, leaf: Blake2sDigest) -> MMR {
         let mut new_roots: Array<Option<Blake2sDigest>> = Default::default();

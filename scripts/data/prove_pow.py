@@ -354,7 +354,15 @@ def run_prover(job_info, executable, proof, arguments):
     return steps_info
 
 
-def prove_batch(height, step, fast_data_generation=True):
+def read_block_mmr_roots(mmr_roots_dir, height):
+    shard_size = 10000
+    shard_name = (height // shard_size + 1) * shard_size
+    mmr_roots_file = mmr_roots_dir / shard_name / f"block_{height}.json"
+    with open(mmr_roots_file, "r") as f:
+        return json.load(f)
+
+
+def prove_batch(height, step, mmr_roots_dir, fast_data_generation=True):
     mode = "light"
     job_info = f"Job(height='{height}', blocks={step})"
 
@@ -379,6 +387,9 @@ def prove_batch(height, step, fast_data_generation=True):
 
         args_start_time = time.time()
 
+        # Read MMR roots from a file
+        mmr_roots = read_block_mmr_roots(mmr_roots_dir, height)
+
         # Batch data - store in the batch directory
         batch_file = batch_dir / "batch.json"
         batch_data = generate_data(
@@ -387,6 +398,7 @@ def prove_batch(height, step, fast_data_generation=True):
         batch_args = {
             "chain_state": batch_data["chain_state"],
             "blocks": batch_data["blocks"],
+            "block_mmr": mmr_roots,
         }
         batch_file.write_text(json.dumps(batch_args, indent=2))
 
@@ -466,6 +478,9 @@ def main(start, blocks, step, fast_data_generation=True):
 
     PROOF_DIR.mkdir(exist_ok=True)
 
+    # TODO: get from arg / env var ?
+    mmr_roots_dir = Path(".mmr_data/roots")
+
     end = start + blocks
 
     # Generate height range
@@ -477,7 +492,9 @@ def main(start, blocks, step, fast_data_generation=True):
 
     # Process jobs sequentially
     for height in height_range:
-        success = prove_batch(height, processing_step, fast_data_generation)
+        success = prove_batch(
+            height, processing_step, mmr_roots_dir, fast_data_generation
+        )
         if success:
             processed_count += 1
         else:
