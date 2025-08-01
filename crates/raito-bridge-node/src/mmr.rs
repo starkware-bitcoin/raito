@@ -1,33 +1,44 @@
+use std::path::Path;
 use std::sync::Arc;
 
 use accumulators::hasher::stark_blake::StarkBlakeHasher;
 use accumulators::hasher::Hasher;
 use accumulators::mmr::{PeaksOptions, MMR};
 use accumulators::store::memory::InMemoryStore;
+use accumulators::store::sqlite::SQLiteStore;
+use accumulators::store::Store;
 use bitcoin::block::Header as BlockHeader;
 
 /// MMR accumulator state
 #[derive(Debug)]
 pub struct Accumulator {
-    hasher: Arc<StarkBlakeHasher>,
+    hasher: Arc<dyn Hasher>,
     #[allow(dead_code)]
-    store: Arc<InMemoryStore>,
+    store: Arc<dyn Store>,
     mmr: MMR,
 }
 
 impl Default for Accumulator {
     fn default() -> Self {
-        Self::new(InMemoryStore::default(), StarkBlakeHasher::default(), None)
+        let store = Arc::new(InMemoryStore::default());
+        let hasher = Arc::new(StarkBlakeHasher::default());
+        Self::new(store, hasher, None)
     }
 }
 
 impl Accumulator {
     /// Create a new default MMR
-    pub fn new(store: InMemoryStore, hasher: StarkBlakeHasher, mmr_id: Option<String>) -> Self {
-        let store = Arc::new(store);
-        let hasher = Arc::new(hasher);
+    pub fn new(store: Arc<dyn Store>, hasher: Arc<dyn Hasher>, mmr_id: Option<String>) -> Self {
         let mmr = MMR::new(store.clone(), hasher.clone(), mmr_id);
         Self { hasher, store, mmr }
+    }
+
+    /// Create MMR from file
+    pub async fn from_file(path: &Path, mmr_id: &str) -> Result<Self, anyhow::Error> {
+        let store =
+            Arc::new(SQLiteStore::new(path.to_str().unwrap(), Some(true), Some(mmr_id)).await?);
+        let hasher = Arc::new(StarkBlakeHasher::default());
+        Ok(Self::new(store, hasher, Some(mmr_id.to_string())))
     }
 
     /// Add a leaf to the MMR
@@ -37,8 +48,17 @@ impl Accumulator {
     }
 
     pub async fn add_block_header(&mut self, block_header: BlockHeader) -> anyhow::Result<()> {
-        let leaf = block_header_blake_digest(&self.hasher, block_header)?;
+        let leaf = block_header_digest(self.hasher.clone(), block_header)?;
         self.add(leaf).await
+    }
+
+    pub async fn get_block_count(&self) -> anyhow::Result<u32> {
+        self.mmr
+            .leaves_count
+            .get()
+            .await
+            .map(|v| v as u32)
+            .map_err(|e| anyhow::anyhow!("Failed to get block count: {}", e))
     }
 
     /// Get the roots of the MMR in sparse format (compatible with Cairo implementation)
@@ -81,8 +101,8 @@ impl Accumulator {
     }
 }
 
-pub fn block_header_blake_digest(
-    hasher: &StarkBlakeHasher,
+pub fn block_header_digest(
+    hasher: Arc<dyn Hasher>,
     block_header: BlockHeader,
 ) -> anyhow::Result<String> {
     let data = vec![
@@ -202,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_block_header_blake_digest() {
-        let hasher = StarkBlakeHasher::default();
+        let hasher = Arc::new(StarkBlakeHasher::default());
         let block_header: BlockHeader = serde_json::from_str(
             r#"
             {
@@ -216,7 +236,7 @@ mod tests {
             "#,
         )
         .unwrap();
-        let digest = block_header_blake_digest(&hasher, block_header).unwrap();
+        let digest = block_header_digest(hasher, block_header).unwrap();
         assert_eq!(
             digest,
             "0x0fcf8d89df790c8b0626b1ce495e22aca80b9332760b3c7bf9f46b7dd3b35556"

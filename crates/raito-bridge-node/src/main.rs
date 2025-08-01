@@ -1,5 +1,7 @@
 #![doc = include_str!("../README.md")]
 
+use std::path::PathBuf;
+
 use clap::{command, Parser};
 use tokio::task::JoinHandle;
 use tracing::{error, info, subscriber::set_global_default};
@@ -27,8 +29,10 @@ struct Cli {
     /// Bitcoin RPC user:password (optional)
     #[arg(long, env = "USERPWD")]
     rpc_userpwd: Option<String>,
+    #[arg(long, default_value = "./.mmr_data/mmr.db")]
+    mmr_db_path: PathBuf,
     /// Output directory for sparse roots JSON files
-    #[arg(long, default_value = "./.mmr_data")]
+    #[arg(long, default_value = "./.mmr_data/roots")]
     mmr_roots_dir: String,
     /// Number of blocks per sparse roots shard directory
     #[arg(long, default_value = "10000")]
@@ -68,6 +72,7 @@ async fn main() {
             output_dir: cli.mmr_roots_dir,
             shard_size: cli.mmr_shard_size,
         },
+        mmr_db_path: cli.mmr_db_path,
     };
     let mut indexer = Indexer::new(indexer_config, shutdown.subscribe());
 

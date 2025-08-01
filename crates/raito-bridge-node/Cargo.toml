@@ -8,7 +8,7 @@ edition = "2021"
 tokio = { version = "1.36", features = ["full"] }
 
 # Merkle mountain range
-accumulators = { git = "https://github.com/m-kus/rust-accumulators", rev = "588711663348fcf22fd4af624d0b0cd3bea709f1", features = ["blake", "memory", "mmr"]}
+accumulators = { git = "https://github.com/m-kus/rust-accumulators", rev = "588711663348fcf22fd4af624d0b0cd3bea709f1", features = ["blake", "memory", "sqlite", "mmr"]}
 
 # Bitcoin RPC and types
 jsonrpsee.workspace = true

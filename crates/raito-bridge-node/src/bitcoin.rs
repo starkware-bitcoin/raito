@@ -79,20 +79,20 @@ impl BitcoinClient {
         Ok(res as u32)
     }
 
-    /// Get next block header
-    pub async fn get_next_block_header(
+    /// Wait for a block header at the given height
+    pub async fn wait_block_header(
         &mut self,
-        current_height: u32,
+        height: u32,
     ) -> anyhow::Result<(BlockHeader, BlockHash)> {
-        while current_height >= self.block_count {
+        while height >= self.block_count {
             self.block_count = self.get_block_count().await?;
-            if current_height < self.block_count {
+            if height < self.block_count {
                 debug!("New block count: {}", self.block_count);
                 break;
             } else {
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
             }
         }
-        self.get_block_header_by_height(current_height + 1).await
+        self.get_block_header_by_height(height).await
     }
 }
