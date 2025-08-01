@@ -32,6 +32,12 @@ install-cairo-execute:
 install-scarb-eject:
 	cargo install --git https://github.com/software-mansion-labs/scarb-eject
 
+install-convert-proof-format:
+	RUSTFLAGS="-C target-cpu=native -C opt-level=3" \
+		cargo install --force \
+		--git https://github.com/starkware-libs/stwo-cairo \
+		dev-utils
+
 install-corelib:
 	mkdir -p vendor
 	rm -rf vendor/cairo
@@ -39,7 +45,7 @@ install-corelib:
 	(cd vendor/cairo && git checkout $(CAIRO_EXECUTE_REV))
 	ln -s "$(CURDIR)/vendor/cairo/corelib" packages/assumevalid/corelib
 
-install: install-bootloader-hints install-stwo install-cairo-execute
+install: install-bootloader-hints install-stwo install-cairo-execute install-convert-proof-format
 
 ########################################## ASSUMEVALID ##########################################
 
@@ -197,6 +203,10 @@ prove-pow:
 	@echo ">>> Prove POW..."
 	. .venv/bin/activate && cd scripts/data && python prove_pow.py $(if $(START),--start $(START)) --blocks $(or $(BLOCKS),100) --step $(or $(STEP),10) $(if $(SLOW),--slow) $(if $(VERBOSE),--verbose)
 
+build-recent-proof:
+	@echo ">>> Building recent proof..."
+	. .venv/bin/activate && cd scripts/data && python build_recent_proof.py $(if $(START),--start $(START)) $(if $(VERBOSE),--verbose)
+
 collect-resources-all:
 	@echo ">>> Collecting resource usage data (all tests)..."
 	cd packages/client && python ../../scripts/data/collect_resources.py $(if $(NOCAPTURE),--nocapture) $(if $(FORCEALL),--forceall)
@@ -204,3 +214,4 @@ collect-resources-all:
 # Main data generation target, depending on specific data generation tasks
 data-generate: data-generate-timestamp data-generate-utxo
 	@echo "All data generation tasks completed."
+

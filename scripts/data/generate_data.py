@@ -342,6 +342,9 @@ def generate_data(
     blocks = []
 
     for i in range(num_blocks):
+        if next_block_hash is None:
+            raise Exception(f"No next block hash for block {initial_height + i + 1}")
+
         logger.debug(f"Fetching block {initial_height + i + 1} {i + 1}/{num_blocks}...")
 
         # Interblock cache
@@ -380,7 +383,10 @@ def generate_data(
 
         blocks.append(block)
         chain_state = next_chain_state(chain_state, block)
-        next_block_hash = block["nextblockhash"]
+
+        logger.info(f"block: {block}")
+
+        next_block_hash = block.get("nextblockhash")
 
         logger.info(f"Fetched block {initial_height + i + 1} {i + 1}/{num_blocks}")
 
