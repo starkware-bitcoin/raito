@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 TMP_DIR = Path(".tmp")
 PROOF_DIR = Path(".proofs")
 
+
 @dataclass
 class StepInfo:
     step: str
@@ -297,6 +298,7 @@ def run_prover(job_info, executable, proof, arguments):
                 logger.warning(f"Failed to clean up {temp_file}: {e}")
 
     return steps_info
+
 
 def prove_batch(height, step, fast_data_generation=True):
     mode = "light"

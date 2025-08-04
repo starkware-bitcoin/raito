@@ -28,6 +28,7 @@ DELAY = 2
 
 MMR_ROOTS_DIR = f"{os.path.dirname(os.path.realpath(__file__))}/.mmr_data/roots"
 
+
 def request_rpc(method: str, params: list):
     """Makes a JSON-RPC call to a Bitcoin API endpoint.
     Retries the request a specified number of times before failing.
@@ -316,6 +317,7 @@ def read_block_mmr_roots(height):
     mmr_roots_file = Path(MMR_ROOTS_DIR) / str(shard_name) / f"block_{height}.json"
     with open(mmr_roots_file, "r") as f:
         return json.load(f)
+
 
 def generate_data(
     mode: str,

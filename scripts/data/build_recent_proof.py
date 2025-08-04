@@ -91,7 +91,7 @@ def convert_proof_to_json(proof_file: Path) -> Optional[Path]:
         return None
 
 
-def upload_to_gcs(proof_file: Path, chainstate_data: Dict[str, Any]) -> bool:
+def upload_to_gcs(proof_file: Path, chainstate_data: Dict[str, Any], mmr_roots: Dict[str, Any]) -> bool:
     """Upload proof and chainstate data to Google Cloud Storage."""
     if storage is None:
         logger.error(
@@ -121,6 +121,7 @@ def upload_to_gcs(proof_file: Path, chainstate_data: Dict[str, Any]) -> bool:
         upload_data = {
             "timestamp": timestamp,
             "chainstate": chainstate_data,
+            "mmr_roots": mmr_roots,
         }
 
         with open(proof_file, "r") as f:
@@ -144,7 +145,12 @@ def upload_to_gcs(proof_file: Path, chainstate_data: Dict[str, Any]) -> bool:
         return False
 
 
-def build_recent_proof(start_height: Optional[int] = None, max_step: int = 1000, fast_data_generation: bool = True) -> bool:
+def build_recent_proof(
+    start_height: Optional[int] = None,
+    max_step: int = 1000,
+    fast_data_generation: bool = True,
+    max_height: Optional[int] = None,
+) -> bool:
     """Main function to build a proof for the most recent Bitcoin block."""
     try:
         latest_height = get_latest_block_height()
@@ -158,13 +164,30 @@ def build_recent_proof(start_height: Optional[int] = None, max_step: int = 1000,
             if start_height < 0:
                 logger.error("Start height cannot be negative")
                 return False
-            if start_height >= latest_height:
+
+        # Apply max_height constraint if specified
+        if max_height is not None:
+            if max_height < start_height:
                 logger.error(
-                    f"Start height ({start_height}) must be less than latest height ({latest_height})"
+                    f"Max height ({max_height}) cannot be less than start height ({start_height})"
                 )
                 return False
+            if max_height >= latest_height:
+                logger.warning(
+                    f"Max height ({max_height}) is greater than or equal to latest height ({latest_height}), using latest height"
+                )
+                max_height = None  # Use latest height instead
 
-        blocks_to_process = latest_height - start_height
+        # Determine the actual end height
+        end_height = max_height if max_height is not None else latest_height
+
+        if start_height >= end_height:
+            logger.error(
+                f"Start height ({start_height}) must be less than end height ({end_height})"
+            )
+            return False
+
+        blocks_to_process = end_height - start_height
 
         if blocks_to_process <= 0:
             logger.info("No new blocks to process")
@@ -176,11 +199,14 @@ def build_recent_proof(start_height: Optional[int] = None, max_step: int = 1000,
         # blocks_to_process = step
 
         logger.info(
-            f"Processing {blocks_to_process} blocks from height {start_height} to {latest_height}, step: {step}"
+            f"Processing {blocks_to_process} blocks from height {start_height} to {end_height}, step: {step}"
         )
 
         proof_file = prove_pow(
-            start_height, blocks_to_process, step, fast_data_generation=fast_data_generation
+            start_height,
+            blocks_to_process,
+            step,
+            fast_data_generation=fast_data_generation,
         )
         if proof_file is None:
             logger.error("Failed to generate proof")
@@ -201,8 +227,9 @@ def build_recent_proof(start_height: Optional[int] = None, max_step: int = 1000,
             fast=fast_data_generation,
         )
         chainstate_data = data["expected"]
+        mmr_roots = data["mmr_roots"]
 
-        upload_success = upload_to_gcs(json_proof_file, chainstate_data)
+        upload_success = upload_to_gcs(json_proof_file, chainstate_data, mmr_roots)
         if not upload_success:
             logger.error("Failed to upload proof to GCS")
             return False
@@ -239,7 +266,12 @@ if __name__ == "__main__":
         "--max-step",
         type=int,
         default=6000,
-        help="Maximum number of blocks to process in each step (default: 1000)",
+        help="Maximum number of blocks to process in each step (default: 6000)",
+    )
+    parser.add_argument(
+        "--max-height",
+        type=int,
+        help="Maximum block height to process (if not provided, processes to latest block)",
     )
     parser.add_argument("--verbose", action="store_true", help="Verbose logging")
     parser.add_argument(
@@ -255,7 +287,9 @@ if __name__ == "__main__":
     # Convert slow_data_generation flag to fast_data_generation parameter
     fast_data_generation = not args.slow
 
-    success = build_recent_proof(args.start, args.max_step, fast_data_generation)
+    success = build_recent_proof(
+        args.start, args.max_step, fast_data_generation, args.max_height
+    )
 
     if success:
         logger.info("Proof building completed successfully")

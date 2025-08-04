@@ -205,7 +205,7 @@ prove-pow:
 
 build-recent-proof:
 	@echo ">>> Building recent proof..."
-	. .venv/bin/activate && cd scripts/data && python build_recent_proof.py $(if $(START),--start $(START)) $(if $(VERBOSE),--verbose)
+	. .venv/bin/activate && cd scripts/data && python build_recent_proof.py $(if $(START),--start $(START)) $(if $(MAX_HEIGHT),--max-height $(MAX_HEIGHT)) $(if $(SLOW),--slow) $(if $(VERBOSE),--verbose)
 
 collect-resources-all:
 	@echo ">>> Collecting resource usage data (all tests)..."
