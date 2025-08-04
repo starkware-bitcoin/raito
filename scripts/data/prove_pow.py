@@ -12,18 +12,17 @@ from generate_data import generate_data
 from format_args import format_args
 from format_assumevalid_args import generate_assumevalid_args
 from generate_program_input import generate_program_input
-from logging.handlers import TimedRotatingFileHandler
 import traceback
 import colorlog
 from dataclasses import dataclass
 from typing import Optional
 import datetime
+import logging_setup
 
 logger = logging.getLogger(__name__)
 
 TMP_DIR = Path(".tmp")
 PROOF_DIR = Path(".proofs")
-
 
 @dataclass
 class StepInfo:
@@ -33,59 +32,6 @@ class StepInfo:
     returncode: int
     elapsed: float
     max_memory: Optional[int]
-
-
-def setup_logging(verbose=False, log_filename="proving.log"):
-    """
-    Set up logging configuration with both file and console handlers.
-
-    Args:
-        verbose (bool): If True, set DEBUG level; otherwise INFO level
-        log_filename (str): Name of the log file
-    """
-    # File handler setup
-    file_handler = TimedRotatingFileHandler(
-        filename=log_filename,
-        when="midnight",
-        interval=1,
-        backupCount=14,
-        encoding="utf8",
-    )
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    )
-
-    # Console handler with colors
-    console_handler = colorlog.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    console_handler.setFormatter(
-        colorlog.ColoredFormatter(
-            "%(asctime)s - %(log_color)s%(levelname)s%(reset)s - %(message)s",
-            log_colors={
-                "DEBUG": "cyan",
-                "INFO": "green",
-                "WARNING": "yellow",
-                "ERROR": "red",
-                "CRITICAL": "red,bg_white",
-            },
-        )
-    )
-
-    # Root logger setup
-    root_logger = logging.getLogger()
-    root_logger.addHandler(console_handler)
-    root_logger.addHandler(file_handler)
-
-    # Set log level based on verbose flag
-    if verbose:
-        root_logger.setLevel(logging.DEBUG)
-    else:
-        root_logger.setLevel(logging.INFO)
-
-    # Set specific log levels for external modules
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("generate_data").setLevel(logging.WARNING)
 
 
 def run(cmd, timeout=None):
@@ -239,57 +185,56 @@ def run_prover(job_info, executable, proof, arguments):
     if returncode != 0:
         logger.error(f"{job_info} [CAIRO_RUNNER] error: {stdout or stderr}")
 
-        #     # Try to get more meaningful error message using scarb execute
-        #     logger.info(
-        #         f"{job_info} [CAIRO_RUNNER] failed, trying scarb execute for better error messages..."
-        #     )
-        #     scarb_cmd = [
-        #         "scarb",
-        #         "--profile",
-        #         "proving",
-        #         "execute",
-        #         "--no-build",
-        #         "--package",
-        #         "assumevalid",
-        #         "--arguments-file",
-        #         str(arguments),
-        #         "--print-resource-usage",
-        #     ]
-        #     logger.debug(
-        #         f"{job_info} [SCARB_EXECUTE] command:\n{' '.join(map(str, scarb_cmd))}"
-        #     )
-        #     (
-        #         scarb_stdout,
-        #         scarb_stderr,
-        #         scarb_returncode,
-        #         scarb_elapsed,
-        #         scarb_max_memory,
-        #     ) = run(scarb_cmd)
+        # Try to get more meaningful error message using scarb execute
+        logger.info(
+            f"{job_info} [CAIRO_RUNNER] failed, trying scarb execute for better error messages..."
+        )
+        scarb_cmd = [
+            "cairo-execute",
+            "--prebuilt",
+            "--args-file",
+            str(arguments),
+            "--output-path",
+            str(batch_dir / "output.txt"),
+            "--layout",
+            "all_cairo_stwo",
+            executable,
+        ]
+        logger.debug(
+            f"{job_info} [CAIRO_EXECUTE] command:\n{' '.join(map(str, scarb_cmd))}"
+        )
+        (
+            scarb_stdout,
+            scarb_stderr,
+            scarb_returncode,
+            scarb_elapsed,
+            scarb_max_memory,
+        ) = run(scarb_cmd)
 
-        #     steps_info.append(
-        #         StepInfo(
-        #             step="SCARB_EXECUTE",
-        #             stdout=scarb_stdout,
-        #             stderr=scarb_stderr,
-        #             returncode=scarb_returncode,
-        #             elapsed=scarb_elapsed,
-        #             max_memory=scarb_max_memory,
-        #         )
-        #     )
+        steps_info.append(
+            StepInfo(
+                step="CAIRO_EXECUTE",
+                stdout=scarb_stdout,
+                stderr=scarb_stderr,
+                returncode=scarb_returncode,
+                elapsed=scarb_elapsed,
+                max_memory=scarb_max_memory,
+            )
+        )
 
-        #     save_prover_log(
-        #         batch_dir,
-        #         "SCARB_EXECUTE",
-        #         scarb_stdout,
-        #         scarb_stderr,
-        #         scarb_returncode,
-        #         scarb_elapsed,
-        #         scarb_max_memory,
-        #     )
+        save_prover_log(
+            batch_dir,
+            "CAIRO_EXECUTE",
+            scarb_stdout,
+            scarb_stderr,
+            scarb_returncode,
+            scarb_elapsed,
+            scarb_max_memory,
+        )
 
-        #     logger.error(
-        #         f"{job_info} [SCARB_EXECUTE] output:\n{scarb_stdout or scarb_stderr}"
-        #     )
+        logger.error(
+            f"{job_info} [CAIRO_EXECUTE] output:\n{scarb_stdout or scarb_stderr}"
+        )
         return steps_info
 
     prove_cmd = [
@@ -353,16 +298,7 @@ def run_prover(job_info, executable, proof, arguments):
 
     return steps_info
 
-
-def read_block_mmr_roots(mmr_roots_dir, height):
-    shard_size = 10000
-    shard_name = (height // shard_size + 1) * shard_size
-    mmr_roots_file = mmr_roots_dir / shard_name / f"block_{height}.json"
-    with open(mmr_roots_file, "r") as f:
-        return json.load(f)
-
-
-def prove_batch(height, step, mmr_roots_dir, fast_data_generation=True):
+def prove_batch(height, step, fast_data_generation=True):
     mode = "light"
     job_info = f"Job(height='{height}', blocks={step})"
 
@@ -383,12 +319,9 @@ def prove_batch(height, step, mmr_roots_dir, fast_data_generation=True):
                 if previous_proof_file.exists():
                     break
 
-        logger.debug(f"{job_info} generating data...")
+        logger.debug(f"{job_info} generating data (fast: {fast_data_generation})...")
 
         args_start_time = time.time()
-
-        # Read MMR roots from a file
-        mmr_roots = read_block_mmr_roots(mmr_roots_dir, height)
 
         # Batch data - store in the batch directory
         batch_file = batch_dir / "batch.json"
@@ -398,7 +331,7 @@ def prove_batch(height, step, mmr_roots_dir, fast_data_generation=True):
         batch_args = {
             "chain_state": batch_data["chain_state"],
             "blocks": batch_data["blocks"],
-            "block_mmr": mmr_roots,
+            "block_mmr": batch_data["mmr_roots"],
         }
         batch_file.write_text(json.dumps(batch_args, indent=2))
 
@@ -434,7 +367,7 @@ def prove_batch(height, step, mmr_roots_dir, fast_data_generation=True):
         if final_return_code != 0:
             error = last_step.stderr or last_step.stdout
             logger.error(f"{job_info} error:\n{error}")
-            return False
+            return None
         else:
             logger.debug(f"{job_info} [GENERATE_ARGS] time: {args_elapsed:.2f} s")
             for info in steps_info:
@@ -458,16 +391,16 @@ def prove_batch(height, step, mmr_roots_dir, fast_data_generation=True):
                 f"{job_info} expected time to complete proving the whole chain: {900000 / step * total_elapsed / 3600:.2f} hours"
             )
 
-            return True
+            return proof_file
 
     except Exception as e:
         logger.error(
             f"{job_info} error while processing {job_info}:\n{e}\nstacktrace:\n{traceback.format_exc()}"
         )
-        return False
+        return None
 
 
-def main(start, blocks, step, fast_data_generation=True):
+def prove_pow(start, blocks, step, fast_data_generation=True):
     logger.info(
         "Initial height: %d, blocks: %d, step: %d, fast_data_generation: %s",
         start,
@@ -478,9 +411,6 @@ def main(start, blocks, step, fast_data_generation=True):
 
     PROOF_DIR.mkdir(exist_ok=True)
 
-    # TODO: get from arg / env var ?
-    mmr_roots_dir = Path(".mmr_data/roots")
-
     end = start + blocks
 
     # Generate height range
@@ -489,19 +419,20 @@ def main(start, blocks, step, fast_data_generation=True):
 
     processed_count = 0
     total_jobs = len(list(height_range))
+    latest_proof_file = None
 
     # Process jobs sequentially
     for height in height_range:
-        success = prove_batch(
-            height, processing_step, mmr_roots_dir, fast_data_generation
-        )
-        if success:
+        proof_file = prove_batch(height, processing_step, fast_data_generation)
+        if proof_file is not None:
             processed_count += 1
+            latest_proof_file = proof_file
         else:
             logger.info(f"Job at height: {height} failed, stopping further processing")
-            return
+            return None
 
     logger.info(f"All {processed_count} jobs have been processed successfully")
+    return latest_proof_file
 
 
 def auto_detect_start():
@@ -541,7 +472,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--verbose", action="store_true", help="Verbose logging")
     parser.add_argument(
-        "--slow-data-generation",
+        "--slow",
         action="store_true",
         help="Use slow data generation mode (default is fast mode)",
     )
@@ -549,7 +480,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Setup logging using the extracted function
-    setup_logging(verbose=args.verbose)
+    logging_setup.setup(verbose=args.verbose)
 
     start = args.start
     if start is None:
@@ -557,6 +488,10 @@ if __name__ == "__main__":
         logger.info(f"Auto-detected start: {start}")
 
     # Convert slow_data_generation flag to fast_data_generation parameter
-    fast_data_generation = not args.slow_data_generation
+    fast_data_generation = not args.slow
 
-    main(start, args.blocks, args.step, fast_data_generation)
+    result = prove_pow(start, args.blocks, args.step, fast_data_generation)
+    if result is None:
+        exit(1)
+    else:
+        print(f"Proof file generated: {result}")
