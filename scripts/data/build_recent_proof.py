@@ -91,7 +91,9 @@ def convert_proof_to_json(proof_file: Path) -> Optional[Path]:
         return None
 
 
-def upload_to_gcs(proof_file: Path, chainstate_data: Dict[str, Any], mmr_roots: Dict[str, Any]) -> bool:
+def upload_to_gcs(
+    proof_file: Path, chainstate_data: Dict[str, Any], mmr_roots: Dict[str, Any]
+) -> bool:
     """Upload proof and chainstate data to Google Cloud Storage."""
     if storage is None:
         logger.error(
