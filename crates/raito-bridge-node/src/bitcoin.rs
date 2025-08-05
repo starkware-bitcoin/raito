@@ -6,17 +6,22 @@ use jsonrpsee::core::client::ClientT;
 use jsonrpsee::core::params::ArrayParams;
 use jsonrpsee::http_client::{HeaderMap, HeaderValue, HttpClient};
 use jsonrpsee::rpc_params;
+use serde::de::DeserializeOwned;
 use std::time::Duration;
 use tracing::debug;
+
+/// Default HTTP request timeout
+pub const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Bitcoin RPC client
 pub struct BitcoinClient {
     client: HttpClient,
     block_count: u32,
+    backoff: backoff::ExponentialBackoff,
 }
 
 impl BitcoinClient {
-    /// Create a new Bitcoin RPC client
+    /// Create a new Bitcoin RPC client with default retry settings (exponential backoff)
     pub fn new(url: String, userpwd: Option<String>) -> anyhow::Result<Self> {
         let mut headers = HeaderMap::new();
         if let Some(userpwd) = userpwd {
@@ -26,35 +31,63 @@ impl BitcoinClient {
                 HeaderValue::from_str(&format!("Basic {creds}")).unwrap(),
             );
         };
-        // Add retry logic
+
         let client = HttpClient::builder()
             .set_headers(headers)
-            .request_timeout(Duration::from_secs(5))
+            .request_timeout(HTTP_REQUEST_TIMEOUT)
             .build(url)
             .map_err(|e| anyhow::anyhow!("Failed to create Bitcoin RPC client: {}", e))?;
+
         Ok(Self {
             client,
             block_count: 0,
+            backoff: backoff::ExponentialBackoff::default(),
         })
     }
 
-    async fn request<T: Decodable>(&self, method: &str, params: ArrayParams) -> anyhow::Result<T> {
-        let res_hex: String = self.client.request(method, params).await?;
-        let res_bytes = hex::decode(res_hex)
-            .map_err(|e| anyhow::anyhow!("Failed to decode response: {}", e))?;
-        bitcoin::consensus::deserialize(&res_bytes)
-            .map_err(|e| anyhow::anyhow!("Failed to deserialize response: {}", e))
+    async fn request_decode<T: Decodable>(
+        &self,
+        method: &str,
+        params: ArrayParams,
+    ) -> anyhow::Result<T> {
+        request_with_retry(self.backoff.clone(), || async {
+            let res_hex: String = self
+                .client
+                .request(method, params.clone())
+                .await
+                .map_err(|e| anyhow::anyhow!("RPC request failed: {}", e))?;
+            let res_bytes = hex::decode(res_hex)
+                .map_err(|e| anyhow::anyhow!("Failed to decode response: {}", e))?;
+            bitcoin::consensus::deserialize(&res_bytes)
+                .map_err(|e| anyhow::anyhow!("Failed to deserialize response: {}", e))
+        })
+        .await
     }
 
+    async fn request<T: DeserializeOwned>(
+        &self,
+        method: &str,
+        params: ArrayParams,
+    ) -> anyhow::Result<T> {
+        request_with_retry(self.backoff.clone(), || async {
+            self.client
+                .request(method, params.clone())
+                .await
+                .map_err(|e| anyhow::anyhow!("RPC request failed: {}", e))
+        })
+        .await
+    }
+
+    /// Get block hash by height
     pub async fn get_block_hash(&self, height: u32) -> anyhow::Result<BlockHash> {
-        self.client
-            .request("getblockhash", rpc_params![height])
+        self.request("getblockhash", rpc_params![height])
             .await
             .map_err(|e| anyhow::anyhow!("Failed to get block hash: {}", e))
     }
 
+    /// Get block header by hash
     pub async fn get_block_header(&self, hash: &BlockHash) -> anyhow::Result<BlockHeader> {
-        self.request("getblockheader", rpc_params![hash.to_string(), false])
+        self.request_decode("getblockheader", rpc_params![hash.to_string(), false])
             .await
             .map_err(|e| anyhow::anyhow!("Failed to get block header: {}", e))
     }
@@ -71,12 +104,10 @@ impl BitcoinClient {
 
     /// Get current chain height
     pub async fn get_block_count(&self) -> anyhow::Result<u32> {
-        let res: u64 = self
-            .client
-            .request("getblockcount", rpc_params![])
+        self.request("getblockcount", rpc_params![])
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to get block count: {}", e))?;
-        Ok(res as u32)
+            .map_err(|e| anyhow::anyhow!("Failed to get block count: {}", e))
+            .map(|res: u64| res as u32)
     }
 
     /// Wait for a block header at the given height
@@ -95,4 +126,21 @@ impl BitcoinClient {
         }
         self.get_block_header_by_height(height).await
     }
+}
+
+/// Execute a request with retry logic using exponential backoff
+async fn request_with_retry<F, Fut, T>(
+    backoff: backoff::ExponentialBackoff,
+    operation: F,
+) -> anyhow::Result<T>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = anyhow::Result<T>>,
+{
+    use backoff::{future::retry, Error};
+
+    retry(backoff, || async {
+        operation().await.map_err(Error::transient)
+    })
+    .await
 }

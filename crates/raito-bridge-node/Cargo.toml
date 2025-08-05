@@ -31,6 +31,8 @@ num-traits.workspace = true
 # Error handling
 thiserror.workspace = true
 anyhow.workspace = true
+# Retry logic
+backoff = { version = "0.4", features = ["futures", "tokio"] }
 # Logging
 tracing.workspace = true
 tracing-subscriber.workspace = true

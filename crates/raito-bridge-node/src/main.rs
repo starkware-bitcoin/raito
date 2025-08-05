@@ -29,6 +29,7 @@ struct Cli {
     /// Bitcoin RPC user:password (optional)
     #[arg(long, env = "USERPWD")]
     rpc_userpwd: Option<String>,
+    /// Path to the database storing the MMR accumulator state
     #[arg(long, default_value = "./.mmr_data/mmr.db")]
     mmr_db_path: PathBuf,
     /// Output directory for sparse roots JSON files

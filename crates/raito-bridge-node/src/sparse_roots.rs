@@ -7,26 +7,38 @@ use std::str::FromStr;
 use tokio::fs;
 use tracing::{debug, info};
 
+/// Configuration for the sparse roots sink
 #[derive(Debug, Clone)]
 pub struct SparseRootsSinkConfig {
+    /// Output directory for the sparse roots JSON files
     pub output_dir: String,
+    /// Shard size for the sparse roots JSON files
     pub shard_size: u32,
 }
 
+/// Sparse roots is MMR peaks for all heights, where missing ones are filled with zeros
+/// This representation is different from the "compact" one, which contains only non-zero peaks
+/// but with total number of elements.
 #[derive(Debug, Clone, Serialize)]
 pub struct SparseRoots {
+    /// Block height
     #[serde(skip)]
     pub block_height: u32,
-    #[serde(serialize_with = "serialize_bigint_vec")]
+    /// MMR peaks for all heights, where missing ones are filled with zeros
+    #[serde(serialize_with = "serialize_u256_array")]
     pub roots: Vec<String>,
 }
 
+/// Sink for writing sparse roots to a JSON file
 pub struct SparseRootsSink {
+    /// Configuration
     config: SparseRootsSinkConfig,
+    /// Output directory
     output_dir: PathBuf,
 }
 
 impl SparseRootsSink {
+    /// Create a new sparse roots sink with the given configuration
     pub async fn new(config: SparseRootsSinkConfig) -> Result<Self, anyhow::Error> {
         let output_dir = PathBuf::from(&config.output_dir);
 
@@ -84,8 +96,8 @@ impl SparseRootsSink {
     }
 }
 
-// Custom serialization for Vec<String> to serialize as integers
-fn serialize_bigint_vec<S>(items: &Vec<String>, serializer: S) -> Result<S::Ok, S::Error>
+// Custom serialization for Vec<String> to serialize as array of u256 (in Cairo)
+fn serialize_u256_array<S>(items: &Vec<String>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
@@ -113,6 +125,8 @@ where
     seq.end()
 }
 
+/// Convert a hex string to a JSON number
+/// What we are doing here is making sure we get `{"key": 123123}` instead of `{"key": "123123"}`
 fn num_str_to_json_number<S>(num_str: &str) -> Result<serde_json::Number, S::Error>
 where
     S: Serializer,

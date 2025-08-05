@@ -20,6 +20,7 @@ pub struct Accumulator {
     mmr: MMR,
 }
 
+/// Default accumulator is an in-memory accumulator with StarkBlake hasher
 impl Default for Accumulator {
     fn default() -> Self {
         let store = Arc::new(InMemoryStore::default());
@@ -53,11 +54,13 @@ impl Accumulator {
         Ok(())
     }
 
+    /// Add a block header to the MMR
     pub async fn add_block_header(&mut self, block_header: BlockHeader) -> anyhow::Result<()> {
         let leaf = block_header_digest(self.hasher.clone(), block_header)?;
         self.add(leaf).await
     }
 
+    /// Get the number of blocks in the MMR (number of leaves)
     pub async fn get_block_count(&self) -> anyhow::Result<u32> {
         self.mmr
             .leaves_count

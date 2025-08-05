@@ -9,16 +9,23 @@ use crate::{
     sparse_roots::{SparseRoots, SparseRootsSink, SparseRootsSinkConfig},
 };
 
+/// Bitcoin block indexer that builds MMR accumulator and generates sparse roots
 pub struct Indexer {
+    /// Indexer configuration
     config: IndexerConfig,
+    /// Shutdown signal receiver
     rx_shutdown: broadcast::Receiver<()>,
 }
 
 #[derive(Debug, Clone)]
 pub struct IndexerConfig {
+    /// Bitcoin RPC URL
     pub rpc_url: String,
+    /// Bitcoin RPC user:password (optional)
     pub rpc_userpwd: Option<String>,
+    /// Output directory for sparse roots JSON files
     pub sink_config: SparseRootsSinkConfig,
+    /// Path to the database storing the MMR accumulator state
     pub mmr_db_path: PathBuf,
 }
 
