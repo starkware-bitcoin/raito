@@ -4,7 +4,7 @@ use tracing::{error, info};
 use crate::{
     app::AppClient,
     bitcoin::BitcoinClient,
-    sparse_roots::{SparseRoots, SparseRootsSink, SparseRootsSinkConfig},
+    sparse_roots::{SparseRootsSink, SparseRootsSinkConfig},
 };
 
 /// Bitcoin block indexer that builds MMR accumulator and generates sparse roots
@@ -60,7 +60,7 @@ impl Indexer {
                         Ok((block_header, block_hash)) => {
                             // Add new block to the MMR accumulator and get resulting sparse roots
                             let roots = self.app_client.add_block(block_header).await?;
-                            sink.write_sparse_roots(&SparseRoots { block_height, roots }).await?;
+                            sink.write_sparse_roots(&roots).await?;
                             info!("Block #{} {} processed", block_height, block_hash);
                             block_height += 1;
                         },

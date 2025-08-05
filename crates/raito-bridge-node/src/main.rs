@@ -27,12 +27,15 @@ mod sparse_roots;
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
+    /// RPC server host
+    #[arg(long, default_value = "127.0.0.1:5000")]
+    rpc_host: String,
     /// Bitcoin RPC URL
     #[arg(long, env = "BITCOIN_RPC")]
-    rpc_url: String,
+    bitcoin_rpc_url: String,
     /// Bitcoin RPC user:password (optional)
     #[arg(long, env = "USERPWD")]
-    rpc_userpwd: Option<String>,
+    bitcoin_rpc_userpwd: Option<String>,
     /// Path to the database storing the MMR accumulator state
     #[arg(long, default_value = "./.mmr_data/mmr.db")]
     mmr_db_path: PathBuf,
@@ -77,8 +80,8 @@ async fn main() {
     let (mut app_server, app_client) = create_app(app_config, shutdown.subscribe());
 
     let indexer_config = IndexerConfig {
-        rpc_url: cli.rpc_url,
-        rpc_userpwd: cli.rpc_userpwd,
+        rpc_url: cli.bitcoin_rpc_url,
+        rpc_userpwd: cli.bitcoin_rpc_userpwd,
         sink_config: SparseRootsSinkConfig {
             output_dir: cli.mmr_roots_dir,
             shard_size: cli.mmr_shard_size,
@@ -87,7 +90,7 @@ async fn main() {
     let mut indexer = Indexer::new(indexer_config, app_client.clone(), shutdown.subscribe());
 
     let rpc_config = RpcConfig {
-        rpc_host: format!("0.0.0.0:5000"),
+        rpc_host: cli.rpc_host,
     };
     let rpc_server = RpcServer::new(rpc_config, app_client.clone(), shutdown.subscribe());
 

@@ -3,13 +3,14 @@ use tokio::sync::broadcast;
 use tracing::{error, info};
 
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
-    routing::{get, post},
+    routing::get,
     Json, Router,
 };
+use tower_http::trace::TraceLayer;
 
-use crate::app::AppClient;
+use crate::{app::AppClient, mmr::InclusionProof};
 
 pub struct RpcConfig {
     pub rpc_host: String,
@@ -35,10 +36,13 @@ impl RpcServer {
     }
 
     async fn run_inner(&self) -> Result<(), std::io::Error> {
+        info!("Starting RPC server on {}", self.config.rpc_host);
+
         let app = Router::new()
-            .route("/broadcast", post(generate_proof))
+            .route("/proof/:height", get(generate_proof))
             .route("/head", get(get_head))
-            .with_state(self.app_client.clone());
+            .with_state(self.app_client.clone())
+            .layer(TraceLayer::new_for_http());
 
         let listener = TcpListener::bind(&self.config.rpc_host).await?;
         let mut rx_shutdown = self.rx_shutdown.resubscribe();
@@ -62,8 +66,15 @@ impl RpcServer {
     }
 }
 
-pub async fn generate_proof(State(app_client): State<AppClient>) -> Result<Json<()>, StatusCode> {
-    Ok(Json(()))
+pub async fn generate_proof(
+    State(app_client): State<AppClient>,
+    Path(height): Path<u32>,
+) -> Result<Json<InclusionProof>, StatusCode> {
+    let proof = app_client
+        .generate_block_proof(height)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(proof))
 }
 
 pub async fn get_head(State(app_client): State<AppClient>) -> Result<Json<u32>, StatusCode> {
