@@ -1,11 +1,9 @@
-use std::path::PathBuf;
-
 use tokio::sync::broadcast;
 use tracing::{error, info};
 
 use crate::{
+    app::AppClient,
     bitcoin::BitcoinClient,
-    mmr::Accumulator,
     sparse_roots::{SparseRoots, SparseRootsSink, SparseRootsSinkConfig},
 };
 
@@ -13,6 +11,8 @@ use crate::{
 pub struct Indexer {
     /// Indexer configuration
     config: IndexerConfig,
+    /// App client
+    app_client: AppClient,
     /// Shutdown signal receiver
     rx_shutdown: broadcast::Receiver<()>,
 }
@@ -25,14 +25,17 @@ pub struct IndexerConfig {
     pub rpc_userpwd: Option<String>,
     /// Output directory for sparse roots JSON files
     pub sink_config: SparseRootsSinkConfig,
-    /// Path to the database storing the MMR accumulator state
-    pub mmr_db_path: PathBuf,
 }
 
 impl Indexer {
-    pub fn new(config: IndexerConfig, rx_shutdown: broadcast::Receiver<()>) -> Self {
+    pub fn new(
+        config: IndexerConfig,
+        app_client: AppClient,
+        rx_shutdown: broadcast::Receiver<()>,
+    ) -> Self {
         Self {
             config,
+            app_client,
             rx_shutdown,
         }
     }
@@ -44,9 +47,7 @@ impl Indexer {
             BitcoinClient::new(self.config.rpc_url.clone(), self.config.rpc_userpwd.clone())?;
         info!("Bitcoin RPC client initialized");
 
-        // We need to specify mmr_id to have deterministic keys in the database
-        let mut mmr = Accumulator::from_file(&self.config.mmr_db_path, "blocks").await?;
-        let mut block_height = mmr.get_block_count().await?;
+        let mut block_height = self.app_client.get_block_count().await?;
         info!("Current MMR blocks count: {}", block_height);
 
         // Initialize the sparse roots sink
@@ -57,12 +58,9 @@ impl Indexer {
                 res = bitcoin_client.wait_block_header(block_height) => {
                     match res {
                         Ok((block_header, block_hash)) => {
-                            mmr.add_block_header(block_header).await?;
-                            // TODO: store block header (add to the queue)
-                            let roots = mmr.get_sparse_roots().await?;
-                            let sparse_roots = SparseRoots { block_height, roots };
-                            // TODO: handle this in a separate task
-                            sink.write_sparse_roots(&sparse_roots).await?;
+                            // Add new block to the MMR accumulator and get resulting sparse roots
+                            let roots = self.app_client.add_block(block_header).await?;
+                            sink.write_sparse_roots(&SparseRoots { block_height, roots }).await?;
                             info!("Block #{} {} processed", block_height, block_hash);
                             block_height += 1;
                         },

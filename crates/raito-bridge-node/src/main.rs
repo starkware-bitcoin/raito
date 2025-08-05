@@ -8,14 +8,18 @@ use tracing::{error, info, subscriber::set_global_default};
 use tracing_subscriber::filter::EnvFilter;
 
 use crate::{
+    app::{create_app, AppConfig},
     indexer::{Indexer, IndexerConfig},
+    rpc::{RpcConfig, RpcServer},
     shutdown::Shutdown,
     sparse_roots::SparseRootsSinkConfig,
 };
 
+mod app;
 mod bitcoin;
 mod indexer;
 mod mmr;
+mod rpc;
 mod shutdown;
 mod sparse_roots;
 
@@ -34,7 +38,7 @@ struct Cli {
     mmr_db_path: PathBuf,
     /// Output directory for sparse roots JSON files
     #[arg(long, default_value = "./.mmr_data/roots")]
-    mmr_roots_dir: String,
+    mmr_roots_dir: PathBuf,
     /// Number of blocks per sparse roots shard directory
     #[arg(long, default_value = "10000")]
     mmr_shard_size: u32,
@@ -66,6 +70,12 @@ async fn main() {
 
     let shutdown = Shutdown::default();
 
+    let app_config = AppConfig {
+        mmr_db_path: cli.mmr_db_path,
+        api_requests_capacity: 1000,
+    };
+    let (mut app_server, app_client) = create_app(app_config, shutdown.subscribe());
+
     let indexer_config = IndexerConfig {
         rpc_url: cli.rpc_url,
         rpc_userpwd: cli.rpc_userpwd,
@@ -73,14 +83,25 @@ async fn main() {
             output_dir: cli.mmr_roots_dir,
             shard_size: cli.mmr_shard_size,
         },
-        mmr_db_path: cli.mmr_db_path,
     };
-    let mut indexer = Indexer::new(indexer_config, shutdown.subscribe());
+    let mut indexer = Indexer::new(indexer_config, app_client.clone(), shutdown.subscribe());
 
+    let rpc_config = RpcConfig {
+        rpc_host: format!("0.0.0.0:5000"),
+    };
+    let rpc_server = RpcServer::new(rpc_config, app_client.clone(), shutdown.subscribe());
+
+    let app_handle = tokio::spawn(async move { app_server.run().await });
     let indexer_handle = tokio::spawn(async move { indexer.run().await });
+    let rpc_handle = tokio::spawn(async move { rpc_server.run().await });
     let shutdown_handle = tokio::spawn(async move { shutdown.run().await });
 
-    match tokio::try_join!(flatten(indexer_handle), flatten(shutdown_handle)) {
+    match tokio::try_join!(
+        flatten(app_handle),
+        flatten(indexer_handle),
+        flatten(rpc_handle),
+        flatten(shutdown_handle)
+    ) {
         Ok(_) => {
             info!("Raito bridge node has shut down");
             std::process::exit(0);

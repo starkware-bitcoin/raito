@@ -6,6 +6,8 @@ edition = "2021"
 [dependencies]
 # Async runtime
 tokio = { version = "1.36", features = ["full"] }
+# Web framework
+axum = "0.7"
 
 # Merkle mountain range
 accumulators = { git = "https://github.com/m-kus/rust-accumulators", rev = "588711663348fcf22fd4af624d0b0cd3bea709f1", features = ["blake", "memory", "sqlite", "mmr"]}

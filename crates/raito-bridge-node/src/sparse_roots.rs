@@ -11,7 +11,7 @@ use tracing::{debug, info};
 #[derive(Debug, Clone)]
 pub struct SparseRootsSinkConfig {
     /// Output directory for the sparse roots JSON files
-    pub output_dir: String,
+    pub output_dir: PathBuf,
     /// Shard size for the sparse roots JSON files
     pub shard_size: u32,
 }
@@ -31,26 +31,21 @@ pub struct SparseRoots {
 
 /// Sink for writing sparse roots to a JSON file
 pub struct SparseRootsSink {
-    /// Configuration
     config: SparseRootsSinkConfig,
-    /// Output directory
-    output_dir: PathBuf,
 }
 
 impl SparseRootsSink {
     /// Create a new sparse roots sink with the given configuration
     pub async fn new(config: SparseRootsSinkConfig) -> Result<Self, anyhow::Error> {
-        let output_dir = PathBuf::from(&config.output_dir);
-
         // Create the output directory if it doesn't exist
-        fs::create_dir_all(&output_dir).await?;
+        fs::create_dir_all(&config.output_dir).await?;
 
         info!(
             "SparseRootsSink initialized with output_dir: {:?}, shard_size: {}",
-            output_dir, config.shard_size
+            config.output_dir, config.shard_size
         );
 
-        Ok(Self { config, output_dir })
+        Ok(Self { config })
     }
 
     /// Calculate the shard directory path for a given block height
@@ -59,7 +54,7 @@ impl SparseRootsSink {
         let shard_start = shard_id * self.config.shard_size;
         let shard_end = shard_start + self.config.shard_size;
         let shard_dir_name = format!("{shard_end}");
-        self.output_dir.join(shard_dir_name)
+        self.config.output_dir.join(shard_dir_name)
     }
 
     /// Get the file path for a specific block height
