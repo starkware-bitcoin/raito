@@ -1,19 +1,19 @@
 # Raito Bridge Node
 
-A Bitcoin block indexer that builds Merkle Mountain Range (MMR) accumulators and generates sparse roots for the [Raito](https://github.com/keep-starknet-strange/raito) Bitcoin ZK client.
+A Bitcoin block indexer that builds Merkle Mountain Range (MMR) accumulator of the Bitcoin blocks, and generates data required for running the [`assumevalid`](../../packages/assumevalid/) program.
 
 ## Overview
 
-The Raito Bridge Node serves as a data preprocessing layer that connects to a Bitcoin Core node and produces MMR commitments to Bitcoin block history. These commitments are used by Raito's Cairo-based ZK client to efficiently prove Bitcoin consensus validation.
+The Raito Bridge Node serves as a data preprocessing layer for the Bitcoin ZK client, and as an API providing compressed SPV proofs. A compressed SPV proof is a self-sufficient transaction inclusion proof that does not require clients to store the Bitcoin headers locally nor keep connection to a Bitcoin RPC node.
 
 ## What it does
 
 1. **Connects to Bitcoin Core** via RPC to fetch block headers
-2. **Builds MMR accumulator** using STARK-compatible Blake2 hashing to create compact commitments to block history  
+2. **Builds MMR accumulator** using Cairo-compatible Blake2 hashing
 3. **Generates sparse roots** - MMR state representations compatible with the Cairo ZK client
-4. **Organizes output** into sharded JSON files for efficient access by proving systems
+4. **Organizes output** into sharded JSON files for efficient access by the proving pipeline
 
-The sparse roots enable the Cairo client to verify historical chain state without processing all previous blocks, significantly reducing the computational overhead for ZK proof generation.
+Raito bridge node does not handle reorgs, instead it operates with a configurable lag (by default — 1 block).
 
 ## Usage
 
@@ -100,8 +100,8 @@ Each file contains the MMR sparse roots at that block height, compatible with Ra
 
 ## Requirements
 
-- Access to a Bitcoin Core node with RPC enabled
-- Sufficient disk space for MMR database and sparse roots output
-- Network connectivity to the Bitcoin node
+- Access to a Bitcoin RPC node
+- Sufficient disk space (numbers are for the first 900K blocks)
+    * 300MB for the accumulator state DB
+    * 3.6GB for the sparse roots files
 
-This bridge node is essential for bootstrapping Raito's ZK proving system with Bitcoin mainnet data.
