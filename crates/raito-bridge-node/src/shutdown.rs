@@ -6,6 +6,8 @@ use tokio::{
 };
 use tracing::info;
 
+/// Manages graceful shutdown by listening for SIGTERM and SIGINT signals
+/// and broadcasting shutdown notifications to subscribers
 pub struct Shutdown {
     tx_shutdown: broadcast::Sender<()>,
 }

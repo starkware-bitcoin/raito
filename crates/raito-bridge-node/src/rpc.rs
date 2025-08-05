@@ -1,3 +1,5 @@
+//! HTTP RPC server providing REST endpoints for MMR proof generation and block count queries.
+
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use tracing::{error, info};
@@ -12,10 +14,13 @@ use tower_http::trace::TraceLayer;
 
 use crate::{app::AppClient, mmr::InclusionProof};
 
+/// Configuration for the RPC server
 pub struct RpcConfig {
+    /// Host and port binding for the RPC server (e.g., "127.0.0.1:5000")
     pub rpc_host: String,
 }
 
+/// HTTP RPC server that provides endpoints for MMR operations
 pub struct RpcServer {
     config: RpcConfig,
     app_client: AppClient,
@@ -66,6 +71,14 @@ impl RpcServer {
     }
 }
 
+/// Generate an inclusion proof for a block at the specified height
+///
+/// # Arguments
+/// * `height` - The block height to generate a proof for
+///
+/// # Returns
+/// * `Json<InclusionProof>` - The inclusion proof in JSON format
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If proof generation fails
 pub async fn generate_proof(
     State(app_client): State<AppClient>,
     Path(height): Path<u32>,
@@ -77,6 +90,11 @@ pub async fn generate_proof(
     Ok(Json(proof))
 }
 
+/// Get the current head (latest block count) from the MMR
+///
+/// # Returns
+/// * `Json<u32>` - The current block count in JSON format
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If getting block count fails
 pub async fn get_head(State(app_client): State<AppClient>) -> Result<Json<u32>, StatusCode> {
     let block_count = app_client
         .get_block_count()

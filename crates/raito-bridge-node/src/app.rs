@@ -1,3 +1,5 @@
+//! Application server and client for managing MMR accumulator operations via async message passing.
+
 use std::path::PathBuf;
 
 use bitcoin::block::Header as BlockHeader;
@@ -9,22 +11,33 @@ use crate::{
     sparse_roots::SparseRoots,
 };
 
+/// Request sent to the application server via the API channel
 pub struct ApiRequest {
+    /// The body of the API request containing the specific operation
     pub body: ApiRequestBody,
+    /// Channel to send the response back to the caller
     pub tx_response: oneshot::Sender<ApiResponse>,
 }
 
 pub type ApiResponse = Result<ApiResponseBody, anyhow::Error>;
 
+/// Possible request operations that can be sent to the application server
 pub enum ApiRequestBody {
+    /// Get the current block count from the MMR
     GetBlockCount(),
+    /// Add a new block header to the MMR
     AddBlock(BlockHeader),
+    /// Generate an inclusion proof for a block at the given height
     GenerateBlockProof(u32),
 }
 
+/// Response body for API requests containing the result data
 pub enum ApiResponseBody {
+    /// Response containing the current block count
     GetBlockCount(u32),
+    /// Response containing sparse roots after adding a block
     AddBlock(SparseRoots),
+    /// Response containing the inclusion proof for a block
     GenerateBlockProof(InclusionProof),
 }
 
@@ -36,12 +49,14 @@ pub struct AppConfig {
     pub api_requests_capacity: usize,
 }
 
+/// The main application server that processes API requests and manages the MMR accumulator
 pub struct AppServer {
     config: AppConfig,
     rx_requests: mpsc::Receiver<ApiRequest>,
     rx_shutdown: broadcast::Receiver<()>,
 }
 
+/// Client for communicating with the application server via async channels
 #[derive(Clone)]
 pub struct AppClient {
     tx_requests: mpsc::Sender<ApiRequest>,
@@ -113,65 +128,62 @@ impl AppClient {
         Self { tx_requests }
     }
 
-    pub async fn get_block_count(&self) -> Result<u32, anyhow::Error> {
+    /// Helper method to send a request and handle the response
+    async fn send_request<T>(
+        &self,
+        body: ApiRequestBody,
+        extract_response: impl FnOnce(ApiResponseBody) -> Option<T>,
+    ) -> Result<T, anyhow::Error> {
         let (tx_response, rx_response) = oneshot::channel();
         self.tx_requests
-            .send(ApiRequest {
-                body: ApiRequestBody::GetBlockCount(),
-                tx_response,
-            })
+            .send(ApiRequest { body, tx_response })
             .await?;
+        
         let res = rx_response
             .await
-            .map_err(|_| anyhow::anyhow!("Failed to get block count"))?;
+            .map_err(|_| anyhow::anyhow!("Failed to send request"))?;
+        
         match res {
-            Ok(ApiResponseBody::GetBlockCount(block_count)) => Ok(block_count),
+            Ok(response_body) => extract_response(response_body)
+                .ok_or_else(|| anyhow::anyhow!("Unexpected response type")),
             Err(err) => Err(err),
-            _ => Err(anyhow::anyhow!(
-                "Unexpected response to GetBlockCount request"
-            )),
         }
     }
 
+    pub async fn get_block_count(&self) -> Result<u32, anyhow::Error> {
+        self.send_request(
+            ApiRequestBody::GetBlockCount(),
+            |response| match response {
+                ApiResponseBody::GetBlockCount(block_count) => Some(block_count),
+                _ => None,
+            },
+        )
+        .await
+    }
+
     pub async fn add_block(&self, block_header: BlockHeader) -> Result<SparseRoots, anyhow::Error> {
-        let (tx_response, rx_response) = oneshot::channel();
-        self.tx_requests
-            .send(ApiRequest {
-                body: ApiRequestBody::AddBlock(block_header),
-                tx_response,
-            })
-            .await?;
-        let res = rx_response
-            .await
-            .map_err(|_| anyhow::anyhow!("Failed to add block"))?;
-        match res {
-            Ok(ApiResponseBody::AddBlock(sparse_roots)) => Ok(sparse_roots),
-            Err(err) => Err(err),
-            _ => Err(anyhow::anyhow!("Unexpected response to AddBlock request")),
-        }
+        self.send_request(
+            ApiRequestBody::AddBlock(block_header),
+            |response| match response {
+                ApiResponseBody::AddBlock(sparse_roots) => Some(sparse_roots),
+                _ => None,
+            },
+        )
+        .await
     }
 
     pub async fn generate_block_proof(
         &self,
         block_height: u32,
     ) -> Result<InclusionProof, anyhow::Error> {
-        let (tx_response, rx_response) = oneshot::channel();
-        self.tx_requests
-            .send(ApiRequest {
-                body: ApiRequestBody::GenerateBlockProof(block_height),
-                tx_response,
-            })
-            .await?;
-        let res = rx_response
-            .await
-            .map_err(|_| anyhow::anyhow!("Failed to generate block proof"))?;
-        match res {
-            Ok(ApiResponseBody::GenerateBlockProof(proof)) => Ok(proof),
-            Err(err) => Err(err),
-            _ => Err(anyhow::anyhow!(
-                "Unexpected response to GenerateBlockProof request"
-            )),
-        }
+        self.send_request(
+            ApiRequestBody::GenerateBlockProof(block_height),
+            |response| match response {
+                ApiResponseBody::GenerateBlockProof(proof) => Some(proof),
+                _ => None,
+            },
+        )
+        .await
     }
 }
 

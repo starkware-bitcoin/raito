@@ -1,3 +1,5 @@
+//! Bitcoin RPC client for fetching block headers and chain information with retry logic.
+
 use base64::{engine::general_purpose, Engine as _};
 use bitcoin::block::Header as BlockHeader;
 use bitcoin::consensus::Decodable;

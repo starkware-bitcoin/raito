@@ -71,6 +71,7 @@ async fn main() {
 
     info!("Raito bridge node is launching...");
 
+    // Instantiating components and wiring them together
     let shutdown = Shutdown::default();
 
     let app_config = AppConfig {
@@ -94,11 +95,13 @@ async fn main() {
     };
     let rpc_server = RpcServer::new(rpc_config, app_client.clone(), shutdown.subscribe());
 
+    // Launching threads for each component
     let app_handle = tokio::spawn(async move { app_server.run().await });
     let indexer_handle = tokio::spawn(async move { indexer.run().await });
     let rpc_handle = tokio::spawn(async move { rpc_server.run().await });
     let shutdown_handle = tokio::spawn(async move { shutdown.run().await });
 
+    // If at least one component exits with an error, the node will exit with an error
     match tokio::try_join!(
         flatten(app_handle),
         flatten(indexer_handle),

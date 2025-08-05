@@ -1,3 +1,5 @@
+//! Bitcoin blockchain indexer that builds MMR accumulator and generates sparse roots for new blocks.
+
 use tokio::sync::broadcast;
 use tracing::{error, info};
 

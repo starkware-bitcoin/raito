@@ -1,3 +1,5 @@
+//! Merkle Mountain Range (MMR) accumulator implementation for Bitcoin block headers with proof generation.
+
 use std::path::Path;
 use std::sync::Arc;
 use tokio::fs;
@@ -25,9 +27,12 @@ pub struct Accumulator {
     mmr: MMR,
 }
 
+/// Proof data structure for demonstrating inclusion of a block in the MMR
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InclusionProof {
+    /// MMR peak hashes at the time of proof generation
     roots: Vec<String>,
+    /// Sibling hashes needed to reconstruct the path to the root
     siblings: Vec<String>,
 }
 
@@ -141,6 +146,15 @@ impl Accumulator {
     }
 }
 
+/// Compute the digest of a block header using the specified hasher
+///
+/// # Arguments
+/// * `hasher` - The hasher implementation to use
+/// * `block_header` - The Bitcoin block header to hash
+///
+/// # Returns
+/// * `String` - The hex-encoded hash digest
+/// * `anyhow::Error` - If hashing fails
 pub fn block_header_digest(
     hasher: Arc<dyn Hasher>,
     block_header: BlockHeader,

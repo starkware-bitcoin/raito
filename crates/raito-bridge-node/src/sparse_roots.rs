@@ -1,3 +1,5 @@
+//! Sparse roots representation and file sink for MMR peaks compatible with Cairo implementation.
+
 use num_bigint::BigInt;
 use num_traits::Num;
 use serde::{Serialize, Serializer};
