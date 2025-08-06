@@ -58,7 +58,7 @@ for test_file in "${test_files[@]}"; do
         else
             arguments_file="$(dirname "$test_file")/.arguments-$(basename "$test_file")"
             python ../../scripts/data/format_args.py --input_file ${test_file} > $arguments_file
-            output=$($SCARB --profile proving execute --no-build --print-resource-usage --arguments-file $arguments_file)
+            output=$($SCARB --profile release execute --no-build --print-resource-usage --arguments-file $arguments_file)
             # See https://github.com/software-mansion/scarb/pull/2276
             rm -rf ../../target/execute
             steps=$(echo $output | grep -o 'steps: [0-9,]*' | sed 's/steps: //')

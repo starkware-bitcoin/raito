@@ -5,10 +5,10 @@ CAIRO_EXECUTE_REV ?= 7fbbd0112b5a926403c17fa95ad831c1715fd1b1
 ########################################## CLIENT ##########################################
 
 client-build:
-	scarb --profile proving build --package client --target-kinds executable
+	scarb --profile release build --package client --target-kinds executable
 
 client-build-with-shinigami:
-	scarb --profile proving build --package client --target-kinds executable --features shinigami
+	scarb --profile release build --package client --target-kinds executable --features shinigami
 
 
 ########################################## BINARIES ##########################################

@@ -16,4 +16,4 @@ cairo_test.workspace = true
 
 [scripts]
 lint = "scarb fmt"
-test = "scarb cairo-test && scarb --profile proving build --target-kinds executable && ../../scripts/data/integration_tests.sh"
+test = "scarb cairo-test && scarb --profile release build --target-kinds executable && ../../scripts/data/integration_tests.sh"

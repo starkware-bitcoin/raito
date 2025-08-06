@@ -6,7 +6,7 @@ use tokio::fs;
 
 use accumulators::hasher::stark_blake::StarkBlakeHasher;
 use accumulators::hasher::Hasher;
-use accumulators::mmr::{map_leaf_index_to_element_index, PeaksOptions, MMR};
+use accumulators::mmr::{map_leaf_index_to_element_index, PeaksOptions, Proof, MMR};
 use accumulators::store::memory::InMemoryStore;
 use accumulators::store::sqlite::SQLiteStore;
 use accumulators::store::Store;
@@ -29,9 +29,11 @@ pub struct BlockMMR {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InclusionProof {
     /// MMR peak hashes at the time of proof generation
-    roots: Vec<String>,
+    pub peaks_hashes: Vec<String>,
     /// Sibling hashes needed to reconstruct the path to the root
-    siblings: Vec<String>,
+    pub siblings_hashes: Vec<String>,
+    /// Total number of elements in the MMR
+    pub elements_count: usize,
 }
 
 /// Default accumulator is an in-memory accumulator with StarkBlake hasher
@@ -60,6 +62,21 @@ impl BlockMMR {
             Arc::new(SQLiteStore::new(path.to_str().unwrap(), Some(true), Some(mmr_id)).await?);
         let hasher = Arc::new(StarkBlakeHasher::default());
         Ok(Self::new(store, hasher, Some(mmr_id.to_string())))
+    }
+
+    /// Create in-memory MMR from peaks hashes and elements count
+    pub async fn from_peaks(peaks_hashes: Vec<String>, elements_count: usize) -> Result<Self, anyhow::Error> {
+        let store = Arc::new(InMemoryStore::default());
+        let hasher = Arc::new(StarkBlakeHasher::default());
+        let mmr = MMR::create_from_peaks(
+            store.clone(),
+            hasher.clone(),
+            None,
+            peaks_hashes,
+            elements_count,
+        )
+        .await?;
+        Ok(Self { hasher, store, mmr })
     }
 
     /// Add a leaf to the MMR
@@ -106,9 +123,38 @@ impl BlockMMR {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to generate proof: {}", e))?;
         Ok(InclusionProof {
-            roots: proof.peaks_hashes,
-            siblings: proof.siblings_hashes,
+            peaks_hashes: proof.peaks_hashes,
+            siblings_hashes: proof.siblings_hashes,
+            elements_count: proof.elements_count,
         })
+    }
+
+    /// Verify an inclusion proof for a given block height and block header
+    /// NOTE that this only guarantees that the block was included in the MMR with the known peaks hashes.
+    /// In order to verify the correctness you have to compute the root hash of the MMR and compare it with the commitеed root.
+    pub async fn verify_proof(&self, block_height: u32, block_header: BlockHeader, proof: InclusionProof) -> anyhow::Result<bool> {
+        let element_hash = block_header_digest(self.hasher.clone(), block_header)?;
+        let element_index = map_leaf_index_to_element_index(block_height as usize);
+        let proof = Proof {
+            element_index,
+            element_hash: element_hash.clone(),
+            siblings_hashes: proof.siblings_hashes,
+            peaks_hashes: proof.peaks_hashes,
+            elements_count: proof.elements_count,
+        };
+        self.mmr
+            .verify_proof(proof, element_hash, None)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to verify proof: {}", e))
+    }
+
+    /// Get the root hash of the MMR (compatible with Cairo implementation)
+    pub async fn get_root_hash(&self) -> anyhow::Result<String> {
+        let SparseRoots {
+            block_height: _,
+            roots,
+        } = self.get_sparse_roots().await?;
+        self.hasher.hash(roots).map_err(|e| anyhow::anyhow!("Failed to get root hash: {}", e))
     }
 }
 
@@ -304,5 +350,46 @@ mod tests {
             digest,
             "0x5fd720d341e64d17d3b8624b17979b0d0dad4fc17d891796a3a51a99d3f41599"
         );
+    }
+
+    #[tokio::test]
+    async fn test_inclusion_proof() {
+        let mut mmr = BlockMMR::default();
+        let block_header: BlockHeader = serde_json::from_str(
+            r#"
+            {
+                "version": 1,
+                "prev_blockhash": "000000002a22cfee1f2c846adbd12b3e183d4f97683f85dad08a79780a84bd55",
+                "merkle_root": "7dac2c5666815c17a3b36427de37bb9d2e2c5ccec3f8633eb91a4205cb4c10ff",
+                "time": 1231731025,
+                "bits": 486604799,
+                "nonce": 1889418792
+            }
+            "#,
+        )
+        .unwrap();
+        // Add 10 blocks
+        for _ in 0..10 {
+            mmr.add_block_header(block_header.clone()).await.unwrap();
+        }
+        // Generate a proof for the fifth block
+        let proof = mmr.generate_proof(5).await.unwrap();
+        // Create an ephemeral MMR from the peaks hashes and elements count
+        let mmr = BlockMMR::from_peaks(proof.peaks_hashes.clone(), proof.elements_count).await.unwrap();
+        // Verify the proof
+        assert!(mmr.verify_proof(5, block_header, proof).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_root_hash() {
+        let mut mmr = BlockMMR::default();
+        let leaf = "0xc713e33d89122b85e2f646cc518c2e6ef88b06d3b016104faa95f84f878dab66".to_string();
+        // Add 15 blocks
+        for _ in 0..15 {
+            mmr.add(leaf.clone()).await.unwrap();
+        }
+        // Get the root hash
+        let root_hash = mmr.get_root_hash().await.unwrap();
+        assert_eq!(root_hash, "0x19f148fb4f9b5e5bac1c12594b8e4b2d4b94d12c073b92e2b3d83349909613b6");
     }
 }

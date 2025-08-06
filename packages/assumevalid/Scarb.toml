@@ -20,4 +20,4 @@ syscalls = ["consensus/syscalls", "utils/syscalls"]
 cairo_test.workspace = true
 
 [scripts]
-test = "scarb cairo-test && scarb --profile proving build --target-kinds executable && ../../scripts/data/integration_tests.sh"
+test = "scarb cairo-test && scarb --profile release build --target-kinds executable && ../../scripts/data/integration_tests.sh"

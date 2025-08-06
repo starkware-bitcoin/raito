@@ -3,14 +3,14 @@ members = ["packages/*"]
 
 [workspace.package]
 description = "Bitcoin ZK client."
-cairo-version = "2.11.4"
+cairo-version = "2.12.0"
 version = "0.1.0"
 readme = "README.md"
 repository = "https://github.com/keep-starknet-strange/raito"
 license-file = "LICENSE"
 
 [workspace.dependencies]
-cairo_test = "2.11.4"
+cairo_test = "2.12.0"
 shinigami_engine = { git = "https://github.com/keep-starknet-strange/shinigami.git", rev = "1963116" }
 
 [profile.proving]
@@ -19,4 +19,9 @@ inherits = "release"
 [profile.proving.cairo]
 enable-gas = false
 sierra-replace-ids = true
+# NOTE: this flag set causes build errors in Cairo 2.12.0 (because of use of print right before a panic).
+# Use only for assumevalid package.
 unsafe-panic = true
+
+[profile.release.cairo]
+enable-gas = false

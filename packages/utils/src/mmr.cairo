@@ -120,6 +120,7 @@ pub impl MMRImpl of MMRTrait {
 
 #[cfg(test)]
 mod tests {
+    use core::box::BoxImpl;
     use super::*;
 
     #[test]
@@ -185,5 +186,22 @@ mod tests {
         ]
             .span();
         assert_eq!(mmr.roots, expected, "cannot add fifth leave");
+    }
+
+    #[test]
+    fn test_root_hash() {
+        let mut mmr: Box<MMR> = BoxImpl::new(Default::default());
+        let leaf: Blake2sDigest =
+            0xc713e33d89122b85e2f646cc518c2e6ef88b06d3b016104faa95f84f878dab66_u256
+            .into();
+        // Add 15 blocks
+        for _ in 0..15_usize {
+            mmr = BoxImpl::new(mmr.add(leaf));
+        }
+        // Compute the root hash
+        let root_hash: u256 = mmr.blake2s_digest().into();
+        assert_eq!(
+            root_hash, 0x19f148fb4f9b5e5bac1c12594b8e4b2d4b94d12c073b92e2b3d83349909613b6_u256,
+        );
     }
 }
