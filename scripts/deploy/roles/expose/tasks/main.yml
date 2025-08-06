@@ -1,0 +1,334 @@
+---
+- name: Check if gcloud CLI is available
+  command: gcloud --version
+  register: gcloud_check
+  failed_when: false
+
+- name: Fail if gcloud CLI is not available
+  fail:
+    msg: "gcloud CLI is required but not found. Please install Google Cloud SDK."
+  when: gcloud_check.rc != 0
+
+- name: Check if authenticated with gcloud
+  shell: gcloud auth list --filter=status:ACTIVE --format="value(account)" | head -1
+  register: gcloud_auth_check
+
+- name: Display authentication info
+  debug:
+    msg: "Using gcloud authentication: {{ gcloud_auth_check.stdout }}"
+  when: gcloud_auth_check.stdout != ''
+
+- name: Fail if not authenticated
+  fail:
+    msg: "No gcloud authentication found. Please run 'gcloud auth login' first"
+  when: gcloud_auth_check.stdout == ''
+
+- name: Set default GCP project
+  shell: gcloud config set project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+
+- name: Check if health check firewall rule exists
+  shell: |
+    gcloud compute firewall-rules describe raito-bridge-health-check \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(name)" 2>/dev/null
+  register: health_check_firewall_check
+  failed_when: false
+
+- name: Create firewall rule for health checks
+  shell: |
+    gcloud compute firewall-rules create raito-bridge-health-check \
+      --allow tcp:8080 \
+      --source-ranges 130.211.0.0/22,35.191.0.0/16 \
+      --target-tags raito-bridge-node \
+      --description "Allow health checks for Raito Bridge Node" \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: health_check_firewall_check.rc != 0
+
+- name: Check if web traffic firewall rule exists
+  shell: |
+    gcloud compute firewall-rules describe raito-bridge-web \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(name)" 2>/dev/null
+  register: web_firewall_check
+  failed_when: false
+
+- name: Create firewall rule for HTTP/HTTPS traffic
+  shell: |
+    gcloud compute firewall-rules create raito-bridge-web \
+      --allow tcp:80,tcp:443 \
+      --target-tags raito-bridge-node \
+      --description "Allow HTTP and HTTPS traffic for Raito Bridge Node" \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: web_firewall_check.rc != 0
+
+- name: Add network tags to VM instance
+  shell: |
+    gcloud compute instances add-tags "{{ lookup('env', 'GCP_INSTANCE_NAME') }}" \
+      --tags raito-bridge-node \
+      --zone "{{ lookup('env', 'GCP_ZONE') }}" \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+
+- name: Check if instance group exists
+  shell: |
+    gcloud compute instance-groups unmanaged describe raito-bridge-group \
+      --zone "{{ lookup('env', 'GCP_ZONE') }}" \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(name)" 2>/dev/null
+  register: instance_group_check
+  failed_when: false
+
+- name: Create instance group for the VM
+  shell: |
+    gcloud compute instance-groups unmanaged create raito-bridge-group \
+      --zone "{{ lookup('env', 'GCP_ZONE') }}" \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: instance_group_check.rc != 0
+
+- name: Check if VM instance is already in the instance group
+  shell: |
+    gcloud compute instance-groups unmanaged list-instances raito-bridge-group \
+      --zone "{{ lookup('env', 'GCP_ZONE') }}" \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(instance)" | grep -q "{{ lookup('env', 'GCP_INSTANCE_NAME') }}"
+  register: instance_in_group_check
+  failed_when: false
+
+- name: Add VM instance to the instance group
+  shell: |
+    gcloud compute instance-groups unmanaged add-instances raito-bridge-group \
+      --instances "{{ lookup('env', 'GCP_INSTANCE_NAME') }}" \
+      --zone "{{ lookup('env', 'GCP_ZONE') }}" \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: instance_in_group_check.rc != 0
+
+- name: Check if named ports are already set
+  shell: |
+    gcloud compute instance-groups unmanaged describe raito-bridge-group \
+      --zone "{{ lookup('env', 'GCP_ZONE') }}" \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(namedPorts[].name)" | grep -q "http"
+  register: named_ports_check
+  failed_when: false
+
+- name: Set named ports for instance group
+  shell: |
+    gcloud compute instance-groups unmanaged set-named-ports raito-bridge-group \
+      --named-ports http:8080 \
+      --zone "{{ lookup('env', 'GCP_ZONE') }}" \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: named_ports_check.rc != 0
+
+- name: Check if health check exists
+  shell: |
+    gcloud compute health-checks describe raito-bridge-health-check \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(name)" 2>/dev/null
+  register: health_check_exists
+  failed_when: false
+
+- name: Create health check
+  shell: |
+    gcloud compute health-checks create http raito-bridge-health-check \
+      --port 8080 \
+      --request-path "/head" \
+      --check-interval 30s \
+      --timeout 10s \
+      --healthy-threshold 2 \
+      --unhealthy-threshold 3 \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: health_check_exists.rc != 0
+
+- name: Check if backend service exists
+  shell: |
+    gcloud compute backend-services describe raito-bridge-backend \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(name)" 2>/dev/null
+  register: backend_service_exists
+  failed_when: false
+
+- name: Create backend service
+  shell: |
+    gcloud compute backend-services create raito-bridge-backend \
+      --protocol HTTP \
+      --health-checks raito-bridge-health-check \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: backend_service_exists.rc != 0
+
+- name: Check if instance group is already added to backend service
+  shell: |
+    gcloud compute backend-services describe raito-bridge-backend \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(backends[].group)" | grep -q "raito-bridge-group"
+  register: backend_group_check
+  failed_when: false
+
+- name: Add instance group to backend service
+  shell: |
+    gcloud compute backend-services add-backend raito-bridge-backend \
+      --instance-group raito-bridge-group \
+      --instance-group-zone "{{ lookup('env', 'GCP_ZONE') }}" \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: backend_group_check.rc != 0
+
+- name: Check if URL map exists
+  shell: |
+    gcloud compute url-maps describe raito-bridge-url-map \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(name)" 2>/dev/null
+  register: url_map_exists
+  failed_when: false
+
+- name: Create URL map
+  shell: |
+    gcloud compute url-maps create raito-bridge-url-map \
+      --default-service raito-bridge-backend \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: url_map_exists.rc != 0
+
+- name: Check if SSL certificate exists
+  shell: |
+    gcloud compute ssl-certificates describe raito-bridge-ssl-cert \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(name)" 2>/dev/null
+  register: ssl_cert_exists
+  failed_when: false
+
+- name: Create managed SSL certificate
+  shell: |
+    gcloud compute ssl-certificates create raito-bridge-ssl-cert \
+      --domains "{{ lookup('env', 'GCP_DOMAIN') }}" \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: ssl_cert_exists.rc != 0
+
+- name: Check if HTTPS proxy exists
+  shell: |
+    gcloud compute target-https-proxies describe raito-bridge-https-proxy \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(name)" 2>/dev/null
+  register: https_proxy_exists
+  failed_when: false
+
+- name: Create HTTPS proxy
+  shell: |
+    gcloud compute target-https-proxies create raito-bridge-https-proxy \
+      --url-map raito-bridge-url-map \
+      --ssl-certificates raito-bridge-ssl-cert \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: https_proxy_exists.rc != 0
+
+- name: Check if HTTP proxy exists
+  shell: |
+    gcloud compute target-http-proxies describe raito-bridge-http-proxy \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(name)" 2>/dev/null
+  register: http_proxy_exists
+  failed_when: false
+
+- name: Create HTTP proxy for redirect
+  shell: |
+    gcloud compute target-http-proxies create raito-bridge-http-proxy \
+      --url-map raito-bridge-url-map \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: http_proxy_exists.rc != 0
+
+- name: Check if static IP address already exists
+  shell: |
+    gcloud compute addresses describe raito-bridge-ip \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(address)" 2>/dev/null || echo "NOT_FOUND"
+  register: existing_ip_check
+
+- name: Reserve static IP address (if not exists)
+  shell: |
+    gcloud compute addresses create raito-bridge-ip \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: existing_ip_check.stdout == "NOT_FOUND"
+
+- name: Get static IP address
+  shell: |
+    gcloud compute addresses describe raito-bridge-ip \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(address)"
+  register: static_ip
+
+- name: Check if HTTPS forwarding rule exists
+  shell: |
+    gcloud compute forwarding-rules describe raito-bridge-https-forwarding-rule \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(name)" 2>/dev/null
+  register: https_forwarding_rule_exists
+  failed_when: false
+
+- name: Create HTTPS forwarding rule
+  shell: |
+    gcloud compute forwarding-rules create raito-bridge-https-forwarding-rule \
+      --address raito-bridge-ip \
+      --global \
+      --target-https-proxy raito-bridge-https-proxy \
+      --ports 443 \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: https_forwarding_rule_exists.rc != 0
+
+- name: Check if HTTP forwarding rule exists
+  shell: |
+    gcloud compute forwarding-rules describe raito-bridge-http-forwarding-rule \
+      --global \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}" \
+      --format="value(name)" 2>/dev/null
+  register: http_forwarding_rule_exists
+  failed_when: false
+
+- name: Create HTTP forwarding rule
+  shell: |
+    gcloud compute forwarding-rules create raito-bridge-http-forwarding-rule \
+      --address raito-bridge-ip \
+      --global \
+      --target-http-proxy raito-bridge-http-proxy \
+      --ports 80 \
+      --project "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+  when: http_forwarding_rule_exists.rc != 0
+
+- name: Display setup completion message
+  debug:
+    msg: |
+      HTTPS setup completed successfully!
+      
+      Static IP Address: {{ static_ip.stdout }}
+      {% if existing_ip_check.stdout != "NOT_FOUND" %}
+      (Using existing static IP address)
+      {% else %}
+      (New static IP address created)
+      {% endif %}
+      Domain: {{ lookup('env', 'GCP_DOMAIN') }}
+
+      📝 MANUAL DNS SETUP REQUIRED:
+      Add DNS A record: {{ lookup('env', 'GCP_DOMAIN') }} → {{ static_ip.stdout }}
+      
+      SSL certificate will be automatically provisioned once DNS is configured.
+      This may take 10-60 minutes to complete.
+      
+      Test endpoints:
+      - https://{{ lookup('env', 'GCP_DOMAIN') }}/head
+      - https://{{ lookup('env', 'GCP_DOMAIN') }}/proof/100
+      
+      NOTES:
+      - This role runs locally using gcloud CLI and doesn't require SSH access to the target server
+      - No machine restart is required - only GCP infrastructure is configured
+      - Your Raito Bridge Node service continues running uninterrupted
+      - Make sure you're authenticated with 'gcloud auth login' before running this role

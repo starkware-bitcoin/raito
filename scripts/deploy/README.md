@@ -68,6 +68,12 @@ USERPWD=your_rpc_user:your_rpc_password
 
 # Bridge node configuration (optional)
 RPC_HOST=0.0.0.0:8080
+
+# Google Cloud Platform configuration (for HTTPS exposure)
+GCP_PROJECT_ID=your-project-id
+GCP_ZONE=us-central1-a
+GCP_DOMAIN=api.raito.wtf
+GCP_INSTANCE_NAME=raito
 ```
 
 ### 2. Environment Variables (Automatic)
@@ -127,6 +133,24 @@ Stop and disable the Raito Bridge Node service:
 make stop
 # OR: ansible-playbook site.yml --tags stop
 ```
+
+### Expose via HTTPS
+
+Set up HTTPS access to the bridge node API via Google Cloud Load Balancer:
+
+```bash
+make expose
+# OR: ansible-playbook expose.yml
+```
+
+**Note**: This role runs locally using `gcloud` CLI and doesn't require SSH access to the target server. **No machine restart is required** - only GCP infrastructure is configured.
+
+This will:
+- Create managed SSL certificate for your domain
+- Set up global load balancer with health checks
+- Configure firewall rules
+- Reserve static IP address (or use existing one)
+- Provide DNS configuration instructions
 
 ## Service Management
 
@@ -205,6 +229,37 @@ For the first 900K Bitcoin blocks:
 - `make start` - Start service
 - `make update` - Update to latest version  
 - `make stop` - Stop service
+- `make expose` - Set up HTTPS access via Google Cloud Load Balancer
 - `make status` - Check status
 - `make logs` - View logs
 - `make test-api` - Test API endpoint
+
+## HTTPS Setup Requirements
+
+To use the `expose` command, you need:
+
+1. **Google Cloud SDK**: Install the `gcloud` CLI tool
+2. **Authentication**: Use gcloud CLI authentication
+   ```bash
+   gcloud auth login
+   gcloud config set project your-project-id
+   ```
+4. **Domain**: Ensure your domain is properly configured to accept the SSL certificate
+
+The expose command will:
+- Create all necessary GCP resources
+- Set up SSL certificate (managed by Google)
+- Configure health checks for your bridge node
+- Use existing static IP or create a new one
+- Provide the static IP address for DNS configuration
+- **No server downtime or restart required**
+
+After running `make expose`, update your DNS records to point your domain to the provided static IP address.
+
+### Expected Outcome
+
+After successful execution:
+- **HTTPS endpoint**: `https://api.raito.wtf/head`
+- **API access**: `https://api.raito.wtf/proof/100`
+- **SSL certificate**: Automatically managed by Google
+- **Global availability**: Load balanced across Google's network

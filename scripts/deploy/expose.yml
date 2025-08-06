@@ -1,0 +1,15 @@
+---
+- name: Expose Raito Bridge Node via HTTPS
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    gcp_project_id: "{{ lookup('env', 'GCP_PROJECT_ID') }}"
+    gcp_zone: "{{ lookup('env', 'GCP_ZONE') }}"
+    gcp_domain: "{{ lookup('env', 'GCP_DOMAIN') }}"
+    gcp_instance_name: "{{ lookup('env', 'GCP_INSTANCE_NAME') }}"
+
+  tasks:
+    - name: Include expose role
+      import_role:
+        name: expose

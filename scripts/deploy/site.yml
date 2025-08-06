@@ -30,3 +30,8 @@
       import_role:
         name: stop
       tags: [stop, never]
+      
+    - name: Include expose role
+      import_role:
+        name: expose
+      tags: [expose, never]

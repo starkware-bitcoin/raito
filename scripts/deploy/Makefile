@@ -1,4 +1,4 @@
-.PHONY: help install setup start update stop status logs env-check
+.PHONY: help install setup start update stop expose status logs env-check
 
 # Include .env file if it exists
 -include .env
@@ -14,6 +14,7 @@ help:
 	@echo "  start     - Start and enable service"
 	@echo "  update    - Update to latest version"
 	@echo "  stop      - Stop and disable service"
+	@echo "  expose    - Set up HTTPS access via Google Cloud Load Balancer"
 	@echo "  status    - Check service status"
 	@echo "  logs      - View service logs"
 	@echo "  env-check - Verify environment variables"
@@ -55,6 +56,10 @@ update: env-check
 # Stop service
 stop: env-check
 	ansible-playbook site.yml --tags stop
+
+# Set up HTTPS access
+expose: env-check
+	ansible-playbook expose.yml
 
 # Check service status
 status:
