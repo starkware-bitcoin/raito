@@ -65,7 +65,10 @@ impl BlockMMR {
     }
 
     /// Create in-memory MMR from peaks hashes and elements count
-    pub async fn from_peaks(peaks_hashes: Vec<String>, elements_count: usize) -> Result<Self, anyhow::Error> {
+    pub async fn from_peaks(
+        peaks_hashes: Vec<String>,
+        elements_count: usize,
+    ) -> Result<Self, anyhow::Error> {
         let store = Arc::new(InMemoryStore::default());
         let hasher = Arc::new(StarkBlakeHasher::default());
         let mmr = MMR::create_from_peaks(
@@ -132,7 +135,12 @@ impl BlockMMR {
     /// Verify an inclusion proof for a given block height and block header
     /// NOTE that this only guarantees that the block was included in the MMR with the known peaks hashes.
     /// In order to verify the correctness you have to compute the root hash of the MMR and compare it with the commitеed root.
-    pub async fn verify_proof(&self, block_height: u32, block_header: BlockHeader, proof: InclusionProof) -> anyhow::Result<bool> {
+    pub async fn verify_proof(
+        &self,
+        block_height: u32,
+        block_header: BlockHeader,
+        proof: InclusionProof,
+    ) -> anyhow::Result<bool> {
         let element_hash = block_header_digest(self.hasher.clone(), block_header)?;
         let element_index = map_leaf_index_to_element_index(block_height as usize);
         let proof = Proof {
@@ -154,7 +162,9 @@ impl BlockMMR {
             block_height: _,
             roots,
         } = self.get_sparse_roots().await?;
-        self.hasher.hash(roots).map_err(|e| anyhow::anyhow!("Failed to get root hash: {}", e))
+        self.hasher
+            .hash(roots)
+            .map_err(|e| anyhow::anyhow!("Failed to get root hash: {}", e))
     }
 }
 
@@ -375,7 +385,9 @@ mod tests {
         // Generate a proof for the fifth block
         let proof = mmr.generate_proof(5).await.unwrap();
         // Create an ephemeral MMR from the peaks hashes and elements count
-        let mmr = BlockMMR::from_peaks(proof.peaks_hashes.clone(), proof.elements_count).await.unwrap();
+        let mmr = BlockMMR::from_peaks(proof.peaks_hashes.clone(), proof.elements_count)
+            .await
+            .unwrap();
         // Verify the proof
         assert!(mmr.verify_proof(5, block_header, proof).await.unwrap());
     }
@@ -390,6 +402,9 @@ mod tests {
         }
         // Get the root hash
         let root_hash = mmr.get_root_hash().await.unwrap();
-        assert_eq!(root_hash, "0x19f148fb4f9b5e5bac1c12594b8e4b2d4b94d12c073b92e2b3d83349909613b6");
+        assert_eq!(
+            root_hash,
+            "0x19f148fb4f9b5e5bac1c12594b8e4b2d4b94d12c073b92e2b3d83349909613b6"
+        );
     }
 }

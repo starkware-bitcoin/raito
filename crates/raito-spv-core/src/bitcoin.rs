@@ -15,6 +15,9 @@ use tracing::debug;
 /// Default HTTP request timeout
 pub const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Default block count update interval in seconds
+pub const BLOCK_COUNT_UPDATE_INTERVAL: Duration = Duration::from_secs(10);
+
 /// Bitcoin RPC client
 pub struct BitcoinClient {
     client: HttpClient,
@@ -112,18 +115,20 @@ impl BitcoinClient {
             .map(|res: u64| res as u32)
     }
 
-    /// Wait for a block header at the given height
+    /// Wait for a block header at the given height.
+    /// If the specified lag is non-zero, the function will wait till `lag` blocks are built on top of the expected block.
     pub async fn wait_block_header(
         &mut self,
         height: u32,
+        lag: u32,
     ) -> anyhow::Result<(BlockHeader, BlockHash)> {
         while height >= self.block_count {
-            self.block_count = self.get_block_count().await?;
+            self.block_count = self.get_block_count().await?.saturating_sub(lag);
             if height < self.block_count {
                 debug!("New block count: {}", self.block_count);
                 break;
             } else {
-                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                tokio::time::sleep(BLOCK_COUNT_UPDATE_INTERVAL).await;
             }
         }
         self.get_block_header_by_height(height).await

@@ -43,6 +43,9 @@ struct Cli {
     /// Number of blocks per sparse roots shard directory
     #[arg(long, default_value = "10000")]
     mmr_shard_size: u32,
+    /// Indexing lag in blocks, to address potential reorgs
+    #[arg(long, default_value = "1")]
+    mmr_block_lag: u32,
     /// Logging level (off, error, warn, info, debug, trace)
     #[arg(long, default_value = "info")]
     log_level: String,
@@ -81,6 +84,7 @@ async fn main() {
     let indexer_config = IndexerConfig {
         rpc_url: cli.bitcoin_rpc_url,
         rpc_userpwd: cli.bitcoin_rpc_userpwd,
+        indexing_lag: cli.mmr_block_lag,
         sink_config: SparseRootsSinkConfig {
             output_dir: cli.mmr_roots_dir,
             shard_size: cli.mmr_shard_size,
