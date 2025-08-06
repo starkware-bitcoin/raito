@@ -6,9 +6,7 @@ use tokio::fs;
 
 use accumulators::hasher::stark_blake::StarkBlakeHasher;
 use accumulators::hasher::Hasher;
-use accumulators::mmr::{
-    elements_count_to_leaf_count, map_leaf_index_to_element_index, PeaksOptions, MMR,
-};
+use accumulators::mmr::{map_leaf_index_to_element_index, PeaksOptions, MMR};
 use accumulators::store::memory::InMemoryStore;
 use accumulators::store::sqlite::SQLiteStore;
 use accumulators::store::Store;
@@ -18,9 +16,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::sparse_roots::SparseRoots;
 
-/// MMR accumulator state
+/// MMR accumulator state for Bitcoin block headers
 #[derive(Debug)]
-pub struct Accumulator {
+pub struct BlockMMR {
     hasher: Arc<dyn Hasher>,
     #[allow(dead_code)]
     store: Arc<dyn Store>,
@@ -37,7 +35,7 @@ pub struct InclusionProof {
 }
 
 /// Default accumulator is an in-memory accumulator with StarkBlake hasher
-impl Default for Accumulator {
+impl Default for BlockMMR {
     fn default() -> Self {
         let store = Arc::new(InMemoryStore::default());
         let hasher = Arc::new(StarkBlakeHasher::default());
@@ -45,7 +43,7 @@ impl Default for Accumulator {
     }
 }
 
-impl Accumulator {
+impl BlockMMR {
     /// Create a new default MMR
     pub fn new(store: Arc<dyn Store>, hasher: Arc<dyn Hasher>, mmr_id: Option<String>) -> Self {
         let mmr = MMR::new(store.clone(), hasher.clone(), mmr_id);
@@ -88,9 +86,7 @@ impl Accumulator {
 
     /// Get the roots of the MMR in sparse format (compatible with Cairo implementation)
     pub async fn get_sparse_roots(&self) -> anyhow::Result<SparseRoots> {
-        let mut elements_count = self.mmr.elements_count.get().await?;
-        let block_count = elements_count_to_leaf_count(elements_count)?;
-
+        let elements_count = self.mmr.elements_count.get().await?;
         let roots = self
             .mmr
             .get_peaks(PeaksOptions {
@@ -98,37 +94,7 @@ impl Accumulator {
                 formatting_opts: None,
             })
             .await?;
-
-        let null_root = format!("0x{:064x}", 0);
-
-        let mut max_height = elements_count.ilog2() + 1;
-        let mut root_idx = 0;
-        let mut result = vec![];
-
-        while elements_count != 0 || max_height != 0 {
-            // Number of elements of the perfect binary tree of the current max height
-            let elements_per_height = (1 << max_height) - 1;
-            if elements_count >= elements_per_height {
-                result.insert(0, roots[root_idx].clone());
-                root_idx += 1;
-                elements_count -= elements_per_height;
-            } else {
-                result.insert(0, null_root.clone());
-            }
-            if max_height != 0 {
-                max_height -= 1;
-            }
-        }
-
-        if result.last().unwrap() != &null_root {
-            result.push(null_root);
-        }
-
-        Ok(SparseRoots {
-            roots: result,
-            // Last block height is the number of leaves - 1
-            block_height: block_count as u32 - 1,
-        })
+        SparseRoots::try_from_peaks(roots, elements_count)
     }
 
     /// Generate an inclusion proof for a given block height
@@ -181,7 +147,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mmr_add() {
-        let mut mmr = Accumulator::default();
+        let mut mmr = BlockMMR::default();
         let leaf = "0xc713e33d89122b85e2f646cc518c2e6ef88b06d3b016104faa95f84f878dab66".to_string();
 
         // Add first leaf

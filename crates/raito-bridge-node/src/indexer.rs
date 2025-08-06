@@ -3,10 +3,11 @@
 use tokio::sync::broadcast;
 use tracing::{error, info};
 
+use raito_spv_core::bitcoin::BitcoinClient;
+
 use crate::{
     app::AppClient,
-    bitcoin::BitcoinClient,
-    sparse_roots::{SparseRootsSink, SparseRootsSinkConfig},
+    file_sink::{SparseRootsSink, SparseRootsSinkConfig},
 };
 
 /// Bitcoin block indexer that builds MMR accumulator and generates sparse roots

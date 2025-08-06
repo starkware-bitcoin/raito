@@ -12,7 +12,9 @@ use axum::{
 };
 use tower_http::trace::TraceLayer;
 
-use crate::{app::AppClient, mmr::InclusionProof};
+use raito_spv_core::block_mmr::InclusionProof;
+
+use crate::app::AppClient;
 
 /// Configuration for the RPC server
 pub struct RpcConfig {

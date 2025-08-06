@@ -9,19 +9,17 @@ use tracing_subscriber::filter::EnvFilter;
 
 use crate::{
     app::{create_app, AppConfig},
+    file_sink::SparseRootsSinkConfig,
     indexer::{Indexer, IndexerConfig},
     rpc::{RpcConfig, RpcServer},
     shutdown::Shutdown,
-    sparse_roots::SparseRootsSinkConfig,
 };
 
 mod app;
-mod bitcoin;
+mod file_sink;
 mod indexer;
-mod mmr;
 mod rpc;
 mod shutdown;
-mod sparse_roots;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

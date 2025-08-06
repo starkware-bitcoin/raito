@@ -6,8 +6,8 @@ use bitcoin::block::Header as BlockHeader;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing::{error, info};
 
-use crate::{
-    mmr::{Accumulator, InclusionProof},
+use raito_spv_core::{
+    block_mmr::{BlockMMR, InclusionProof},
     sparse_roots::SparseRoots,
 };
 
@@ -79,7 +79,7 @@ impl AppServer {
         info!("App server started");
 
         // We need to specify mmr_id to have deterministic keys in the database
-        let mut mmr = Accumulator::from_file(&self.config.mmr_db_path, "blocks").await?;
+        let mut mmr = BlockMMR::from_file(&self.config.mmr_db_path, "blocks").await?;
 
         loop {
             tokio::select! {
@@ -138,11 +138,11 @@ impl AppClient {
         self.tx_requests
             .send(ApiRequest { body, tx_response })
             .await?;
-        
+
         let res = rx_response
             .await
             .map_err(|_| anyhow::anyhow!("Failed to send request"))?;
-        
+
         match res {
             Ok(response_body) => extract_response(response_body)
                 .ok_or_else(|| anyhow::anyhow!("Unexpected response type")),
@@ -151,13 +151,10 @@ impl AppClient {
     }
 
     pub async fn get_block_count(&self) -> Result<u32, anyhow::Error> {
-        self.send_request(
-            ApiRequestBody::GetBlockCount(),
-            |response| match response {
-                ApiResponseBody::GetBlockCount(block_count) => Some(block_count),
-                _ => None,
-            },
-        )
+        self.send_request(ApiRequestBody::GetBlockCount(), |response| match response {
+            ApiResponseBody::GetBlockCount(block_count) => Some(block_count),
+            _ => None,
+        })
         .await
     }
 

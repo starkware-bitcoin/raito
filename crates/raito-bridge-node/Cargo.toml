@@ -4,19 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# Core SPV functionality
+raito-spv-core = { path = "../raito-spv-core" }
+
 # Async runtime
-tokio = { version = "1.36", features = ["full"] }
+tokio.workspace = true
 # Web framework
 axum = "0.7"
 tower-http = { version = "0.5", features = ["trace"] }
 
-# Merkle mountain range
-accumulators = { git = "https://github.com/m-kus/rust-accumulators", rev = "588711663348fcf22fd4af624d0b0cd3bea709f1", features = ["blake", "memory", "sqlite", "mmr"]}
-
-# Bitcoin RPC and types
-jsonrpsee.workspace = true
+# Bitcoin RPC and types (re-exported from raito-spv-core but needed for specific features)
 bitcoin.workspace = true
-base64.workspace = true
 # Storage
 libmdbx.workspace = true
 # CLI
@@ -44,4 +42,4 @@ tracing-subscriber.workspace = true
 # Testing
 mockall.workspace = true
 wiremock.workspace = true
-tempfile.workspace = true 
+tempfile.workspace = true

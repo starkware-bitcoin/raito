@@ -1,0 +1,40 @@
+[package]
+name = "raito-spv-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Async runtime
+tokio.workspace = true
+
+# Merkle mountain range
+accumulators = { git = "https://github.com/m-kus/rust-accumulators", rev = "588711663348fcf22fd4af624d0b0cd3bea709f1", features = ["blake", "memory", "sqlite", "mmr"]}
+
+# Bitcoin RPC and types
+jsonrpsee.workspace = true
+bitcoin.workspace = true
+base64.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+hex.workspace = true
+
+# BigInt (for sparse_roots serialization)
+num-bigint.workspace = true
+num-traits.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Retry logic (for bitcoin client)
+backoff = { version = "0.4", features = ["futures", "tokio"] }
+
+# Logging
+tracing.workspace = true
+
+[dev-dependencies]
+# Testing
+mockall.workspace = true
+tempfile.workspace = true 
