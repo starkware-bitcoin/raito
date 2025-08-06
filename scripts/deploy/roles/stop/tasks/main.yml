@@ -1,0 +1,23 @@
+---
+- name: Stop raito service
+  systemd:
+    name: "{{ raito_service_name }}"
+    state: stopped
+
+- name: Disable raito service
+  systemd:
+    name: "{{ raito_service_name }}"
+    enabled: no
+
+- name: Wait for service to stop completely
+  wait_for:
+    timeout: 10
+
+- name: Display service status
+  shell: systemctl status {{ raito_service_name }} --no-pager
+  register: service_status
+  ignore_errors: yes
+
+- name: Show final service status
+  debug:
+    msg: "{{ service_status.stdout_lines }}"

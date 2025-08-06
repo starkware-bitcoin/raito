@@ -1,0 +1,28 @@
+[Unit]
+Description=Raito Bridge Node - Bitcoin ZK Client Bridge
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User={{ raito_user }}
+Group={{ raito_user }}
+WorkingDirectory={{ raito_working_dir }}
+Environment=PATH=/home/{{ raito_user }}/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile={{ raito_working_dir }}/.env
+ExecStart=/home/{{ raito_user }}/.cargo/bin/raito-bridge-node --rpc-host {{ rpc_host }}
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=raito-bridge-node
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=false
+ReadWritePaths={{ raito_working_dir }}
+
+[Install]
+WantedBy=multi-user.target

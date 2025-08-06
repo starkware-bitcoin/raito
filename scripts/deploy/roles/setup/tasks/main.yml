@@ -1,0 +1,65 @@
+---
+- name: Create raito user
+  user:
+    name: "{{ raito_user }}"
+    shell: /bin/bash
+    home: "/home/{{ raito_user }}"
+    create_home: yes
+    system: yes
+
+- name: Check if Rust is installed for raito user
+  stat:
+    path: "/home/{{ raito_user }}/.cargo/bin/cargo"
+  register: rust_installed
+
+- name: Install Rust for raito user
+  shell: |
+    su - {{ raito_user }} -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+  when: not rust_installed.stat.exists
+
+- name: Create working directory
+  file:
+    path: "{{ raito_working_dir }}"
+    state: directory
+    owner: "{{ raito_user }}"
+    group: "{{ raito_user }}"
+    mode: '0755'
+
+- name: Create .mmr_data directory
+  file:
+    path: "{{ raito_working_dir }}/.mmr_data"
+    state: directory
+    owner: "{{ raito_user }}"
+    group: "{{ raito_user }}"
+    mode: '0755'
+
+- name: Create .env file
+  template:
+    src: env.j2
+    dest: "{{ raito_working_dir }}/.env"
+    owner: "{{ raito_user }}"
+    group: "{{ raito_user }}"
+    mode: '0600'
+
+- name: Install raito-bridge-node
+  shell: |
+    su - {{ raito_user }} -c "source ~/.cargo/env && cargo install --git https://github.com/starkware-bitcoin/raito raito-bridge-node"
+
+- name: Create systemd service file
+  template:
+    src: raito-bridge-node.service.j2
+    dest: "/etc/systemd/system/{{ raito_service_name }}.service"
+    mode: '0644'
+  notify:
+    - Reload systemd
+    - Enable and start raito service
+
+- name: Ensure systemd is reloaded
+  systemd:
+    daemon_reload: yes
+
+- name: Enable and start raito service
+  systemd:
+    name: "{{ raito_service_name }}"
+    enabled: yes
+    state: started

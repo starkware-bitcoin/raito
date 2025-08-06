@@ -1,0 +1,33 @@
+---
+- name: Stop raito service
+  systemd:
+    name: "{{ raito_service_name }}"
+    state: stopped
+
+- name: Wait for service to stop completely
+  wait_for:
+    timeout: 10
+
+- name: Install latest raito-bridge-node
+  shell: |
+    su - {{ raito_user }} -c "source ~/.cargo/env && cargo install --git https://github.com/starkware-bitcoin/raito raito-bridge-node --force"
+
+- name: Update .env file if needed
+  template:
+    src: env.j2
+    dest: "{{ raito_working_dir }}/.env"
+    owner: "{{ raito_user }}"
+    group: "{{ raito_user }}"
+    mode: '0600'
+
+- name: Start raito service
+  systemd:
+    name: "{{ raito_service_name }}"
+    state: started
+
+- name: Wait for service to be fully started
+  wait_for:
+    port: "{{ rpc_host.split(':')[1] }}"
+    host: "{{ rpc_host.split(':')[0] }}"
+    delay: 5
+    timeout: 30

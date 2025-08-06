@@ -1,0 +1,25 @@
+---
+- name: Enable raito service
+  systemd:
+    name: "{{ raito_service_name }}"
+    enabled: yes
+
+- name: Start raito service
+  systemd:
+    name: "{{ raito_service_name }}"
+    state: started
+
+- name: Wait for service to be fully started
+  wait_for:
+    port: "{{ rpc_host.split(':')[1] }}"
+    host: "{{ rpc_host.split(':')[0] }}"
+    delay: 5
+    timeout: 30
+
+- name: Display service status
+  shell: systemctl status {{ raito_service_name }} --no-pager
+  register: service_status
+
+- name: Show service status
+  debug:
+    msg: "{{ service_status.stdout_lines }}"

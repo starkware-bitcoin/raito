@@ -1,0 +1,32 @@
+---
+- name: Manage Raito Bridge Node
+  hosts: all
+  become: yes
+  vars:
+    raito_working_dir: /opt/raito-bridge-node
+    raito_user: raito
+    raito_service_name: raito-bridge-node
+    bitcoin_rpc_url: "{{ lookup('env', 'BITCOIN_RPC') }}"
+    bitcoin_rpc_userpwd: "{{ lookup('env', 'USERPWD') }}"
+    rpc_host: "{{ lookup('env', 'RPC_HOST') | default('0.0.0.0:8080') }}"
+
+  tasks:
+    - name: Include setup role
+      import_role:
+        name: setup
+      tags: [setup, never]
+      
+    - name: Include start role
+      import_role:
+        name: start
+      tags: [start, never]
+      
+    - name: Include update role
+      import_role:
+        name: update
+      tags: [update, never]
+      
+    - name: Include stop role
+      import_role:
+        name: stop
+      tags: [stop, never]

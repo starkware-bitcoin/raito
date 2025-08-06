@@ -1,0 +1,210 @@
+# Raito Bridge Node Ansible Playbook
+
+This Ansible playbook automates the deployment and management of the Raito Bridge Node on remote servers.
+
+## Prerequisites
+
+- Ansible 2.9 or higher
+- SSH access to target machine(s)
+- Python 3.6+ on both control machine and target machines
+- Sudo privileges on target machines
+
+## Features
+
+- **Rust Installation**: Installs Rust toolchain if not present
+- **Automated Installation**: Installs raito-bridge-node from the official repository
+- **Service Management**: Creates and manages systemd service
+- **Environment Configuration**: Securely manages Bitcoin RPC credentials
+- **Update Management**: Provides clean update workflow (replaces binary without uninstall)
+- **Service Control**: Easy start/stop operations
+
+## Directory Structure
+
+```
+scripts/deploy/
+├── ansible.cfg          # Ansible configuration
+├── inventory.yml        # Target hosts configuration
+├── site.yml            # Main playbook
+├── env.example         # Environment variables template
+├── Makefile            # Convenient command shortcuts
+├── README.md           # This file
+└── roles/
+    ├── setup/          # Initial installation and configuration
+    │   ├── tasks/main.yml
+    │   ├── templates/
+    │   │   ├── env.j2
+    │   │   └── raito-bridge-node.service.j2
+    │   └── handlers/main.yml
+    ├── start/          # Start and enable service
+    │   └── tasks/main.yml
+    ├── update/         # Update existing installation
+    │   ├── tasks/main.yml
+    │   └── templates/env.j2
+    └── stop/           # Stop and disable service
+        └── tasks/main.yml
+```
+
+## Configuration
+
+### 1. Environment Variables
+
+Copy the example environment file and configure your settings:
+
+```bash
+cp env.example .env
+```
+
+Edit `.env` with your specific configuration:
+
+```env
+# Target machine configuration
+TARGET_HOST=your.server.ip
+TARGET_USER=ubuntu
+SSH_KEY_PATH=~/.ssh/id_rsa
+
+# Bitcoin RPC configuration
+BITCOIN_RPC=http://your-bitcoin-node:8332
+USERPWD=your_rpc_user:your_rpc_password
+
+# Bridge node configuration (optional)
+RPC_HOST=0.0.0.0:8080
+```
+
+### 2. Environment Variables (Automatic)
+
+Environment variables are automatically loaded from the `.env` file when using the Makefile commands. If running ansible-playbook directly, you'll need to source the environment manually:
+
+```bash
+source .env
+export $(cut -d= -f1 .env)
+```
+
+## Usage
+
+### Initial Setup
+
+Deploy and configure the Raito Bridge Node for the first time:
+
+```bash
+make setup
+# OR: ansible-playbook site.yml --tags setup
+```
+
+This will:
+- Create dedicated user account
+- Install Rust if not present
+- Install raito-bridge-node
+- Configure and start systemd service
+
+### Start Service
+
+Start and enable the service:
+
+```bash
+make start
+# OR: ansible-playbook site.yml --tags start
+```
+
+### Update Node
+
+Update the Raito Bridge Node to the latest version:
+
+```bash
+make update
+# OR: ansible-playbook site.yml --tags update
+```
+
+This will:
+- Stop the current service
+- Install the latest version (replaces existing binary)
+- Restart the service
+
+### Stop Service
+
+Stop and disable the Raito Bridge Node service:
+
+```bash
+make stop
+# OR: ansible-playbook site.yml --tags stop
+```
+
+## Service Management
+
+Once deployed, you can manage the service directly on the target machine:
+
+```bash
+# Check service status
+sudo systemctl status raito-bridge-node
+
+# View logs
+sudo journalctl -u raito-bridge-node -f
+
+# Manual restart
+sudo systemctl restart raito-bridge-node
+```
+
+## API Endpoints
+
+The bridge node exposes HTTP endpoints on the configured port (default 8080):
+
+- `GET /head` - Get current block count
+- `GET /proof/:height` - Get inclusion proof for block at height
+
+Example usage:
+```bash
+curl http://your-server-ip:8080/head
+curl http://your-server-ip:8080/proof/100
+```
+
+## Security Features
+
+- Dedicated system user with minimal privileges
+- Secure file permissions for configuration files
+- Systemd security hardening (NoNewPrivileges, PrivateTmp, etc.)
+- Environment-based credential management
+
+## File Locations
+
+On the target machine:
+- **Working Directory**: `/opt/raito-bridge-node/`
+- **Configuration**: `/opt/raito-bridge-node/.env`
+- **Data Storage**: `/opt/raito-bridge-node/.mmr_data/`
+- **Service File**: `/etc/systemd/system/raito-bridge-node.service`
+- **Binary Location**: `/home/raito/.cargo/bin/raito-bridge-node`
+
+## Troubleshooting
+
+### Check Service Status
+```bash
+make status
+# OR: ansible all -m shell -a "systemctl status raito-bridge-node"
+```
+
+### View Logs
+```bash
+make logs
+# OR: ansible all -m shell -a "journalctl -u raito-bridge-node --lines=50"
+```
+
+### Test Connectivity
+```bash
+make test-api
+# OR: ansible all -m shell -a "curl -s http://localhost:8080/head"
+```
+
+## Storage Requirements
+
+For the first 900K Bitcoin blocks:
+- ~300MB for accumulator state database
+- ~3.6GB for sparse roots files
+- Additional space for logs and temporary files
+
+## Commands Summary
+
+- `make setup` - Initial deployment
+- `make start` - Start service
+- `make update` - Update to latest version  
+- `make stop` - Stop service
+- `make status` - Check status
+- `make logs` - View logs
+- `make test-api` - Test API endpoint

@@ -1,0 +1,10 @@
+---
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: Enable and start raito service
+  systemd:
+    name: "{{ raito_service_name }}"
+    enabled: yes
+    state: started
