@@ -8,3 +8,4 @@ google-cloud-storage==2.18.2
 google-api-python-client==2.149.0
 colorlog==6.8.2
 cairo-lang==0.13.5
+python-json-logger==2.0.7

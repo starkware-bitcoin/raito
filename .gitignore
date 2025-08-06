@@ -33,9 +33,9 @@ __pycache__
 .mmr_data/
 .timestamps_data/
 .arguments*.json
-.proofs
+.proofs*
 proving.log*
-
+build_recent_proof.log*
 vendor
 corelib
 *.txt

@@ -284,7 +284,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    logging_setup.setup(verbose=args.verbose)
+    logging_setup.setup(
+        verbose=args.verbose, log_filename="/var/log/raito/build_recent_proof.log"
+    )
 
     # Convert slow_data_generation flag to fast_data_generation parameter
     fast_data_generation = not args.slow

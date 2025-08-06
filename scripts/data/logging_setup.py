@@ -3,17 +3,18 @@
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import colorlog
+from pythonjsonlogger import jsonlogger
 
 
 def setup(verbose=False, log_filename="proving.log"):
     """
-    Set up logging configuration with both file and console handlers.
+    Set up logging configuration with JSON file logging and colored console output.
 
     Args:
         verbose (bool): If True, set DEBUG level; otherwise INFO level
         log_filename (str): Name of the log file
     """
-    # File handler setup
+    # JSON file handler setup
     file_handler = TimedRotatingFileHandler(
         filename=log_filename,
         when="midnight",
@@ -22,9 +23,13 @@ def setup(verbose=False, log_filename="proving.log"):
         encoding="utf8",
     )
     file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+
+    # JSON formatter for file logging
+    json_formatter = jsonlogger.JsonFormatter(
+        fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
+    file_handler.setFormatter(json_formatter)
 
     # Console handler with colors
     console_handler = colorlog.StreamHandler()
