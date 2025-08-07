@@ -1,8 +1,14 @@
 #![doc = include_str!("../README.md")]
 
+use bitcoin::{MerkleBlock, Txid};
 use clap::{command, Parser};
+use raito_spv_core::bitcoin::BitcoinClient;
+use std::str::FromStr;
 use tracing::subscriber::set_global_default;
 use tracing_subscriber::filter::EnvFilter;
+
+mod proof;
+mod verifier;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -40,4 +46,28 @@ async fn main() {
 
     let cli = Cli::parse();
     init_tracing(&cli.log_level);
+
+    let bitcoin_client = BitcoinClient::new(cli.bitcoin_rpc_url, cli.bitcoin_rpc_userpwd).unwrap();
+    let txid =
+        Txid::from_str("46954558cd3f07ffcdd4befe304cc6fe15b96633dff20ab3a989676061cccd10").unwrap();
+    let MerkleBlock { header, txn } = bitcoin_client
+        .get_transaction_inclusion_proof(&txid)
+        .await
+        .unwrap();
+
+    let block_hash = header.block_hash();
+    let transaction = bitcoin_client
+        .get_transaction(&txid, &block_hash)
+        .await
+        .unwrap();
+
+    let block_header_ex = bitcoin_client
+        .get_block_header_ex(&block_hash)
+        .await
+        .unwrap();
+    let block_height = block_header_ex.height;
+
+    println!("Block height: {}", block_height);
+    println!("Block hash: {}", block_hash);
+    println!("Transaction: {:?}", transaction);
 }

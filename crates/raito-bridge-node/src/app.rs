@@ -7,7 +7,7 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing::{error, info};
 
 use raito_spv_core::{
-    block_mmr::{BlockMMR, InclusionProof},
+    block_mmr::{BlockInclusionProof, BlockMMR},
     sparse_roots::SparseRoots,
 };
 
@@ -38,7 +38,7 @@ pub enum ApiResponseBody {
     /// Response containing sparse roots after adding a block
     AddBlock(SparseRoots),
     /// Response containing the inclusion proof for a block
-    GenerateBlockProof(InclusionProof),
+    GenerateBlockProof(BlockInclusionProof),
 }
 
 #[derive(Debug, Clone)]
@@ -173,7 +173,7 @@ impl AppClient {
         &self,
         block_height: u32,
         block_count: Option<u32>,
-    ) -> Result<InclusionProof, anyhow::Error> {
+    ) -> Result<BlockInclusionProof, anyhow::Error> {
         self.send_request(
             ApiRequestBody::GenerateBlockProof((block_height, block_count)),
             |response| match response {

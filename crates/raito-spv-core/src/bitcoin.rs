@@ -3,8 +3,9 @@
 use base64::{engine::general_purpose, Engine as _};
 use bitcoin::block::Header as BlockHeader;
 use bitcoin::consensus::Decodable;
-use bitcoin::{BlockHash, Txid};
-use bitcoincore_rpc_json::{GetBlockHeaderResult, GetRawTransactionResult};
+use bitcoin::MerkleBlock;
+use bitcoin::{BlockHash, Transaction, Txid};
+use bitcoincore_rpc_json::GetBlockHeaderResult;
 use jsonrpsee::core::client::ClientT;
 use jsonrpsee::core::params::ArrayParams;
 use jsonrpsee::http_client::{HeaderMap, HeaderValue, HttpClient};
@@ -20,15 +21,12 @@ pub enum BitcoinClientError {
     /// RPC client errors
     #[error("RPC client error: {0}")]
     RpcClient(#[from] jsonrpsee::core::client::Error),
-
     /// Invalid HTTP header value
     #[error("Invalid HTTP header value")]
     InvalidHeader,
-
     /// Failed to decode hex response
     #[error("Failed to decode hex response: {0}")]
     HexDecode(#[from] hex::FromHexError),
-
     /// Failed to deserialize Bitcoin consensus data
     #[error("Failed to deserialize Bitcoin data: {0}")]
     BitcoinDeserialization(#[from] bitcoin::consensus::encode::Error),
@@ -113,6 +111,15 @@ impl BitcoinClient {
             .await
     }
 
+    /// Get block header by hash with extended data
+    pub async fn get_block_header_ex(
+        &self,
+        hash: &BlockHash,
+    ) -> Result<GetBlockHeaderResult, BitcoinClientError> {
+        self.request("getblockheader", rpc_params![hash.to_string(), true])
+            .await
+    }
+
     /// Get block header by height
     pub async fn get_block_header_by_height(
         &self,
@@ -123,21 +130,25 @@ impl BitcoinClient {
         Ok((header, hash))
     }
 
-    /// Get transaction by hash with verbose data
-    pub async fn get_transaction_verbose(
+    /// Get transaction by txid and hash of the block containing the transaction
+    pub async fn get_transaction(
         &self,
         txid: &Txid,
-    ) -> Result<GetRawTransactionResult, BitcoinClientError> {
-        self.request("getrawtransaction", rpc_params![txid.to_string(), true])
-            .await
+        block_hash: &BlockHash,
+    ) -> Result<Transaction, BitcoinClientError> {
+        self.request_decode(
+            "getrawtransaction",
+            rpc_params![txid.to_string(), false, block_hash.to_string()],
+        )
+        .await
     }
 
-    /// Get block header with extended data
-    pub async fn get_block_header_verbose(
+    /// Get transaction inclusion proof
+    pub async fn get_transaction_inclusion_proof(
         &self,
-        hash: &BlockHash,
-    ) -> Result<GetBlockHeaderResult, BitcoinClientError> {
-        self.request("getblockheader", rpc_params![hash.to_string(), true])
+        txid: &Txid,
+    ) -> Result<MerkleBlock, BitcoinClientError> {
+        self.request_decode("gettxoutproof", rpc_params![[txid.to_string()]])
             .await
     }
 

@@ -12,7 +12,7 @@ use axum::{
 };
 use tower_http::trace::TraceLayer;
 
-use raito_spv_core::block_mmr::InclusionProof;
+use raito_spv_core::block_mmr::BlockInclusionProof;
 
 use crate::app::AppClient;
 
@@ -85,7 +85,7 @@ pub async fn generate_proof(
     State(app_client): State<AppClient>,
     Path(height): Path<u32>,
     Query(block_count): Query<Option<u32>>,
-) -> Result<Json<InclusionProof>, StatusCode> {
+) -> Result<Json<BlockInclusionProof>, StatusCode> {
     let proof = app_client
         .generate_block_proof(height, block_count)
         .await

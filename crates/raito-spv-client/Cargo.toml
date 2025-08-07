@@ -20,3 +20,12 @@ tokio = { workspace = true }
 # Logging
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+# Stwo-cairo
+stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "0e90b31", features = [
+    "parallel",
+], default-features = false }
+cairo-air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "6f6a9d46306c8e38e2ba356f679d02a0a4af7d59", features = ["std"] }
+
+# Serialization
+serde = { workspace = true }

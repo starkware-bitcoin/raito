@@ -29,7 +29,7 @@ pub struct BlockMMR {
 
 /// Proof data structure for demonstrating inclusion of a block in the MMR
 #[derive(Debug, Serialize, Deserialize)]
-pub struct InclusionProof {
+pub struct BlockInclusionProof {
     /// MMR peak hashes at the time of proof generation
     pub peaks_hashes: Vec<String>,
     /// Sibling hashes needed to reconstruct the path to the root
@@ -125,7 +125,7 @@ impl BlockMMR {
         &self,
         block_height: u32,
         block_count: Option<u32>,
-    ) -> anyhow::Result<InclusionProof> {
+    ) -> anyhow::Result<BlockInclusionProof> {
         let element_index = map_leaf_index_to_element_index(block_height as usize);
         let options = ProofOptions {
             elements_count: block_count.map(|c| leaf_count_to_mmr_size(c as usize)),
@@ -136,7 +136,7 @@ impl BlockMMR {
             .get_proof(element_index, Some(options))
             .await
             .map_err(|e| anyhow::anyhow!("Failed to generate proof: {}", e))?;
-        Ok(InclusionProof {
+        Ok(BlockInclusionProof {
             peaks_hashes: proof.peaks_hashes,
             siblings_hashes: proof.siblings_hashes,
             elements_count: proof.elements_count,
@@ -150,7 +150,7 @@ impl BlockMMR {
         &self,
         block_height: u32,
         block_header: BlockHeader,
-        proof: InclusionProof,
+        proof: BlockInclusionProof,
     ) -> anyhow::Result<bool> {
         let element_hash = block_header_digest(self.hasher.clone(), block_header)?;
         let element_index = map_leaf_index_to_element_index(block_height as usize);
