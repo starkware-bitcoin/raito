@@ -1,0 +1,16 @@
+[package]
+name = "raito-spv-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# CLI and env
+clap = { workspace = true }
+dotenv = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
