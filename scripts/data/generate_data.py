@@ -310,6 +310,7 @@ def next_chain_state(current_state: dict, new_block: dict) -> dict:
 
     return next_state
 
+
 def generate_data(
     mode: str,
     initial_height: int,

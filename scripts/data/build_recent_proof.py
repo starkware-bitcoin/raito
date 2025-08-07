@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "raito-proofs")
 
+
 def convert_proof_to_json(proof_file: Path) -> Optional[Path]:
     """Convert proof from Cairo-serde format to JSON format.
 
@@ -137,7 +138,7 @@ def build_recent_proof(
     """Main function to build a proof for the most recent Bitcoin block."""
     proof_file = None
     proof_dir = None
-    
+
     try:
         latest_height = get_latest_block_height()
 
@@ -197,7 +198,7 @@ def build_recent_proof(
         if proof_file is None:
             logger.error("Failed to generate proof")
             return False
-        
+
         # Store the proof directory for potential cleanup
         proof_dir = proof_file.parent
 
@@ -239,16 +240,19 @@ def build_recent_proof(
     except Exception as e:
         logger.error(f"Error in build_recent_proof: {e}")
         logger.error(traceback.format_exc())
-        
+
         # Clean up the proof directory if it exists
         if proof_dir is not None and proof_dir.exists():
             try:
                 import shutil
+
                 shutil.rmtree(proof_dir)
                 logger.debug(f"Cleaned up proof directory: {proof_dir}")
             except Exception as cleanup_error:
-                logger.error(f"Failed to clean up proof directory {proof_dir}: {cleanup_error}")
-        
+                logger.error(
+                    f"Failed to clean up proof directory {proof_dir}: {cleanup_error}"
+                )
+
         return False
 
 

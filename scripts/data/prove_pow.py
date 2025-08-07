@@ -428,7 +428,7 @@ def prove_pow(start, blocks, step, fast_data_generation=True):
         current_step = min(step, end - height)
         if current_step <= 0:
             break
-            
+
         proof_file = prove_batch(height, current_step, fast_data_generation)
         if proof_file is not None:
             processed_count += 1
