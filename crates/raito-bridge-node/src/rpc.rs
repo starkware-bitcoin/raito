@@ -5,7 +5,7 @@ use tokio::sync::broadcast;
 use tracing::{error, info};
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     routing::get,
     Json, Router,
@@ -84,9 +84,10 @@ impl RpcServer {
 pub async fn generate_proof(
     State(app_client): State<AppClient>,
     Path(height): Path<u32>,
+    Query(block_count): Query<Option<u32>>,
 ) -> Result<Json<InclusionProof>, StatusCode> {
     let proof = app_client
-        .generate_block_proof(height)
+        .generate_block_proof(height, block_count)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(proof))

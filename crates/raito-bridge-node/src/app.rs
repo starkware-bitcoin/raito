@@ -27,8 +27,8 @@ pub enum ApiRequestBody {
     GetBlockCount(),
     /// Add a new block header to the MMR
     AddBlock(BlockHeader),
-    /// Generate an inclusion proof for a block at the given height
-    GenerateBlockProof(u32),
+    /// Generate an inclusion proof for a block at the given height and block count (optional)
+    GenerateBlockProof((u32, Option<u32>)),
 }
 
 /// Response body for API requests containing the result data
@@ -89,8 +89,8 @@ impl AppServer {
                             let res = mmr.get_block_count().await.map(|block_count| ApiResponseBody::GetBlockCount(block_count));
                             req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to GetBlockCount request"))?;
                         }
-                        ApiRequestBody::GenerateBlockProof(block_height) => {
-                            let res = mmr.generate_proof(block_height).await.map(|proof| ApiResponseBody::GenerateBlockProof(proof));
+                        ApiRequestBody::GenerateBlockProof((block_height, block_count)) => {
+                            let res = mmr.generate_proof(block_height, block_count).await.map(|proof| ApiResponseBody::GenerateBlockProof(proof));
                             req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to GenerateBlockProof request"))?;
                         }
                         ApiRequestBody::AddBlock(block_header) => {
@@ -172,9 +172,10 @@ impl AppClient {
     pub async fn generate_block_proof(
         &self,
         block_height: u32,
+        block_count: Option<u32>,
     ) -> Result<InclusionProof, anyhow::Error> {
         self.send_request(
-            ApiRequestBody::GenerateBlockProof(block_height),
+            ApiRequestBody::GenerateBlockProof((block_height, block_count)),
             |response| match response {
                 ApiResponseBody::GenerateBlockProof(proof) => Some(proof),
                 _ => None,
