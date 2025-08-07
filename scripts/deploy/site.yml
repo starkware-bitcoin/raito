@@ -3,7 +3,7 @@
   hosts: all
   become: yes
   vars:
-    raito_working_dir: /opt/raito-bridge-node
+    raito_working_dir: /home/raito/raito-bridge-node
     raito_user: raito
     raito_service_name: raito-bridge-node
     bitcoin_rpc_url: "{{ lookup('env', 'BITCOIN_RPC') }}"
