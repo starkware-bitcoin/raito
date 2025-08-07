@@ -27,24 +27,22 @@ import logging_setup
 logger = logging.getLogger(__name__)
 
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "raito-proofs")
-
-BITCOIN_RPC = os.getenv("BITCOIN_RPC")
-USERPWD = os.getenv("USERPWD")
-DEFAULT_URL = "https://bitcoin-mainnet.public.blastapi.io"
+RAITO_API_URL = os.getenv("RAITO_API_URL", "https://api.raito.wtf/head")
 
 
 def get_latest_block_height() -> int:
-    """Get the latest block height from Bitcoin node API."""
+    """Get the latest block height from Raito API."""
     try:
-        latest_hash = request_rpc("getbestblockhash", [])
+        import requests
 
-        block_info = request_rpc("getblock", [latest_hash])
-        height = block_info["height"]
+        response = requests.get(RAITO_API_URL)
+        response.raise_for_status()
 
+        height = int(response.text.strip())
         logger.info(f"Latest block height: {height}")
         return height
     except Exception as e:
-        logger.error(f"Failed to get latest block height: {e}")
+        logger.error(f"Failed to get latest block height from Raito API: {e}")
         raise
 
 
