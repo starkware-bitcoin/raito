@@ -70,7 +70,7 @@ impl Indexer {
                             next_block_height += 1;
                         },
                         Err(e) => {
-                            return Err(e)
+                            return Err(e.into())
                         }
                     }
                 },

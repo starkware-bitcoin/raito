@@ -13,6 +13,7 @@ accumulators = { git = "https://github.com/m-kus/rust-accumulators", rev = "5887
 # Bitcoin RPC and types
 jsonrpsee.workspace = true
 bitcoin.workspace = true
+bitcoincore-rpc-json.workspace = true
 base64.workspace = true
 
 # Serialization
