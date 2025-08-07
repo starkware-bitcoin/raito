@@ -417,7 +417,6 @@ def prove_pow(start, blocks, step, fast_data_generation=True):
 
     # Generate height range
     height_range = range(start, end, step)
-    processing_step = step
 
     processed_count = 0
     total_jobs = len(list(height_range))
@@ -425,7 +424,12 @@ def prove_pow(start, blocks, step, fast_data_generation=True):
 
     # Process jobs sequentially
     for height in height_range:
-        proof_file = prove_batch(height, processing_step, fast_data_generation)
+        # Adjust step size for the last batch to not exceed end height
+        current_step = min(step, end - height)
+        if current_step <= 0:
+            break
+            
+        proof_file = prove_batch(height, current_step, fast_data_generation)
         if proof_file is not None:
             processed_count += 1
             latest_proof_file = proof_file

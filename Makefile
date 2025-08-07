@@ -147,3 +147,8 @@ build-recent-proof-service-status:
 build-recent-proof-service-run:
 	sudo systemctl start build-recent-proof.service
 
+build-recent-proof-service-stop:
+	sudo systemctl stop build-recent-proof.timer
+
+build-recent-proof-service-start:
+	sudo systemctl start build-recent-proof.timer

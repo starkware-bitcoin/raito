@@ -22,29 +22,12 @@ except ImportError:
 
 from generate_data import request_rpc
 from prove_pow import auto_detect_start, prove_pow
+from mmr import get_latest_block_height
 import logging_setup
 
 logger = logging.getLogger(__name__)
 
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "raito-proofs")
-RAITO_API_URL = os.getenv("RAITO_API_URL", "https://api.raito.wtf/head")
-
-
-def get_latest_block_height() -> int:
-    """Get the latest block height from Raito API."""
-    try:
-        import requests
-
-        response = requests.get(RAITO_API_URL)
-        response.raise_for_status()
-
-        height = int(response.text.strip())
-        logger.info(f"Latest block height: {height}")
-        return height
-    except Exception as e:
-        logger.error(f"Failed to get latest block height from Raito API: {e}")
-        raise
-
 
 def convert_proof_to_json(proof_file: Path) -> Optional[Path]:
     """Convert proof from Cairo-serde format to JSON format.
@@ -56,7 +39,7 @@ def convert_proof_to_json(proof_file: Path) -> Optional[Path]:
         Path to the converted JSON proof file, or None if conversion failed
     """
     json_proof_file = proof_file.parent / f"{proof_file.stem}_json{proof_file.suffix}"
-    logger.info(f"Converting proof from Cairo-serde format to JSON format...")
+    logger.debug(f"Converting proof from Cairo-serde format to JSON format...")
 
     try:
         import subprocess
@@ -136,7 +119,7 @@ def upload_to_gcs(
             json.dumps(upload_data, indent=2), content_type="application/json"
         )
 
-        logger.info(f"Successfully uploaded proof to GCS: {filename}")
+        logger.debug(f"Successfully uploaded proof to GCS: {filename}")
         return True
 
     except Exception as e:
@@ -152,6 +135,9 @@ def build_recent_proof(
     max_height: Optional[int] = None,
 ) -> bool:
     """Main function to build a proof for the most recent Bitcoin block."""
+    proof_file = None
+    proof_dir = None
+    
     try:
         latest_height = get_latest_block_height()
 
@@ -181,16 +167,16 @@ def build_recent_proof(
         # Determine the actual end height
         end_height = max_height if max_height is not None else latest_height
 
-        if start_height >= end_height:
+        if start_height > end_height:
             logger.error(
-                f"Start height ({start_height}) must be less than end height ({end_height})"
+                f"Start height ({start_height}) must be less than or equal to end height ({end_height})"
             )
             return False
 
         blocks_to_process = end_height - start_height
 
         if blocks_to_process <= 0:
-            logger.info("No new blocks to process")
+            logger.debug("No new blocks to process")
             return True
 
         step = min(max_step, blocks_to_process)
@@ -211,6 +197,9 @@ def build_recent_proof(
         if proof_file is None:
             logger.error("Failed to generate proof")
             return False
+        
+        # Store the proof directory for potential cleanup
+        proof_dir = proof_file.parent
 
         # Convert proof from Cairo-serde format to JSON format
         json_proof_file = convert_proof_to_json(proof_file)
@@ -250,6 +239,16 @@ def build_recent_proof(
     except Exception as e:
         logger.error(f"Error in build_recent_proof: {e}")
         logger.error(traceback.format_exc())
+        
+        # Clean up the proof directory if it exists
+        if proof_dir is not None and proof_dir.exists():
+            try:
+                import shutil
+                shutil.rmtree(proof_dir)
+                logger.debug(f"Cleaned up proof directory: {proof_dir}")
+            except Exception as cleanup_error:
+                logger.error(f"Failed to clean up proof directory {proof_dir}: {cleanup_error}")
+        
         return False
 
 
