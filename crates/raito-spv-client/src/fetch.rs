@@ -19,7 +19,11 @@ pub struct FetchArgs {
     #[arg(long)]
     proof_path: PathBuf,
     /// Raito node RPC URL
-    #[arg(long, env = "RAITO_BRIDGE_RPC", default_value = "https://api.raito.wtf")]
+    #[arg(
+        long,
+        env = "RAITO_BRIDGE_RPC",
+        default_value = "https://api.raito.wtf"
+    )]
     raito_rpc_url: String,
     /// Bitcoin RPC URL
     #[arg(long, env = "BITCOIN_RPC")]
@@ -130,8 +134,13 @@ pub async fn fetch_chain_state_proof(
     raito_rpc_url: String,
 ) -> Result<ChainStateProof, anyhow::Error> {
     info!("Fetching chain state proof");
-    let url = format!("{}/proofs/recent_proof.json", raito_rpc_url);
-    let response = reqwest::get(url).await?;
+    let url = format!("{}/chainstate-proof/recent_proof", raito_rpc_url);
+    let client = reqwest::Client::new();
+    let response = client
+        .get(url)
+        .header("Accept-Encoding", "gzip")
+        .send()
+        .await?;
     let proof: ChainStateProof = response.json().await?;
     Ok(proof)
 }
