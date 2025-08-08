@@ -65,7 +65,7 @@ def get_latest_block_height() -> int:
 
         # Find the highest block height
         latest_height = max(block_files)
-        logger.info(f"Latest available MMR block height: {latest_height}")
+        logger.debug(f"Latest available MMR block height: {latest_height}")
         return latest_height
 
     except Exception as e:

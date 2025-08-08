@@ -105,7 +105,6 @@ def upload_to_gcs(
         upload_data = {
             "timestamp": timestamp,
             "chainstate": chainstate_data,
-            "mmr_roots": mmr_roots,
         }
 
         with open(proof_file, "r") as f:
@@ -120,7 +119,12 @@ def upload_to_gcs(
             json.dumps(upload_data, indent=2), content_type="application/json"
         )
 
+        # Copy the blob to recent_proof.json
+        recent_proof_blob = bucket.blob("recent_proof.json")
+        bucket.copy_blob(blob, bucket, "recent_proof.json")
+
         logger.debug(f"Successfully uploaded proof to GCS: {filename}")
+        logger.debug(f"Successfully copied proof to recent_proof.json")
         return True
 
     except Exception as e:
@@ -177,7 +181,7 @@ def build_recent_proof(
         blocks_to_process = end_height - start_height
 
         if blocks_to_process <= 0:
-            logger.debug("No new blocks to process")
+            logger.info("No new blocks to process")
             return True
 
         step = min(max_step, blocks_to_process)
@@ -297,8 +301,6 @@ if __name__ == "__main__":
     )
 
     if success:
-        logger.info("Proof building completed successfully")
         exit(0)
     else:
-        logger.error("Proof building failed")
         exit(1)
