@@ -10,7 +10,7 @@
 
 - name: Install latest raito-bridge-node
   shell: |
-    su - {{ raito_user }} -c "source ~/.cargo/env && cargo install --git https://github.com/starkware-bitcoin/raito raito-bridge-node --force"
+    su - {{ raito_user }} -c "source ~/.cargo/env && cargo install --git https://github.com/starkware-bitcoin/raito --rev {{ raito_git_revision }} raito-bridge-node --force"
 
 - name: Update .env file if needed
   template:

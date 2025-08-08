@@ -17,6 +17,7 @@ This Ansible playbook automates the deployment and management of the Raito Bridg
 - **Environment Configuration**: Securely manages Bitcoin RPC credentials
 - **Update Management**: Provides clean update workflow (replaces binary without uninstall)
 - **Service Control**: Easy start/stop operations
+- **Data Fetch**: Fetch SQLite database from remote server to project root
 
 ## Directory Structure
 
@@ -40,7 +41,11 @@ scripts/deploy/
     ├── update/         # Update existing installation
     │   ├── tasks/main.yml
     │   └── templates/env.j2
-    └── stop/           # Stop and disable service
+    ├── stop/           # Stop and disable service
+    │   └── tasks/main.yml
+    ├── fetch_db/       # Fetch SQLite database
+    │   └── tasks/main.yml
+    └── expose/         # Set up HTTPS access via GCP Load Balancer
         └── tasks/main.yml
 ```
 
@@ -148,6 +153,22 @@ make expose
 This will:
 - Create managed SSL certificate for your domain
 - Set up global load balancer with health checks
+
+### Fetch Database
+
+Fetch the SQLite database from the remote server to your local machine:
+
+```bash
+make fetch-db
+# OR: ansible-playbook site.yml --tags fetch-db
+```
+
+This will:
+- Ensure local `.mmr_data` directory exists in the project root
+- Download the SQLite database (`mmr.db`) from remote server
+- Provide status feedback for the download operation
+
+**Note**: The database is downloaded to `.mmr_data/mmr.db` in the project root directory. This allows you to use the data locally for development or analysis purposes.
 - Configure firewall rules
 - Reserve static IP address (or use existing one)
 - Provide DNS configuration instructions

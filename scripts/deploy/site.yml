@@ -6,6 +6,7 @@
     raito_working_dir: /home/raito/raito-bridge-node
     raito_user: raito
     raito_service_name: raito-bridge-node
+    raito_git_revision: "{{ lookup('env', 'RAITO_GIT_REVISION') | default('main') }}"
     bitcoin_rpc_url: "{{ lookup('env', 'BITCOIN_RPC') }}"
     bitcoin_rpc_userpwd: "{{ lookup('env', 'USERPWD') }}"
     rpc_host: "{{ lookup('env', 'RPC_HOST') | default('0.0.0.0:8080') }}"
@@ -35,3 +36,8 @@
       import_role:
         name: expose
       tags: [expose, never]
+      
+    - name: Include fetch_db role
+      import_role:
+        name: fetch_db
+      tags: [fetch-db, never]

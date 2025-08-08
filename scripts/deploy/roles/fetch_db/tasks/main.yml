@@ -1,0 +1,35 @@
+---
+- name: Get current working directory on localhost
+  command: pwd
+  register: pwd_result
+  delegate_to: localhost
+  become: no
+
+- name: Set project root path
+  set_fact:
+    project_root: "{{ pwd_result.stdout | dirname | dirname }}"
+
+- name: Ensure local .mmr_data directory exists
+  file:
+    path: "{{ project_root }}/.mmr_data"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  become: no
+
+- name: Download MMR SQLite database from remote server
+  fetch:
+    src: "{{ raito_working_dir }}/.mmr_data/mmr.db"
+    dest: "{{ project_root }}/.mmr_data/mmr.db"
+    flat: yes
+  ignore_errors: yes
+  register: db_download_result
+
+- name: Display database download status
+  debug:
+    msg: |
+      {% if db_download_result.failed %}
+      Database download failed: {{ db_download_result.msg | default('File may not exist on remote server') }}
+      {% else %}
+      Database downloaded successfully to {{ project_root }}/.mmr_data/mmr.db
+      {% endif %}

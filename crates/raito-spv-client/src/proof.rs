@@ -25,11 +25,13 @@ pub struct ChainState {
     /// The height of the best block in the chain
     pub block_height: u32,
     /// The total work of the chain
-    pub total_work: Work,
+    /// FIXME: Work
+    pub total_work: String,
     /// The hash of the best block in the chain
     pub best_block_hash: BlockHash,
     /// The current target difficulty
-    pub current_target: Target,
+    /// FIXME: Target
+    pub current_target: String,
     /// The start time of the current epoch
     pub epoch_start_time: u32,
     /// The timestamps of the previous 11 blocks

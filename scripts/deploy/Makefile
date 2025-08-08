@@ -1,4 +1,4 @@
-.PHONY: help install setup start update stop expose status logs env-check
+.PHONY: help install setup start update stop expose fetch-db status logs env-check
 
 # Include .env file if it exists
 -include .env
@@ -15,6 +15,7 @@ help:
 	@echo "  update    - Update to latest version"
 	@echo "  stop      - Stop and disable service"
 	@echo "  expose    - Set up HTTPS access via Google Cloud Load Balancer"
+	@echo "  fetch-db  - Fetch SQLite database from remote server"
 	@echo "  status    - Check service status"
 	@echo "  logs      - View service logs"
 	@echo "  env-check - Verify environment variables"
@@ -60,6 +61,10 @@ stop: env-check
 # Set up HTTPS access
 expose: env-check
 	ansible-playbook expose.yml
+
+# Fetch database
+fetch-db: env-check
+	ansible-playbook site.yml --tags fetch-db
 
 # Check service status
 status:
