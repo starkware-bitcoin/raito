@@ -316,6 +316,7 @@ def generate_data(
     initial_height: int,
     num_blocks: int,
     fast: bool,
+    mmr_roots: bool = True,  # TODO: remove it
 ):
     """Generates arguments for Raito program in a human readable form and the expected result.
 
@@ -398,7 +399,7 @@ def generate_data(
     result = {
         "chain_state": format_chain_state(initial_chain_state),
         "blocks": list(map(block_formatter, blocks)),
-        "mmr_roots": read_block_mmr_roots(initial_height),
+        "mmr_roots": read_block_mmr_roots(initial_height) if mmr_roots else None,
         "expected": format_chain_state(chain_state),
     }
 

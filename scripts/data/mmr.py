@@ -3,6 +3,7 @@
 import json
 import os
 import logging
+import requests
 from pathlib import Path
 from typing import Dict, Any
 
@@ -11,65 +12,31 @@ logger = logging.getLogger(__name__)
 # MMR configuration
 MMR_ROOTS_DIR = f"{os.path.dirname(os.path.realpath(__file__))}/.mmr_data/roots"
 MMR_SHARD_SIZE = 10000
+RAITO_API_URL = "https://api.raito.wtf/head"
 
 
 def get_latest_block_height() -> int:
-    """Get the latest block height available in the .mmr_data/roots directory."""
+    """Get the latest block height from the Raito API."""
     try:
-        mmr_roots_dir = Path(MMR_ROOTS_DIR)
+        logger.debug(f"Fetching latest block height from {RAITO_API_URL}")
 
-        if not mmr_roots_dir.exists():
-            logger.error(f"MMR roots directory does not exist: {mmr_roots_dir}")
-            raise FileNotFoundError(f"MMR roots directory not found: {mmr_roots_dir}")
+        response = requests.get(RAITO_API_URL, timeout=10)
+        response.raise_for_status()  # Raise an exception for bad status codes
 
-        # Find all shard directories (they are named with numbers)
-        shard_dirs = []
-        for item in mmr_roots_dir.iterdir():
-            if item.is_dir() and item.name.isdigit():
-                shard_dirs.append(int(item.name))
+        # The API returns just the block height as plain text
+        latest_height = int(response.text.strip())
 
-        if not shard_dirs:
-            logger.error("No MMR shard directories found")
-            raise FileNotFoundError("No MMR shard directories found")
-
-        # Sort shard directories to find the highest one
-        shard_dirs.sort()
-        latest_shard = shard_dirs[-1]
-
-        # Look for the highest block file in the latest shard
-        latest_shard_dir = mmr_roots_dir / str(latest_shard)
-        block_files = []
-
-        for item in latest_shard_dir.iterdir():
-            if (
-                item.is_file()
-                and item.name.startswith("block_")
-                and item.name.endswith(".json")
-            ):
-                try:
-                    # Extract block height from filename (block_XXXXX.json)
-                    block_height = int(
-                        item.name[6:-5]
-                    )  # Remove "block_" prefix and ".json" suffix
-                    block_files.append(block_height)
-                except ValueError:
-                    continue
-
-        if not block_files:
-            logger.error(
-                f"No block files found in latest shard directory: {latest_shard_dir}"
-            )
-            raise FileNotFoundError(
-                f"No block files found in latest shard directory: {latest_shard_dir}"
-            )
-
-        # Find the highest block height
-        latest_height = max(block_files)
-        logger.debug(f"Latest available MMR block height: {latest_height}")
+        logger.debug(f"Latest block height from API: {latest_height}")
         return latest_height
 
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch latest block height from API: {e}")
+        raise
+    except ValueError as e:
+        logger.error(f"Invalid response from API (expected integer): {e}")
+        raise
     except Exception as e:
-        logger.error(f"Failed to get latest block height from MMR directory: {e}")
+        logger.error(f"Unexpected error while fetching latest block height: {e}")
         raise
 
 
