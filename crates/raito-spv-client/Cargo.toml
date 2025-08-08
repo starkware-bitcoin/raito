@@ -32,3 +32,5 @@ cairo-air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "6f6a9
 
 # Serialization
 serde = { workspace = true }
+serde_json = { workspace = true }
+serde-brief = { version = "0.1", features = ["std"] }

@@ -52,7 +52,7 @@ async fn main() {
 
     match res {
         Ok(_) => {
-            info!("Raito client has completed");
+            info!("Raito client has exited successfully");
             std::process::exit(0);
         }
         Err(err) => {
