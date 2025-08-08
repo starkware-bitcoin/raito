@@ -108,8 +108,11 @@ impl BlockMMR {
     }
 
     /// Get the roots of the MMR in sparse format (compatible with Cairo implementation)
-    pub async fn get_sparse_roots(&self) -> anyhow::Result<SparseRoots> {
-        let elements_count = self.mmr.elements_count.get().await?;
+    pub async fn get_sparse_roots(&self, chain_height: Option<u32>) -> anyhow::Result<SparseRoots> {
+        let elements_count = match chain_height {
+            Some(chain_height) => leaf_count_to_mmr_size(chain_height as usize + 1),
+            None => self.mmr.elements_count.get().await?,
+        };
         let roots = self
             .mmr
             .get_peaks(PeaksOptions {
@@ -125,11 +128,11 @@ impl BlockMMR {
     pub async fn generate_proof(
         &self,
         block_height: u32,
-        block_count: Option<u32>,
+        chain_height: Option<u32>,
     ) -> anyhow::Result<BlockInclusionProof> {
         let element_index = map_leaf_index_to_element_index(block_height as usize);
         let options = ProofOptions {
-            elements_count: block_count.map(|c| leaf_count_to_mmr_size(c as usize)),
+            elements_count: chain_height.map(|c| leaf_count_to_mmr_size(c as usize + 1)),
             ..Default::default()
         };
         let proof = self
@@ -173,11 +176,11 @@ impl BlockMMR {
     }
 
     /// Get the root hash of the MMR (compatible with Cairo implementation)
-    pub async fn get_root_hash(&self) -> anyhow::Result<String> {
+    pub async fn get_root_hash(&self, block_count: Option<u32>) -> anyhow::Result<String> {
         let SparseRoots {
             block_height: _,
             roots,
-        } = self.get_sparse_roots().await?;
+        } = self.get_sparse_roots(block_count).await?;
         self.hasher
             .hash(roots)
             .map_err(|e| anyhow::anyhow!("Failed to get root hash: {}", e))
@@ -227,7 +230,7 @@ mod tests {
         let SparseRoots {
             block_height,
             roots,
-        } = mmr.get_sparse_roots().await.unwrap();
+        } = mmr.get_sparse_roots(None).await.unwrap();
         assert_eq!(roots.len(), 2);
         assert_eq!(block_height, 0);
         assert_eq!(
@@ -244,7 +247,7 @@ mod tests {
         let SparseRoots {
             block_height,
             roots,
-        } = mmr.get_sparse_roots().await.unwrap();
+        } = mmr.get_sparse_roots(None).await.unwrap();
         assert_eq!(roots.len(), 3);
         assert_eq!(block_height, 1);
         assert_eq!(
@@ -265,7 +268,7 @@ mod tests {
         let SparseRoots {
             block_height,
             roots,
-        } = mmr.get_sparse_roots().await.unwrap();
+        } = mmr.get_sparse_roots(None).await.unwrap();
         assert_eq!(roots.len(), 3);
         assert_eq!(block_height, 2);
         assert_eq!(
@@ -286,7 +289,7 @@ mod tests {
         let SparseRoots {
             block_height,
             roots,
-        } = mmr.get_sparse_roots().await.unwrap();
+        } = mmr.get_sparse_roots(None).await.unwrap();
         assert_eq!(roots.len(), 4);
         assert_eq!(block_height, 3);
         assert_eq!(
@@ -311,7 +314,7 @@ mod tests {
         let SparseRoots {
             block_height,
             roots,
-        } = mmr.get_sparse_roots().await.unwrap();
+        } = mmr.get_sparse_roots(None).await.unwrap();
         assert_eq!(roots.len(), 4);
         assert_eq!(block_height, 4);
         assert_eq!(
@@ -426,7 +429,7 @@ mod tests {
             mmr.add(leaf.clone()).await.unwrap();
         }
         // Get the root hash
-        let root_hash = mmr.get_root_hash().await.unwrap();
+        let root_hash = mmr.get_root_hash(None).await.unwrap();
         assert_eq!(
             root_hash,
             "0x19f148fb4f9b5e5bac1c12594b8e4b2d4b94d12c073b92e2b3d83349909613b6"

@@ -182,20 +182,20 @@ pub async fn fetch_transaction_proof(
 /// - `raito_rpc_url`: URL of the Raito bridge RPC endpoint
 pub async fn fetch_block_proof(
     block_height: u32,
-    block_count: u32,
+    chain_height: u32,
     raito_rpc_url: String,
 ) -> Result<BlockInclusionProof, anyhow::Error> {
     info!("Fetching block proof for block height {}", block_height);
-    if block_height > block_count {
+    if block_height > chain_height {
         return Err(anyhow::anyhow!(
-            "Block height {} cannot be greater than block count {}",
+            "Block height {} cannot be greater than chain height {}",
             block_height,
-            block_count
+            chain_height
         ));
     }
     let url = format!(
-        "{}/block-inclusion-proof/{}?block_count={}",
-        raito_rpc_url, block_height, block_count
+        "{}/block-inclusion-proof/{}?chain_height={}",
+        raito_rpc_url, block_height, chain_height
     );
     let response = reqwest::get(url).await?;
     let proof: BlockInclusionProof = response.json().await?;

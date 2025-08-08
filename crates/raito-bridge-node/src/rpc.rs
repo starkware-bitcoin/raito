@@ -13,14 +13,14 @@ use axum::{
 use serde::Deserialize;
 use tower_http::trace::TraceLayer;
 
-use raito_spv_core::block_mmr::BlockInclusionProof;
+use raito_spv_core::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
 
 use crate::app::AppClient;
 
-/// Query parameters for block inclusion proof generation
+/// Query parameters for block inclusion proof generation and roots retrieval
 #[derive(Debug, Deserialize)]
-pub struct BlockProofQuery {
-    pub block_count: Option<u32>,
+pub struct ChainHeightQuery {
+    pub chain_height: Option<u32>,
 }
 
 /// Configuration for the RPC server
@@ -53,8 +53,9 @@ impl RpcServer {
         info!("Starting RPC server on {}", self.config.rpc_host);
 
         let app = Router::new()
-            .route("/block-inclusion-proof/:height", get(generate_proof))
+            .route("/block-inclusion-proof/:block_height", get(generate_proof))
             .route("/head", get(get_head))
+            .route("/roots", get(get_roots))
             .with_state(self.app_client.clone())
             .layer(TraceLayer::new_for_http());
 
@@ -83,24 +84,44 @@ impl RpcServer {
 /// Generate an inclusion proof for a block at the specified height
 ///
 /// # Arguments
-/// * `height` - The block height to generate a proof for
+/// * `block_height` - The block height to generate a proof for
+/// * `chain_height` - The chain (MMR) height to generate a proof for (optional)
 ///
 /// # Returns
 /// * `Json<InclusionProof>` - The inclusion proof in JSON format
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If proof generation fails
 pub async fn generate_proof(
     State(app_client): State<AppClient>,
-    Path(height): Path<u32>,
-    Query(query): Query<BlockProofQuery>,
+    Path(block_height): Path<u32>,
+    Query(query): Query<ChainHeightQuery>,
 ) -> Result<Json<BlockInclusionProof>, StatusCode> {
     let proof = app_client
-        .generate_block_proof(height, query.block_count)
+        .generate_block_proof(block_height, query.chain_height)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(proof))
 }
 
-/// Get the current head (latest block count) from the MMR
+/// Get the roots of the MMR: latest or for a given block count (optional)
+///
+/// # Arguments
+/// * `chain_height` - The chain (MMR) height to get the roots for (optional)
+///
+/// # Returns
+/// * `Json<SparseRoots>` - The sparse roots in JSON format
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If getting roots fails
+pub async fn get_roots(
+    State(app_client): State<AppClient>,
+    Query(query): Query<ChainHeightQuery>,
+) -> Result<Json<SparseRoots>, StatusCode> {
+    let sparse_roots = app_client
+        .get_sparse_roots(query.chain_height)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(sparse_roots))
+}
+
+/// Get the current head (latest processed block height) from the MMR
 ///
 /// # Returns
 /// * `Json<u32>` - The current block count in JSON format
@@ -110,5 +131,5 @@ pub async fn get_head(State(app_client): State<AppClient>) -> Result<Json<u32>, 
         .get_block_count()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(Json(block_count))
+    Ok(Json(block_count - 1))
 }

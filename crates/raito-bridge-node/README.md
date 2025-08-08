@@ -106,44 +106,74 @@ The Raito Bridge Node runs an HTTP RPC server that provides REST endpoints for q
 
 ### Available Endpoints
 
-#### GET /proof/:height
+#### GET /block-inclusion-proof/:height
 
 Generate an inclusion proof for a block at the specified height.
 
 **Parameters:**
 - `height` (path parameter): The block height to generate a proof for (0-indexed)
+- `block_count` (query, optional): If provided, generate the proof against the MMR state at this total number of blocks
 
 **Response:**
 ```json
 {
-  "roots": [
+  "peaks_hashes": [
     "0x5fd720d341e64d17d3b8624b17979b0d0dad4fc17d891796a3a51a99d3f41599",
     "0x693aa1ab81c6362fe339fc4c7f6d8ddb1e515701e58c5bb2fb54a193c8287fdc"
   ],
-  "siblings": [
+  "siblings_hashes": [
     "0xc713e33d89122b85e2f646cc518c2e6ef88b06d3b016104faa95f84f878dab66"
-  ]
+  ],
+  "leaf_count": 832500
 }
 ```
 
 **Response Fields:**
-- `roots`: Array of MMR peak hashes at the time of proof generation (hex-encoded strings)
-- `siblings`: Array of sibling hashes needed to reconstruct the path to the root (hex-encoded strings)
+- `peaks_hashes`: Array of MMR peak hashes at the time of proof generation (hex-encoded strings)
+- `siblings_hashes`: Array of sibling hashes needed to reconstruct the path to the root (hex-encoded strings)
+- `leaf_count`: Total number of leaves (blocks) in the MMR the proof was generated against
 
 **Status Codes:**
 - `200 OK`: Proof generated successfully
 - `500 Internal Server Error`: Failed to generate proof (e.g., invalid height)
 
+#### GET /roots
+
+Get the roots of the MMR for the latest state or for a given `block_count`.
+
+**Parameters:**
+- `block_count` (query, optional): If provided, return roots for the MMR state at this total number of blocks
+
+**Response:**
+```json
+{
+  "roots": [
+    {"hi": 0, "lo": 123456789},
+    {"hi": 42, "lo": 987654321}
+  ]
+}
+```
+
+Notes:
+- Roots are serialized as Cairo-style u256 objects with `hi` and `lo` numeric fields.
+- The internal `block_height` field is not present in the JSON response.
+
+**Status Codes:**
+- `200 OK`: Roots returned successfully
+- `500 Internal Server Error`: Failed to get roots
+
 #### GET /head
 
-Get the current head (latest block count) from the MMR.
+Get the current head (latest processed block height) from the MMR.
+
+Note: The service operates with a lag of at least 1 block; `/head` returns the latest processed height (0-indexed), which is typically `block_count - 1`.
 
 **Response:**
 ```json
 832500
 ```
 
-**Response:** The current block count as a JSON number (total number of blocks indexed)
+**Response:** The current head height as a JSON number (0-indexed)
 
 **Status Codes:**
 - `200 OK`: Block count retrieved successfully
@@ -152,11 +182,20 @@ Get the current head (latest block count) from the MMR.
 ### Usage Examples
 
 ```bash
-# Get the current block count
+# Get the current head (latest processed block height)
 curl http://localhost:5000/head
 
-# Generate a proof for block at height 100
-curl http://localhost:5000/proof/100
+# Generate a proof for block at height 100 (latest state)
+curl "http://localhost:5000/block-inclusion-proof/100"
+
+# Generate a proof for block at height 100 for an earlier MMR state (block_count=90)
+curl "http://localhost:5000/block-inclusion-proof/100?block_count=90"
+
+# Get sparse roots for the latest state
+curl "http://localhost:5000/roots"
+
+# Get sparse roots for a specific MMR state
+curl "http://localhost:5000/roots?block_count=832500"
 
 # Using a custom RPC host
 cargo run --bin raito-bridge-node -- \

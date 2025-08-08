@@ -25,9 +25,12 @@ pub type ApiResponse = Result<ApiResponseBody, anyhow::Error>;
 pub enum ApiRequestBody {
     /// Get the current block count from the MMR
     GetBlockCount(),
+    /// Get MMR sparse roots for a given chain height (optional)
+    /// The chain height is the number of blocks in the MMR minus one
+    GetSparseRoots(Option<u32>),
     /// Add a new block header to the MMR
     AddBlock(BlockHeader),
-    /// Generate an inclusion proof for a block at the given height and block count (optional)
+    /// Generate an inclusion proof for a block at the given height and chain height (optional)
     GenerateBlockProof((u32, Option<u32>)),
 }
 
@@ -35,6 +38,8 @@ pub enum ApiRequestBody {
 pub enum ApiResponseBody {
     /// Response containing the current block count
     GetBlockCount(u32),
+    /// Response containing the sparse roots for a given block count
+    GetSparseRoots(SparseRoots),
     /// Response containing sparse roots after adding a block
     AddBlock(SparseRoots),
     /// Response containing the inclusion proof for a block
@@ -89,14 +94,18 @@ impl AppServer {
                             let res = mmr.get_block_count().await.map(|block_count| ApiResponseBody::GetBlockCount(block_count));
                             req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to GetBlockCount request"))?;
                         }
-                        ApiRequestBody::GenerateBlockProof((block_height, block_count)) => {
-                            let res = mmr.generate_proof(block_height, block_count).await.map(|proof| ApiResponseBody::GenerateBlockProof(proof));
+                        ApiRequestBody::GetSparseRoots(chain_height) => {
+                            let res = mmr.get_sparse_roots(chain_height).await.map(|sparse_roots| ApiResponseBody::GetSparseRoots(sparse_roots));
+                            req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to GetSparseRoots request"))?;
+                        }
+                        ApiRequestBody::GenerateBlockProof((block_height, chain_height)) => {
+                            let res = mmr.generate_proof(block_height, chain_height).await.map(|proof| ApiResponseBody::GenerateBlockProof(proof));
                             req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to GenerateBlockProof request"))?;
                         }
                         ApiRequestBody::AddBlock(block_header) => {
                             // This is a local-only method, so we treat errors differently here
                             mmr.add_block_header(block_header).await?;
-                            let sparse_roots = mmr.get_sparse_roots().await?;
+                            let sparse_roots = mmr.get_sparse_roots(None).await?;
                             let res = Ok(ApiResponseBody::AddBlock(sparse_roots));
                             req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to AddBlock request"))?;
                         }
@@ -155,6 +164,20 @@ impl AppClient {
             ApiResponseBody::GetBlockCount(block_count) => Some(block_count),
             _ => None,
         })
+        .await
+    }
+
+    pub async fn get_sparse_roots(
+        &self,
+        block_count: Option<u32>,
+    ) -> Result<SparseRoots, anyhow::Error> {
+        self.send_request(
+            ApiRequestBody::GetSparseRoots(block_count),
+            |response| match response {
+                ApiResponseBody::GetSparseRoots(sparse_roots) => Some(sparse_roots),
+                _ => None,
+            },
+        )
         .await
     }
 

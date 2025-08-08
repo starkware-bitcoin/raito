@@ -325,7 +325,6 @@
       
       Test endpoints:
       - https://{{ lookup('env', 'GCP_DOMAIN') }}/head
-      - https://{{ lookup('env', 'GCP_DOMAIN') }}/proof/100
       
       NOTES:
       - This role runs locally using gcloud CLI and doesn't require SSH access to the target server

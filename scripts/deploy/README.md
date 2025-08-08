@@ -188,19 +188,6 @@ sudo journalctl -u raito-bridge-node -f
 sudo systemctl restart raito-bridge-node
 ```
 
-## API Endpoints
-
-The bridge node exposes HTTP endpoints on the configured port (default 8080):
-
-- `GET /head` - Get current block count
-- `GET /proof/:height` - Get inclusion proof for block at height
-
-Example usage:
-```bash
-curl http://your-server-ip:8080/head
-curl http://your-server-ip:8080/proof/100
-```
-
 ## Security Features
 
 - Dedicated system user with minimal privileges
@@ -276,11 +263,3 @@ The expose command will:
 - **No server downtime or restart required**
 
 After running `make expose`, update your DNS records to point your domain to the provided static IP address.
-
-### Expected Outcome
-
-After successful execution:
-- **HTTPS endpoint**: `https://api.raito.wtf/head`
-- **API access**: `https://api.raito.wtf/proof/100`
-- **SSL certificate**: Automatically managed by Google
-- **Global availability**: Load balanced across Google's network
