@@ -16,7 +16,10 @@ pub struct SparseRoots {
     #[serde(skip)]
     pub block_height: u32,
     /// MMR peaks for all heights, where missing ones are filled with zeros
-    #[serde(serialize_with = "serialize_u256_array")]
+    #[serde(
+        serialize_with = "serialize_u256_array",
+        deserialize_with = "deserialize_u256_array"
+    )]
     pub roots: Vec<String>,
 }
 

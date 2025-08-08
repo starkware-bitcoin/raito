@@ -8,8 +8,6 @@ use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 pub struct CompressedSpvProof {
     /// The current state of the chain
     pub chain_state: ChainState,
-    /// Block MMR root hash
-    pub block_mmr_root: Vec<u8>,
     /// Recursive STARK proof of the chain state and block MMR root validity
     pub chain_state_proof: CairoProof<Blake2sMerkleHasher>,
     /// The header of the block containing the transaction

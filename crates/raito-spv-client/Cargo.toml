@@ -4,11 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = { workspace = true }
+
 # Core SPV functionality
 raito-spv-core = { path = "../raito-spv-core" }
 
 # Bitcoin RPC and types
-bitcoin.workspace = true
+bitcoin = {workspace = true }
 
 # CLI and env
 clap = { workspace = true }
@@ -16,6 +18,7 @@ dotenv = { workspace = true }
 
 # Async runtime
 tokio = { workspace = true }
+reqwest = { workspace = true }
 
 # Logging
 tracing = { workspace = true }

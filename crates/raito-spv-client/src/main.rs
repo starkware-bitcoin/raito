@@ -1,31 +1,29 @@
 #![doc = include_str!("../README.md")]
 
-use bitcoin::{MerkleBlock, Txid};
-use clap::{command, Parser};
-use raito_spv_core::bitcoin::BitcoinClient;
-use std::str::FromStr;
-use tracing::subscriber::set_global_default;
+use clap::{command, Parser, Subcommand};
+use tracing::{error, info, subscriber::set_global_default};
 use tracing_subscriber::filter::EnvFilter;
 
+mod fetch;
 mod proof;
-mod verifier;
+mod verify;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
-    /// Bridge node RPC URL
-    #[arg(long, default_value = "127.0.0.1:5000")]
-    bridge_rpc_url: String,
-    /// Bitcoin RPC URL
-    #[arg(long, env = "BITCOIN_RPC")]
-    bitcoin_rpc_url: String,
-    /// Bitcoin RPC user:password (optional)
-    #[arg(long, env = "USERPWD")]
-    bitcoin_rpc_userpwd: Option<String>,
+    #[command(subcommand)]
+    command: Commands,
     /// Logging level (off, error, warn, info, debug, trace)
     #[arg(long, default_value = "info")]
     log_level: String,
+}
+
+#[derive(Subcommand, Clone, Debug)]
+enum Commands {
+    /// Fetch a compressed proof
+    Fetch(fetch::FetchArgs),
+    Verify(verify::VerifyArgs),
 }
 
 fn init_tracing(log_level: &str) {
@@ -47,27 +45,19 @@ async fn main() {
     let cli = Cli::parse();
     init_tracing(&cli.log_level);
 
-    let bitcoin_client = BitcoinClient::new(cli.bitcoin_rpc_url, cli.bitcoin_rpc_userpwd).unwrap();
-    let txid =
-        Txid::from_str("46954558cd3f07ffcdd4befe304cc6fe15b96633dff20ab3a989676061cccd10").unwrap();
-    let MerkleBlock { header, txn } = bitcoin_client
-        .get_transaction_inclusion_proof(&txid)
-        .await
-        .unwrap();
+    let res = match cli.command {
+        Commands::Fetch(args) => fetch::run(args).await,
+        Commands::Verify(args) => verify::run(args).await,
+    };
 
-    let block_hash = header.block_hash();
-    let transaction = bitcoin_client
-        .get_transaction(&txid, &block_hash)
-        .await
-        .unwrap();
-
-    let block_header_ex = bitcoin_client
-        .get_block_header_ex(&block_hash)
-        .await
-        .unwrap();
-    let block_height = block_header_ex.height;
-
-    println!("Block height: {}", block_height);
-    println!("Block hash: {}", block_hash);
-    println!("Transaction: {:?}", transaction);
+    match res {
+        Ok(_) => {
+            info!("Raito client has completed");
+            std::process::exit(0);
+        }
+        Err(err) => {
+            error!("Raito client has exited with error: {}", err);
+            std::process::exit(1);
+        }
+    }
 }
