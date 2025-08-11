@@ -7,6 +7,7 @@ use tracing_subscriber::filter::EnvFilter;
 mod fetch;
 mod proof;
 mod verify;
+mod work;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

@@ -10,7 +10,8 @@ anyhow = { workspace = true }
 raito-spv-core = { path = "../raito-spv-core" }
 
 # Bitcoin RPC and types
-bitcoin = {workspace = true }
+bitcoin = { workspace = true }
+num-bigint = "0.4.3"
 
 # CLI and env
 clap = { workspace = true }
@@ -28,9 +29,11 @@ tracing-subscriber = { workspace = true }
 stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "0e90b31", features = [
     "parallel",
 ], default-features = false }
-cairo-air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "6f6a9d46306c8e38e2ba356f679d02a0a4af7d59", features = ["std"] }
+cairo-air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "bbe3e469bc636b89c37cb385854447bd46277b3b", features = ["std"] }
+starknet-ff = "0.3.7"
 
 # Serialization
+hex = "0.4.3"
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde-brief = { version = "0.1", features = ["std"] }

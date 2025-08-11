@@ -39,7 +39,6 @@ pub impl ChainStateHashImpl of ChainStateHashTrait {
     fn blake2s_digest(self: @ChainState) -> Blake2sDigest {
         let mut hasher = Blake2sHasher::new();
 
-        // TODO(m-kus): reorder the fields to make the structure more aligned?
         let a0 = *self.block_height;
         let [a1, a2, a3, a4, a5, a6, a7, a8] = u256_to_u32x8(*self.total_work);
         let [a9, a10, a11, a12, a13, a14, a15, b0] = *self.best_block_hash.value;
@@ -125,5 +124,20 @@ impl SpanHash<S, +HashStateTrait<S>, +Drop<S>, T, +Hash<T, S>, +Copy<T>> of Hash
             state = state.update_with(*element);
         }
         state
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use utils::blake2s_hasher::Blake2sDigestIntoU256;
+    use super::*;
+
+    #[test]
+    fn test_chain_state_hash() {
+        let chain_state: ChainState = Default::default();
+        let digest: u256 = chain_state.blake2s_digest().into();
+        let expected =
+            0x6002eaa4410bd0b15e778656f84fc895fd091827e27ce697ba4231076c70c43b_u256; // spellchecker:disable-line
+        assert_eq!(digest, expected);
     }
 }

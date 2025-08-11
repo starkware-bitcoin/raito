@@ -34,16 +34,19 @@ Optional (can also be provided via env):
 - `--raito-rpc-url <URL>`: Raito bridge RPC base URL. Default: `https://api.raito.wtf`. Env: `RAITO_BRIDGE_RPC`.
 - `--bitcoin-rpc-url <URL>`: Bitcoin node RPC URL. Env: `BITCOIN_RPC`.
 - `--bitcoin-rpc-userpwd <USER:PASSWORD>`: Basic auth credentials for Bitcoin RPC. Env: `USERPWD`.
+- `--verify`: Verify the proof immediately after fetching.
+- `--dev`: Development mode. Uses local bridge node and skips certain cross-checks.
 
 Example:
 
 ```bash
-cargo run -p raito-spv-client -- fetch \
+cargo run -p raito-spv-client -- --log-level debug fetch \
   --txid <hex_txid> \
   --proof-path ./proofs/tx_proof.brief \
   --raito-rpc-url https://api.raito.wtf \
   --bitcoin-rpc-url http://127.0.0.1:8332 \
-  --bitcoin-rpc-userpwd user:pass
+  --bitcoin-rpc-userpwd user:pass \
+  --verify
 ```
 
 ### verify
@@ -56,8 +59,13 @@ Read a proof from disk and verify it.
 Required:
 - `--proof-path <PATH>`: Path to the proof file.
 
+Optional:
+- `--dev`: Development mode. Skips certain cross-checks (e.g., strict MMR height equality).
+
 ```bash
 cargo run -p raito-spv-client -- verify --proof-path ./proofs/tx_proof.brief
+# or with dev mode enabled
+cargo run -p raito-spv-client -- verify --proof-path ./proofs/tx_proof.brief --dev
 ```
 
 Note: Implementation details of verification may evolve; the intended behavior is fully offline verification using the self‑contained proof.

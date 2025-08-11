@@ -104,7 +104,7 @@ impl AppServer {
                         }
                         ApiRequestBody::AddBlock(block_header) => {
                             // This is a local-only method, so we treat errors differently here
-                            mmr.add_block_header(block_header).await?;
+                            mmr.add_block_header(&block_header).await?;
                             let sparse_roots = mmr.get_sparse_roots(None).await?;
                             let res = Ok(ApiResponseBody::AddBlock(sparse_roots));
                             req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to AddBlock request"))?;

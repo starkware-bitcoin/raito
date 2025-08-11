@@ -29,12 +29,14 @@ pub struct BlockMMR {
 }
 
 /// Proof data structure for demonstrating inclusion of a block in the MMR
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockInclusionProof {
     /// MMR peak hashes at the time of proof generation
     pub peaks_hashes: Vec<String>,
     /// Sibling hashes needed to reconstruct the path to the root
     pub siblings_hashes: Vec<String>,
+    /// Leaf index of the block in the MMR (same as block height)
+    pub leaf_index: usize,
     /// Total number of leaves in the MMR
     pub leaf_count: usize,
 }
@@ -92,7 +94,7 @@ impl BlockMMR {
     }
 
     /// Add a block header to the MMR
-    pub async fn add_block_header(&mut self, block_header: BlockHeader) -> anyhow::Result<()> {
+    pub async fn add_block_header(&mut self, block_header: &BlockHeader) -> anyhow::Result<()> {
         let leaf = block_header_digest(self.hasher.clone(), block_header)?;
         self.add(leaf).await
     }
@@ -144,6 +146,7 @@ impl BlockMMR {
         Ok(BlockInclusionProof {
             peaks_hashes: proof.peaks_hashes,
             siblings_hashes: proof.siblings_hashes,
+            leaf_index: block_height as usize,
             leaf_count,
         })
     }
@@ -153,17 +156,22 @@ impl BlockMMR {
     /// In order to verify the correctness you have to compute the root hash of the MMR and compare it with the commitеed root.
     pub async fn verify_proof(
         &self,
-        block_height: u32,
-        block_header: BlockHeader,
+        block_header: &BlockHeader,
         proof: BlockInclusionProof,
     ) -> anyhow::Result<bool> {
+        let BlockInclusionProof {
+            peaks_hashes,
+            siblings_hashes,
+            leaf_index,
+            leaf_count,
+        } = proof;
         let element_hash = block_header_digest(self.hasher.clone(), block_header)?;
         let proof = Proof {
-            element_index: map_leaf_index_to_element_index(block_height as usize),
+            element_index: map_leaf_index_to_element_index(leaf_index),
             element_hash: element_hash.clone(),
-            siblings_hashes: proof.siblings_hashes,
-            peaks_hashes: proof.peaks_hashes,
-            elements_count: leaf_count_to_mmr_size(proof.leaf_count),
+            siblings_hashes,
+            peaks_hashes,
+            elements_count: leaf_count_to_mmr_size(leaf_count),
         };
         let options = ProofOptions {
             elements_count: Some(proof.elements_count),
@@ -198,7 +206,7 @@ impl BlockMMR {
 /// * `anyhow::Error` - If hashing fails
 pub fn block_header_digest(
     hasher: Arc<dyn Hasher>,
-    block_header: BlockHeader,
+    block_header: &BlockHeader,
 ) -> anyhow::Result<String> {
     let data = vec![
         hex::encode(&block_header.version.to_consensus().to_be_bytes()),
@@ -351,7 +359,7 @@ mod tests {
             "#,
         )
         .unwrap();
-        let digest = block_header_digest(hasher, block_header).unwrap();
+        let digest = block_header_digest(hasher, &block_header).unwrap();
         assert_eq!(
             digest,
             "0x50b005dd2964720fcd066875bc1cf13a06703a5c8efe8b02a1fd7ea902050f09"
@@ -374,7 +382,7 @@ mod tests {
             "#,
         )
         .unwrap();
-        let digest = block_header_digest(hasher, block_header).unwrap();
+        let digest = block_header_digest(hasher, &block_header).unwrap();
         assert_eq!(
             digest,
             "0x5fd720d341e64d17d3b8624b17979b0d0dad4fc17d891796a3a51a99d3f41599"
@@ -399,7 +407,7 @@ mod tests {
         .unwrap();
         // Add 10 blocks
         for _ in 0..10 {
-            mmr.add_block_header(block_header.clone()).await.unwrap();
+            mmr.add_block_header(&block_header).await.unwrap();
         }
         // Generate a proof for the fifth block
         let proof = mmr.generate_proof(5, None).await.unwrap();
@@ -408,7 +416,7 @@ mod tests {
             .await
             .unwrap();
         // Verify the proof
-        assert!(view_mmr.verify_proof(5, block_header, proof).await.unwrap());
+        assert!(view_mmr.verify_proof(&block_header, proof).await.unwrap());
 
         // Generate a proof for a previous MMR state
         let proof = mmr.generate_proof(1, Some(4)).await.unwrap();
@@ -417,7 +425,7 @@ mod tests {
             .await
             .unwrap();
         // Verify the proof
-        assert!(view_mmr.verify_proof(1, block_header, proof).await.unwrap());
+        assert!(view_mmr.verify_proof(&block_header, proof).await.unwrap());
     }
 
     #[tokio::test]

@@ -1,3 +1,6 @@
+//! Functions to fetch all components required to construct a compressed SPV proof
+//! from the Raito bridge RPC and a Bitcoin node.
+
 use std::path::PathBuf;
 
 use bitcoin::{block::Header as BlockHeader, consensus, MerkleBlock, Transaction, Txid};
@@ -7,7 +10,10 @@ use serde::{Deserialize, Serialize};
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use tracing::info;
 
-use crate::proof::{ChainState, CompressedSpvProof};
+use crate::{
+    proof::{ChainState, CompressedSpvProof},
+    verify::{verify_proof, VerifierConfig},
+};
 
 /// CLI arguments for the `fetch` subcommand
 #[derive(Clone, Debug, clap::Args)]
@@ -31,6 +37,12 @@ pub struct FetchArgs {
     /// Bitcoin RPC user:password (optional)
     #[arg(long, env = "USERPWD")]
     bitcoin_rpc_userpwd: Option<String>,
+    /// Verify the proof after fetching it
+    #[arg(long, default_value = "false")]
+    verify: bool,
+    /// Development mode
+    #[arg(long, default_value = "false")]
+    dev: bool,
 }
 
 /// Chain state and its recursive proof produced by the Raito node
@@ -68,6 +80,7 @@ pub async fn run(args: FetchArgs) -> Result<(), anyhow::Error> {
         args.bitcoin_rpc_url,
         args.bitcoin_rpc_userpwd,
         args.raito_rpc_url,
+        args.dev,
     )
     .await?;
 
@@ -80,6 +93,10 @@ pub async fn run(args: FetchArgs) -> Result<(), anyhow::Error> {
     let mut writer = std::io::BufWriter::new(file);
     serde_brief::to_writer(&compressed_proof, &mut writer)?;
     info!("Proof written to {}", proof_path.display());
+
+    if args.verify {
+        verify_proof(compressed_proof, &VerifierConfig::default(), args.dev).await?;
+    }
 
     Ok(())
 }
@@ -95,11 +112,12 @@ pub async fn fetch_compressed_proof(
     bitcoin_rpc_url: String,
     bitcoin_rpc_userpwd: Option<String>,
     raito_rpc_url: String,
+    dev: bool,
 ) -> Result<CompressedSpvProof, anyhow::Error> {
     let ChainStateProof {
         chain_state,
         chain_state_proof,
-    } = fetch_chain_state_proof(raito_rpc_url.clone())
+    } = fetch_chain_state_proof(&raito_rpc_url)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to fetch chain state proof: {:?}", e))?;
 
@@ -112,10 +130,14 @@ pub async fn fetch_compressed_proof(
         .await
         .map_err(|e| anyhow::anyhow!("Failed to fetch transaction proof: {:?}", e))?;
 
-    let block_header_proof =
-        fetch_block_proof(block_height, chain_state.block_height as u32, raito_rpc_url)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to fetch block proof: {:?}", e))?;
+    let block_header_proof = fetch_block_proof(
+        block_height,
+        chain_state.block_height as u32,
+        &raito_rpc_url,
+        dev,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to fetch block proof: {:?}", e))?;
 
     Ok(CompressedSpvProof {
         chain_state,
@@ -131,7 +153,7 @@ pub async fn fetch_compressed_proof(
 ///
 /// - `raito_rpc_url`: URL of the Raito bridge RPC endpoint
 pub async fn fetch_chain_state_proof(
-    raito_rpc_url: String,
+    raito_rpc_url: &str,
 ) -> Result<ChainStateProof, anyhow::Error> {
     info!("Fetching chain state proof");
     let url = format!("{}/chainstate-proof/recent_proof", raito_rpc_url);
@@ -141,8 +163,10 @@ pub async fn fetch_chain_state_proof(
         .header("Accept-Encoding", "gzip")
         .send()
         .await?;
-    let proof: ChainStateProof = response.json().await?;
-    Ok(proof)
+    match response.error_for_status() {
+        Ok(res) => Ok(res.json().await?),
+        Err(e) => Err(e.into()),
+    }
 }
 
 /// Fetch the transaction inclusion data from a Bitcoin RPC
@@ -178,14 +202,35 @@ pub async fn fetch_transaction_proof(
 /// Fetch the block MMR inclusion proof from the Raito bridge RPC
 ///
 /// - `block_height`: Height of the block to prove
-/// - `block_count`: Current best height (chain head)
+/// - `chain_height`: Current best height (chain head)
 /// - `raito_rpc_url`: URL of the Raito bridge RPC endpoint
 pub async fn fetch_block_proof(
     block_height: u32,
     chain_height: u32,
-    raito_rpc_url: String,
+    raito_rpc_url: &str,
+    dev: bool,
 ) -> Result<BlockInclusionProof, anyhow::Error> {
-    info!("Fetching block proof for block height {}", block_height);
+    let url = if dev {
+        info!("DEV MODE: using local bridge node and default chain height");
+        format!(
+            "http://127.0.0.1:5000/block-inclusion-proof/{}",
+            block_height
+        )
+    } else {
+        let mmr_height = get_mmr_height(&raito_rpc_url).await?;
+        if mmr_height < chain_height {
+            return Err(anyhow::anyhow!(
+                "MMR height {} is less than chain height {}",
+                mmr_height,
+                chain_height
+            ));
+        }
+        format!(
+            "{}/block-inclusion-proof/{}?chain_height={}",
+            raito_rpc_url, block_height, chain_height
+        )
+    };
+
     if block_height > chain_height {
         return Err(anyhow::anyhow!(
             "Block height {} cannot be greater than chain height {}",
@@ -193,11 +238,22 @@ pub async fn fetch_block_proof(
             chain_height
         ));
     }
-    let url = format!(
-        "{}/block-inclusion-proof/{}?chain_height={}",
-        raito_rpc_url, block_height, chain_height
-    );
+
+    info!("Fetching block proof for block height {}", block_height);
     let response = reqwest::get(url).await?;
-    let proof: BlockInclusionProof = response.json().await?;
-    Ok(proof)
+    match response.error_for_status() {
+        Ok(res) => Ok(res.json().await?),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Get the current MMR height from the Raito bridge RPC
+pub async fn get_mmr_height(raito_rpc_url: &str) -> Result<u32, anyhow::Error> {
+    let url = format!("{}/head", raito_rpc_url);
+    let client = reqwest::Client::new();
+    let response = client.get(url).send().await?;
+    match response.error_for_status() {
+        Ok(res) => Ok(res.json().await?),
+        Err(e) => Err(e.into()),
+    }
 }

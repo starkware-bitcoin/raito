@@ -10,7 +10,7 @@ allow-syscalls = true
 cairo_execute = "2.11.4"
 consensus = { path = "../consensus" }
 utils = { path = "../utils" }
-stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "d09a2cfd2b308b6210906f26320f767cf279abef", features = ["minimal_verifier", "qm31_opcode"] }
+stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "bbe3e469bc636b89c37cb385854447bd46277b3b", features = ["minimal_verifier", "qm31_opcode"] }
 
 [features]
 default = ["syscalls"]
