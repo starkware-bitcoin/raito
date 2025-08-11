@@ -6,13 +6,6 @@ use stwo_cairo_air::{CairoProof, VerificationOutput, get_verification_output, ve
 use utils::blake2s_hasher::{Blake2sDigestFromU256, Blake2sDigestIntoU256};
 use utils::mmr::{MMR, MMRTrait};
 
-/// Hash of the bootloader program.
-/// See
-/// - https://github.com/starkware-industries/starkware/pull/38618
-/// -
-/// https://github.com/starkware-libs/stwo-cairo/blob/3ab588b1ee9b1a0070020dbe1f7e22896bf77fc3/stwo_cairo_verifier/crates/cairo_air/src/lib.cairo#L2474
-const BOOTLOADER_PROGRAM_HASH: felt252 =
-    2674360517196449694956552942274105361570126537305198542284292462433974515;
 
 #[derive(Drop, Serde)]
 struct Args {
@@ -33,11 +26,14 @@ struct Result {
     chain_state_hash: u256,
     /// Hash of the roots of the Merkle Mountain Range of the block hashes.
     block_mmr_hash: u256,
+    /// Hash of the bootloader program that was recursively verified.
+    bootloader_hash: felt252,
     /// Hash of the program that was recursively verified.
     /// We cannot know the hash of the program from within the program, so we have to carry it over.
     /// This also allows composing multiple programs (e.g. if we'd need to upgrade at a certain
     /// block height).
-    prev_program_hash: felt252,
+    program_hash: felt252,
+
 }
 
 #[derive(Drop, Serde)]
@@ -71,7 +67,9 @@ fn main(args: Args) -> Result {
         Result {
             chain_state_hash: chain_state.blake2s_digest().into(),
             block_mmr_hash: block_mmr.blake2s_digest().into(),
-            prev_program_hash: 0,
+            bootloader_hash: 0,
+            program_hash: 0,
+
         }
     };
 
@@ -103,17 +101,14 @@ fn main(args: Args) -> Result {
     Result {
         chain_state_hash: current_chain_state.blake2s_digest().into(),
         block_mmr_hash: current_block_mmr.blake2s_digest().into(),
-        prev_program_hash: prev_result.prev_program_hash,
+        bootloader_hash: prev_result.bootloader_hash, 
+        program_hash: prev_result.program_hash,
     }
 }
 
 /// Verify Cairo proof, extract and validate the task output.
 fn get_prev_result(proof: CairoProof) -> Result {
     let VerificationOutput { program_hash, output } = get_verification_output(proof: @proof);
-
-    // Check that the program hash is the bootloader program hash
-    // println!("bootloader hash: {}", program_hash);
-    assert(program_hash == BOOTLOADER_PROGRAM_HASH, 'Unexpected bootloader');
 
     // Verify the proof
     match verify_cairo(proof) {
@@ -135,16 +130,23 @@ fn get_prev_result(proof: CairoProof) -> Result {
         task_output_size == 7, 'Unexpected task output size',
     ); // 1 felt for program hash, 5 for output, 1 for the size
 
-    // Check that the task program hash is the same as the previous program hash
-    // In case of the genesis state, the previous program hash is 0
-    if task_result.prev_program_hash != 0 {
-        assert(task_result.prev_program_hash == task_program_hash, 'Program hash mismatch');
+
+    // Check that the task bootloader hash and program hash is the same as 
+    // the previous bootloader hash and program hash. In case of the genesis state, 
+    // the previous hash is 0
+
+    if task_result.bootloader_hash != 0 {
+        assert(task_result.bootloader_hash == program_hash, 'Bootloader hash mismatch')
+    }
+    if task_result.program_hash != 0 {
+        assert(task_result.program_hash == task_program_hash, 'Program hash mismatch');
     }
 
     Result {
         chain_state_hash: task_result.chain_state_hash,
         block_mmr_hash: task_result.block_mmr_hash,
-        prev_program_hash: task_program_hash,
+        bootloader_hash: program_hash,
+        program_hash: task_program_hash,
     }
 }
 
