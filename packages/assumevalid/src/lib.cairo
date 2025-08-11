@@ -126,7 +126,7 @@ fn get_prev_result(proof: CairoProof) -> Result {
     assert(n_tasks == 1, 'Unexpected number of tasks');
     assert(
         task_output_size == 8, 'Unexpected task output size',
-    ); // 1 felt for bootloader hash, 1 felt for program hash, 5 for output, 1 for the size
+    ); // 1 felt for program hash, 6 for output, 1 for the size
 
     // Check that the task bootloader hash and program hash is the same as
     // the previous bootloader hash and program hash. In case of the genesis state,
