@@ -33,7 +33,6 @@ struct Result {
     /// This also allows composing multiple programs (e.g. if we'd need to upgrade at a certain
     /// block height).
     program_hash: felt252,
-
 }
 
 #[derive(Drop, Serde)]
@@ -69,7 +68,6 @@ fn main(args: Args) -> Result {
             block_mmr_hash: block_mmr.blake2s_digest().into(),
             bootloader_hash: 0,
             program_hash: 0,
-
         }
     };
 
@@ -101,7 +99,7 @@ fn main(args: Args) -> Result {
     Result {
         chain_state_hash: current_chain_state.blake2s_digest().into(),
         block_mmr_hash: current_block_mmr.blake2s_digest().into(),
-        bootloader_hash: prev_result.bootloader_hash, 
+        bootloader_hash: prev_result.bootloader_hash,
         program_hash: prev_result.program_hash,
     }
 }
@@ -130,9 +128,8 @@ fn get_prev_result(proof: CairoProof) -> Result {
         task_output_size == 7, 'Unexpected task output size',
     ); // 1 felt for program hash, 5 for output, 1 for the size
 
-
-    // Check that the task bootloader hash and program hash is the same as 
-    // the previous bootloader hash and program hash. In case of the genesis state, 
+    // Check that the task bootloader hash and program hash is the same as
+    // the previous bootloader hash and program hash. In case of the genesis state,
     // the previous hash is 0
 
     if task_result.bootloader_hash != 0 {
