@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 MMR_ROOTS_DIR = f"{os.path.dirname(os.path.realpath(__file__))}/.mmr_data/roots"
 MMR_SHARD_SIZE = 10000
 RAITO_API_URL = "https://api.raito.wtf/head"
+RAITO_ROOTS_API_URL = "https://api.raito.wtf/roots"
 
 
 def get_latest_block_height() -> int:
@@ -41,7 +42,7 @@ def get_latest_block_height() -> int:
 
 
 def read_block_mmr_roots(height: int) -> Dict[str, Any]:
-    """Read MMR roots for a specific block height.
+    """Read MMR roots for a specific block height from the Raito API.
 
     Args:
         height: The block height to read MMR roots for
@@ -50,13 +51,39 @@ def read_block_mmr_roots(height: int) -> Dict[str, Any]:
         Dictionary containing the MMR roots data
 
     Raises:
-        FileNotFoundError: If the MMR roots file doesn't exist
+        requests.RequestException: If the API request fails
+        ValueError: If the API response is invalid
     """
-    shard_name = (height // MMR_SHARD_SIZE + 1) * MMR_SHARD_SIZE
-    mmr_roots_file = Path(MMR_ROOTS_DIR) / str(shard_name) / f"block_{height}.json"
+    try:
+        logger.debug(
+            f"Fetching MMR roots for block height {height} from {RAITO_ROOTS_API_URL}"
+        )
 
-    if not mmr_roots_file.exists():
-        raise FileNotFoundError(f"MMR roots file not found: {mmr_roots_file}")
+        response = requests.get(
+            f"{RAITO_ROOTS_API_URL}?chain_height={height}", timeout=10
+        )
+        response.raise_for_status()  # Raise an exception for bad status codes
 
-    with open(mmr_roots_file, "r") as f:
-        return json.load(f)
+        data = response.json()
+
+        # Validate the response structure
+        if "roots" not in data:
+            raise ValueError("Invalid API response: missing 'roots' field")
+
+        logger.debug(f"Successfully fetched MMR roots for block height {height}")
+        return data
+
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch MMR roots from API for height {height}: {e}")
+        raise
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON response from API for height {height}: {e}")
+        raise
+    except ValueError as e:
+        logger.error(f"Invalid response structure from API for height {height}: {e}")
+        raise
+    except Exception as e:
+        logger.error(
+            f"Unexpected error while fetching MMR roots for height {height}: {e}"
+        )
+        raise
