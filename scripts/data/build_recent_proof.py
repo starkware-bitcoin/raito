@@ -213,9 +213,7 @@ def build_recent_proof(
         blocks_to_process = end_height - start_height
 
         if blocks_to_process <= 0:
-            logger.info(
-                f"No new blocks to process, latest_height: {latest_height}"
-            )
+            logger.info(f"No new blocks to process, latest_height: {latest_height}")
             return True
 
         step = min(max_step, blocks_to_process)
