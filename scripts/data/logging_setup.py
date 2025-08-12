@@ -6,7 +6,7 @@ import colorlog
 from pythonjsonlogger import jsonlogger
 
 
-def setup(verbose=False, log_filename="proving.log"):
+def setup(verbose=False, log_filename=None):
     """
     Set up logging configuration with JSON file logging and colored console output.
 
@@ -14,43 +14,47 @@ def setup(verbose=False, log_filename="proving.log"):
         verbose (bool): If True, set DEBUG level; otherwise INFO level
         log_filename (str): Name of the log file
     """
-    # JSON file handler setup
-    file_handler = TimedRotatingFileHandler(
-        filename=log_filename,
-        when="midnight",
-        interval=1,
-        backupCount=14,
-        encoding="utf8",
-    )
-    file_handler.setLevel(logging.INFO)
-
-    # JSON formatter for file logging
-    json_formatter = jsonlogger.JsonFormatter(
-        fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    file_handler.setFormatter(json_formatter)
-
-    # Console handler with colors
-    console_handler = colorlog.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    console_handler.setFormatter(
-        colorlog.ColoredFormatter(
-            "%(asctime)s - %(log_color)s%(levelname)s%(reset)s - %(message)s",
-            log_colors={
-                "DEBUG": "cyan",
-                "INFO": "green",
-                "WARNING": "yellow",
-                "ERROR": "red",
-                "CRITICAL": "red,bg_white",
-            },
-        )
-    )
 
     # Root logger setup
     root_logger = logging.getLogger()
+
+    if log_filename is not None:
+        # JSON file handler setup
+        file_handler = TimedRotatingFileHandler(
+            filename=log_filename,
+            when="midnight",
+            interval=1,
+            backupCount=14,
+            encoding="utf8",
+        )
+        file_handler.setLevel(logging.INFO)
+        root_logger.addHandler(file_handler)
+
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+
+    if verbose:
+        # Use colored formatter in verbose mode
+        console_handler.setFormatter(
+            colorlog.ColoredFormatter(
+                "%(asctime)s - %(log_color)s%(levelname)s%(reset)s - %(message)s",
+                log_colors={
+                    "DEBUG": "cyan",
+                    "INFO": "green",
+                    "WARNING": "yellow",
+                    "ERROR": "red",
+                    "CRITICAL": "red,bg_white",
+                },
+            )
+        )
+    else:
+        # Use simple formatter in non-verbose mode
+        console_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        )
+
     root_logger.addHandler(console_handler)
-    root_logger.addHandler(file_handler)
 
     # Set log level based on verbose flag
     if verbose:

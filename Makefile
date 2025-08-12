@@ -141,14 +141,14 @@ data-generate: data-generate-timestamp data-generate-utxo
 
 ################################## SERVICES ##################################
 build-recent-proof-service-status:
-	systemctl status build-recent-proof.service || true
-	systemctl status build-recent-proof.timer || true
+	systemctl status raito-build-recent-proof.service || true
+	systemctl status raito-build-recent-proof.timer || true
 
 build-recent-proof-service-run:
-	sudo systemctl start build-recent-proof.service
+	sudo systemctl start raito-build-recent-proof.service
 
 build-recent-proof-service-stop:
-	sudo systemctl stop build-recent-proof.timer
+	sudo systemctl stop raito-build-recent-proof.timer
 
 build-recent-proof-service-start:
-	sudo systemctl start build-recent-proof.timer
+	sudo systemctl start raito-build-recent-proof.timer

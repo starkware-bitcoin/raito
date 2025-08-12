@@ -60,7 +60,7 @@ def convert_proof_to_json(proof_file: Path) -> Optional[Path]:
             text=True,
             check=True,
         )
-        logger.info(f"Successfully converted proof to JSON format: {json_proof_file}")
+        logger.debug(f"Successfully converted proof to JSON format: {json_proof_file}")
         return json_proof_file
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to convert proof format: {e}")
@@ -86,7 +86,7 @@ def compress_proof_data(proof_file: Path) -> Optional[Path]:
             compressed_proof_file, "wb"
         ) as f_out:
             f_out.writelines(f_in)
-        logger.info(f"Successfully compressed proof data: {compressed_proof_file}")
+        logger.debug(f"Successfully compressed proof data: {compressed_proof_file}")
         return compressed_proof_file
     except Exception as e:
         logger.error(f"Failed to compress proof data: {e}")
@@ -213,7 +213,9 @@ def build_recent_proof(
         blocks_to_process = end_height - start_height
 
         if blocks_to_process <= 0:
-            logger.info("No new blocks to process")
+            logger.info(
+                f"No new blocks to process, latest_height: {latest_height}"
+            )
             return True
 
         step = min(max_step, blocks_to_process)
@@ -328,9 +330,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    logging_setup.setup(
-        verbose=args.verbose, log_filename="/var/log/raito/build_recent_proof.log"
-    )
+    logging_setup.setup(verbose=args.verbose)
 
     # Convert slow_data_generation flag to fast_data_generation parameter
     fast_data_generation = not args.slow

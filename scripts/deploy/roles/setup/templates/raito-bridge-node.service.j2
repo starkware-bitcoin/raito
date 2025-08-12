@@ -10,6 +10,7 @@ Group={{ raito_user }}
 WorkingDirectory={{ raito_working_dir }}
 Environment=PATH=/home/{{ raito_user }}/.cargo/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile={{ raito_working_dir }}/.env
+Environment=NO_COLOR=1
 ExecStart=/home/{{ raito_user }}/.cargo/bin/raito-bridge-node --rpc-host {{ rpc_host }}
 Restart=always
 RestartSec=10

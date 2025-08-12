@@ -486,7 +486,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Setup logging using the extracted function
-    logging_setup.setup(verbose=args.verbose)
+    logging_setup.setup(verbose=args.verbose, log_filename="proving.log")
 
     start = args.start
     if start is None:
