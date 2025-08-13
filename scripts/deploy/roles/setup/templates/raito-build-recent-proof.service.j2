@@ -1,0 +1,15 @@
+[Unit]
+Description=Build recent proof
+
+[Service]
+Type=oneshot
+User={{ proof_builder_user }}
+Group={{ proof_builder_user }}
+WorkingDirectory={{ proof_builder_working_dir }}
+Environment=GOOGLE_APPLICATION_CREDENTIALS=/home/{{ proof_builder_user }}/google-credentials.json
+Environment=BITCOIN_RPC={{ bitcoin_rpc_url }}
+Environment=USERPWD={{ bitcoin_rpc_userpwd }}
+Environment=PATH=/home/{{ proof_builder_user }}/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/make build-recent-proof SLOW=1
+# Optional: prevent overlap if previous run still active
+ExecStartPre=/usr/bin/flock -n /tmp/recent-proof-builder.lock true 

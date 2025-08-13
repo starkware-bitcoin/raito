@@ -8,3 +8,20 @@
     name: "{{ raito_service_name }}"
     enabled: yes
     state: started
+
+- name: Enable raito build proof service
+  systemd:
+    name: raito-build-recent-proof
+    enabled: yes
+
+- name: Enable and start raito build proof timer
+  systemd:
+    name: raito-build-recent-proof.timer
+    enabled: yes
+    state: started
+
+- name: Restart Google Cloud Ops Agent
+  systemd:
+    name: google-cloud-ops-agent
+    state: restarted
+  ignore_errors: yes

@@ -1,0 +1,19 @@
+# /etc/systemd/system/build-recent-proof.timer
+[Unit]
+Description=Run build-recent-proof every 15 minutes
+
+[Timer]
+# First run 5 minutes after boot
+OnBootSec=5min
+
+# Then every 15 minutes
+OnUnitActiveSec=15min
+
+# Optional: allow up to 1 minute of jitter
+AccuracySec=1min
+
+# (Not required, but explicit is nice)
+Unit=raito-build-recent-proof.service
+
+[Install]
+WantedBy=timers.target 

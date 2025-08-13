@@ -1,0 +1,69 @@
+logging:
+  receivers:
+    journald:
+      type: systemd_journald
+
+  processors:
+    # build_recent_proof
+    set_build_recent_log_name:
+      type: modify_fields
+      fields:
+        logName:
+          static_value: raito-build-recent-proof.service
+
+    only_build_recent:
+      type: exclude_logs
+      match_any:
+        - 'NOT (jsonPayload._SYSTEMD_UNIT="raito-build-recent-proof.service" AND jsonPayload._COMM="python")'
+
+    parse_build_recent_message:
+      type: parse_regex
+      field: MESSAGE
+      regex: '^(?<time>\S+\s\S+)\s+-\s+(?<severity>DEBUG|INFO|NOTICE|WARN|WARNING|ERROR|CRITICAL)\s+-\s+(?<message>.*)$'
+
+    move_build_recent_severity:
+      type: modify_fields
+      fields:
+        severity:
+          move_from: jsonPayload.severity
+          map_values:
+            WARN: WARNING
+
+    # bridge_node
+    set_bridge_node_name:
+      type: modify_fields
+      fields:
+        logName:
+          static_value: raito-bridge-node.service
+
+    only_bridge_node:
+      type: exclude_logs
+      match_any:
+        - 'NOT jsonPayload._SYSTEMD_UNIT="raito-bridge-node.service"'
+
+    parse_bridge_message:
+      type: parse_regex
+      field: MESSAGE
+      regex: '^(?<time>\S+)\s+(?<severity>DEBUG|INFO|NOTICE|WARN|WARNING|ERROR|CRITICAL)\s+(?<module>\S+):\s+(?<message>.*)$'
+
+    move_bridge_severity:
+      type: modify_fields
+      fields:
+        severity:
+          move_from: jsonPayload.severity
+          map_values:
+            WARN: WARNING
+
+  service:
+    pipelines:
+      # Optional: silence default syslog tail to avoid noise/dupes
+      default_pipeline:
+        receivers: []
+
+      raito_build_recent:
+        receivers: [journald]
+        processors: [only_build_recent, parse_build_recent_message, move_build_recent_severity, set_build_recent_log_name]
+
+      raito_bridge_node:
+        receivers: [journald]
+        processors: [only_bridge_node, parse_bridge_message, move_bridge_severity, set_bridge_node_name] 

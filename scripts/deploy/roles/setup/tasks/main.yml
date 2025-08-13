@@ -7,6 +7,15 @@
     create_home: yes
     system: yes
 
+# Proof builder user is created manually
+# - name: Create proof builder user
+#   user:
+#     name: "{{ proof_builder_user }}"
+#     shell: /bin/bash
+#     home: "/home/{{ proof_builder_user }}"
+#     create_home: yes
+#     system: yes
+
 - name: Check if Rust is installed for raito user
   stat:
     path: "/home/{{ raito_user }}/.cargo/bin/cargo"
@@ -17,6 +26,24 @@
     su - {{ raito_user }} -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
   when: not rust_installed.stat.exists
 
+# - name: Check if Rust is installed for proof builder user
+#   stat:
+#     path: "/home/{{ proof_builder_user }}/.cargo/bin/cargo"
+#   register: proof_builder_rust_installed
+
+# - name: Install Rust for proof builder user
+#   shell: |
+#     su - {{ proof_builder_user }} -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+#   when: not proof_builder_rust_installed.stat.exists
+
+# - name: Ensure system packages are available for proof builder
+#   apt:
+#     name:
+#       - python3-pip
+#       - python3.11-venv
+#     state: present
+#     update_cache: yes
+
 - name: Create working directory
   file:
     path: "{{ raito_working_dir }}"
@@ -24,6 +51,14 @@
     owner: "{{ raito_user }}"
     group: "{{ raito_user }}"
     mode: '0755'
+
+# - name: Create proof builder working directory
+#   file:
+#     path: "{{ proof_builder_working_dir }}"
+#     state: directory
+#     owner: "{{ proof_builder_user }}"
+#     group: "{{ proof_builder_user }}"
+#     mode: '0755'
 
 - name: Create .mmr_data directory
   file:
@@ -45,6 +80,48 @@
   shell: |
     su - {{ raito_user }} -c "source ~/.cargo/env && cargo install --git https://github.com/starkware-bitcoin/raito --rev {{ raito_git_revision }} raito-bridge-node"
 
+# Let's keep this manual for now
+# - name: Clone raito repository for proof builder
+#   git:
+#     repo: https://github.com/starkware-bitcoin/raito.git
+#     dest: "{{ proof_builder_working_dir }}"
+#     version: "{{ raito_git_revision }}"
+#   become_user: "{{ proof_builder_user }}"
+
+# - name: Ensure proof builder can access Google credentials
+#   file:
+#     src: "{{ google_application_credentials }}"
+#     dest: "/home/{{ proof_builder_user }}/google-credentials.json"
+#     state: link
+#     owner: "{{ proof_builder_user }}"
+#     group: "{{ proof_builder_user }}"
+
+# - name: Create Python virtual environment for proof builder
+#   shell: |
+#     su - {{ proof_builder_user }} -c "cd {{ proof_builder_working_dir }} && python3 -m venv .venv"
+#   args:
+#     creates: "{{ proof_builder_working_dir }}/.venv"
+
+# - name: Install Python dependencies for proof builder
+#   shell: |
+#     su - {{ proof_builder_user }} -c "cd {{ proof_builder_working_dir }} && . .venv/bin/activate && pip install -r scripts/data/requirements.txt"
+
+# - name: Install convert-proof-format tool for proof builder
+#   shell: |
+#     su - {{ proof_builder_user }} -c "source ~/.cargo/env && RUSTFLAGS='-C target-cpu=native -C opt-level=3' cargo install --force --git https://github.com/starkware-libs/stwo-cairo --rev d09a2cfd2b308b6210906f26320f767cf279abef dev-utils"
+
+# - name: Install cairo-execute for proof builder
+#   shell: |
+#     su - {{ proof_builder_user }} -c "source ~/.cargo/env && cargo install --git https://github.com/m-kus/cairo --rev 7fbbd0112b5a926403c17fa95ad831c1715fd1b1 cairo-execute"
+
+# - name: Install scarb for proof builder
+#   shell: |
+#     su - {{ proof_builder_user }} -c "source ~/.cargo/env && cargo install --git https://github.com/software-mansion-labs/scarb --tag v2.5.4"
+
+# - name: Install adapted_stwo for proof builder
+#   shell: |
+#     su - {{ proof_builder_user }} -c "source ~/.cargo/env && RUSTFLAGS='-C target-cpu=native -C opt-level=3' cargo install --force --git https://github.com/starkware-libs/stwo-cairo --rev d09a2cfd2b308b6210906f26320f767cf279abef adapted_stwo"
+
 - name: Create systemd service file
   template:
     src: raito-bridge-node.service.j2
@@ -54,6 +131,38 @@
     - Reload systemd
     - Enable and start raito service
 
+- name: Create raito-build-recent-proof service file
+  template:
+    src: raito-build-recent-proof.service.j2
+    dest: "/etc/systemd/system/raito-build-recent-proof.service"
+    mode: '0644'
+  notify:
+    - Reload systemd
+    - Enable raito build proof service
+
+- name: Create raito-build-recent-proof timer file
+  template:
+    src: raito-build-recent-proof.timer.j2
+    dest: "/etc/systemd/system/raito-build-recent-proof.timer"
+    mode: '0644'
+  notify:
+    - Reload systemd
+    - Enable and start raito build proof timer
+
+- name: Create Google Cloud Ops Agent config directory
+  file:
+    path: /etc/google-cloud-ops-agent
+    state: directory
+    mode: '0755'
+
+- name: Create Google Cloud Ops Agent config file
+  template:
+    src: google-cloud-ops-agent-config.yaml.j2
+    dest: /etc/google-cloud-ops-agent/config.yaml
+    mode: '0644'
+  notify:
+    - Restart Google Cloud Ops Agent
+
 - name: Ensure systemd is reloaded
   systemd:
     daemon_reload: yes
@@ -61,5 +170,16 @@
 - name: Enable and start raito service
   systemd:
     name: "{{ raito_service_name }}"
+    enabled: yes
+    state: started
+
+- name: Enable raito build proof service
+  systemd:
+    name: raito-build-recent-proof
+    enabled: yes
+
+- name: Enable and start raito build proof timer
+  systemd:
+    name: raito-build-recent-proof.timer
     enabled: yes
     state: started

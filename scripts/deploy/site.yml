@@ -6,10 +6,16 @@
     raito_working_dir: /home/raito/raito-bridge-node
     raito_user: raito
     raito_service_name: raito-bridge-node
+    # Proof builder configuration
+    proof_builder_user: maciej
+    proof_builder_working_dir: /home/maciej/raito-prim
     raito_git_revision: "{{ lookup('env', 'RAITO_GIT_REVISION') | default('main') }}"
     bitcoin_rpc_url: "{{ lookup('env', 'BITCOIN_RPC') }}"
     bitcoin_rpc_userpwd: "{{ lookup('env', 'USERPWD') }}"
     rpc_host: "{{ lookup('env', 'RPC_HOST') | default('0.0.0.0:8080') }}"
+    gcp_instance_name: "{{ lookup('env', 'GCP_INSTANCE_NAME') | default('raito') }}"
+    gcp_environment: "{{ lookup('env', 'GCP_ENVIRONMENT') | default('production') }}"
+    google_application_credentials: "{{ lookup('env', 'GOOGLE_APPLICATION_CREDENTIALS') | default('/home/' + raito_user + '/google-credentials.json') }}"
 
   tasks:
     - name: Include setup role
