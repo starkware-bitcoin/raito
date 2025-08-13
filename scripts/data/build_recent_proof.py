@@ -139,7 +139,9 @@ def upload_to_gcs(proof_file: Path, chainstate_data: Dict[str, Any]) -> bool:
         # Upload directly as recent_proof
         recent_proof_blob = bucket.blob("recent_proof")
         recent_proof_blob.content_encoding = "gzip"
-        recent_proof_blob.upload_from_string(compressed_data, content_type="application/json")
+        recent_proof_blob.upload_from_string(
+            compressed_data, content_type="application/json"
+        )
 
         logger.debug(f"Successfully uploaded compressed proof to GCS as recent_proof")
         return True
