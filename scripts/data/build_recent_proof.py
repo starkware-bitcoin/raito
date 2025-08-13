@@ -95,7 +95,7 @@ def compress_proof_data(proof_file: Path) -> Optional[Path]:
 
 
 def upload_to_gcs(proof_file: Path, chainstate_data: Dict[str, Any]) -> bool:
-    """Upload compressed proof and chainstate data to Google Cloud Storage."""
+    """Upload compressed proof and chainstate data to Google Cloud Storage as recent_proof."""
     if storage is None:
         logger.error(
             "Google Cloud Storage not available. Please install google-cloud-storage package."
@@ -131,25 +131,17 @@ def upload_to_gcs(proof_file: Path, chainstate_data: Dict[str, Any]) -> bool:
             "proof": proof_content,
         }
 
-        # Create filename without extension
-        filename = f"proof_{chainstate_data['block_height']}_{chainstate_data['best_block_hash']}"
-
         # Compress the entire upload data
         compressed_data = gzip.compress(
             json.dumps(upload_data, indent=2).encode("utf-8")
         )
 
-        blob = bucket.blob(filename)
-        blob.content_encoding = "gzip"
-        blob.upload_from_string(compressed_data, content_type="application/json")
-
-        # Copy the blob to recent_proof
+        # Upload directly as recent_proof
         recent_proof_blob = bucket.blob("recent_proof")
         recent_proof_blob.content_encoding = "gzip"
-        bucket.copy_blob(blob, bucket, "recent_proof")
+        recent_proof_blob.upload_from_string(compressed_data, content_type="application/json")
 
-        logger.debug(f"Successfully uploaded compressed proof to GCS: {filename}")
-        logger.debug(f"Successfully copied compressed proof to recent_proof")
+        logger.debug(f"Successfully uploaded compressed proof to GCS as recent_proof")
         return True
 
     except Exception as e:
