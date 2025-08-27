@@ -4,6 +4,8 @@ A small CLI with two commands:
 - Fetch a compressed proof for a Bitcoin transaction from network sources
 - Verify that proof completely offline on a stateless machine (e.g., air‑gapped)
 
+![](../../docs/img/raito_spv_client.png)
+
 Goal: Produce a self‑sufficient proof that can be verified by a client with no prior state and no network access — suitable for air‑gapped environments or long‑term archival.
 
 The resulting proof is written to disk in a compact binary format using [`serde-brief`](https://docs.rs/serde-brief).
@@ -88,3 +90,21 @@ Proofs are written using `serde-brief` (binary, compact). The file contains a se
   - Bitcoin `PartialMerkleTree` (consensus-encoded) containing the Merkle path for the transaction within the block.
 
 This format is not human‑readable. To deserialize programmatically, use `serde-brief` reader APIs.
+
+## Compressed SPV proof workflow
+
+- Batch Execution: The executor processes batches of Bitcoin block headers (e.g., 1-10,000, then 10,001-20,000) with relevant bootloader and assumevalid Cairo programs, producing traces and public/private execution inputs.
+- Proof Generation: A prover (using Cairo+Stwo) creates a STARK proof that attests to the block validation logic having been correctly executed over those headers.
+- Verification: The compressed proof, along with the current chain state and MMR (Merkle Mountain Range) root, is passed to an on-chain or off-chain verifier, which can trustlessly check:
+  * The validity and linkage of all block headers back to genesis.
+  * The target block’s inclusion in the chain (via MMR proof).
+  * Sufficient cumulative difficulty/work.
+  * Correct and recent timestamps as well as other consensus rules.
+  * The inclusion of a target transaction in the block (via Merkle/SPV proof).
+
+![](../../docs/img/compressed_spv_proof.svg)
+
+Key Properties of the Compressed SPV Proof:
+- Succinctness: The resulting STARK proof and auxiliary data are much smaller than the raw block header chain or full block data itself.
+- Trust-minimization: The verifying party does not need to replay block validation—only to verify the proof and inclusion paths.
+- Security: The system preserves full SPV properties: valid chain, correct target block inclusion (via MMR), and transaction inclusion (via standard Merkle proof construction), and ensures adequate accumulated proof-of-work.

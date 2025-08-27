@@ -1,6 +1,7 @@
 //! Verification routines for compressed SPV proofs, including transaction, block MMR,
 //! Cairo recursive proof, and subchain work checks.
 
+use bitcoin::Network;
 use bitcoin::{block::Header as BlockHeader, consensus, MerkleBlock, Transaction};
 use cairo_air::utils::{get_verification_output, VerificationOutput};
 use cairo_air::{CairoProof, PreProcessedTraceVariant};
@@ -9,7 +10,7 @@ use std::path::PathBuf;
 use stwo_prover::core::vcs::blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher};
 use tracing::info;
 
-use crate::format::{format_transaction, FormatConfig};
+use crate::format::format_transaction;
 use crate::proof::{BootloaderOutput, ChainState, CompressedSpvProof, TaskResult};
 use crate::work::verify_subchain_work;
 
@@ -108,8 +109,13 @@ pub async fn verify_proof(
     info!("Verification successful!");
 
     // Format and display the transaction with ASCII graphics
-    let format_config = FormatConfig::default();
-    let formatted_tx = format_transaction(&transaction, &format_config);
+    let formatted_tx = format_transaction(
+        &transaction,
+        Network::Bitcoin,
+        &block_header,
+        block_height,
+        chain_state.block_height,
+    );
     println!("{}", formatted_tx);
 
     Ok(())
