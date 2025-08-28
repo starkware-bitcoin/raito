@@ -6,7 +6,7 @@ A small CLI with two commands:
 
 Goal: Produce a self‑sufficient proof that can be verified by a client with no prior state and no network access — suitable for air‑gapped environments or long‑term archival.
 
-The resulting proof is written to disk in a compact binary format using [`serde-brief`](https://docs.rs/serde-brief).
+The resulting proof is written to disk in a compact binary format using [`bincode`](https://docs.rs/bincode) with bzip2 compression for optimal file size.
 
 ## Installation
 
@@ -42,7 +42,7 @@ Example:
 ```bash
 cargo run -p raito-spv-client -- --log-level debug fetch \
   --txid <hex_txid> \
-  --proof-path ./proofs/tx_proof.brief \
+  --proof-path ./proofs/tx_proof.bin.bz2 \
   --raito-rpc-url https://api.raito.wtf \
   --bitcoin-rpc-url http://127.0.0.1:8332 \
   --bitcoin-rpc-userpwd user:pass \
@@ -63,17 +63,23 @@ Optional:
 - `--dev`: Development mode. Skips certain cross-checks (e.g., strict MMR height equality).
 
 ```bash
-cargo run -p raito-spv-client -- verify --proof-path ./proofs/tx_proof.brief
+cargo run -p raito-spv-client -- verify --proof-path ./proofs/tx_proof.bin.bz2
 # or with dev mode enabled
-cargo run -p raito-spv-client -- verify --proof-path ./proofs/tx_proof.brief --dev
+cargo run -p raito-spv-client -- verify --proof-path ./proofs/tx_proof.bin.bz2 --dev
 ```
 
 Note: Implementation details of verification may evolve; the intended behavior is fully offline verification using the self‑contained proof.
 
 ## Output proof format
 
-Proofs are written using `serde-brief` (binary, compact). The file contains a serialized `CompressedSpvProof`:
+Proofs are written using `bincode` (binary, compact) with bzip2 compression applied for maximum file size reduction. The file contains a bzip2-compressed, serialized `CompressedSpvProof`:
 
+**File Structure:**
+- **Compression**: bzip2 with maximum compression ratio (`Compression::best()`)
+- **Serialization**: `bincode` binary format for optimal space efficiency and performance
+- **Extension**: Recommended `.bin.bz2` to indicate binary + bzip2 format
+
+**Proof Contents:**
 - `chain_state: ChainState`
   - Snapshot of chain height, total work, best block hash, current target, epoch start time, and previous timestamps.
 - `chain_state_proof: CairoProof<Blake2sMerkleHasher>`
@@ -87,4 +93,8 @@ Proofs are written using `serde-brief` (binary, compact). The file contains a se
 - `transaction_proof: Vec<u8>`
   - Bitcoin `PartialMerkleTree` (consensus-encoded) containing the Merkle path for the transaction within the block.
 
-This format is not human‑readable. To deserialize programmatically, use `serde-brief` reader APIs.
+This format is not human‑readable. To deserialize programmatically:
+1. Decompress using bzip2 decoder (e.g., `bzip2::read::BzDecoder`)
+2. Deserialize using `bincode::deserialize()` from the decompressed bytes
+
+The client automatically handles both compression during proof generation and decompression during verification.

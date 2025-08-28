@@ -1,9 +1,11 @@
 //! Functions to fetch all components required to construct a compressed SPV proof
 //! from the Raito bridge RPC and a Bitcoin node.
 
-use std::path::PathBuf;
+use std::{io::Write, path::PathBuf};
 
 use bitcoin::{block::Header as BlockHeader, consensus, MerkleBlock, Transaction, Txid};
+use bzip2::write::BzEncoder;
+use bzip2::Compression;
 use cairo_air::CairoProof;
 use raito_spv_core::{bitcoin::BitcoinClient, block_mmr::BlockInclusionProof};
 use serde::{Deserialize, Serialize};
@@ -84,20 +86,52 @@ pub async fn run(args: FetchArgs) -> Result<(), anyhow::Error> {
     )
     .await?;
 
-    // Write proof to the file
-    let proof_path = args.proof_path;
-    let proof_dir = proof_path.parent().unwrap();
-    std::fs::create_dir_all(proof_dir)?;
-
-    let file = std::fs::File::create(&proof_path)?;
-    let mut writer = std::io::BufWriter::new(file);
-    serde_brief::to_writer(&compressed_proof, &mut writer)?;
-    info!("Proof written to {}", proof_path.display());
+    // Save proof to the file using bincode binary codec with bzip2 compression
+    save_compressed_proof_with_bzip2(&compressed_proof, &args.proof_path)?;
 
     if args.verify {
         verify_proof(compressed_proof, &VerifierConfig::default(), args.dev).await?;
     }
 
+    Ok(())
+}
+
+/// Save a compressed proof to disk using bincode binary codec with bzip2 compression
+///
+/// - `proof`: The compressed SPV proof to save
+/// - `proof_path`: Path where the proof should be saved
+///
+/// This function first serializes the proof to bytes using bincode binary codec,
+/// then applies bzip2 compression with maximum compression ratio for optimal file size.
+pub fn save_compressed_proof_with_bzip2(
+    proof: &CompressedSpvProof,
+    proof_path: &PathBuf,
+) -> Result<(), anyhow::Error> {
+    info!("Serializing proof to binary format...");
+
+    // Step 1: Serialize the proof to bytes using bincode
+    let serialized_bytes = bincode::serialize(proof)?;
+    info!(
+        "Serialized {} bytes, now compressing...",
+        serialized_bytes.len()
+    );
+
+    // Create parent directories if they don't exist
+    if let Some(proof_dir) = proof_path.parent() {
+        std::fs::create_dir_all(proof_dir)?;
+    }
+
+    // Step 2: Compress the serialized bytes and write to file
+    let file = std::fs::File::create(proof_path)?;
+    let mut bz_encoder = BzEncoder::new(file, Compression::best());
+
+    // Write the serialized bytes to the bzip2 encoder
+    bz_encoder.write_all(&serialized_bytes)?;
+
+    // Finish the bzip2 stream to ensure all data is written
+    bz_encoder.finish()?;
+
+    info!("Compressed proof written to {}", proof_path.display());
     Ok(())
 }
 
