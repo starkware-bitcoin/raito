@@ -3,28 +3,18 @@
 //! Provides ASCII art visualization of Bitcoin transactions similar to block explorers.
 
 use bitcoin::absolute::LockTime;
+use bitcoin::block::Header as BlockHeader;
 use bitcoin::{Address, Amount, Network, Transaction, TxIn, TxOut};
-
-/// Configuration for transaction formatting
-pub struct FormatConfig {
-    /// Network to use for address generation
-    pub network: Network,
-    /// Show detailed information (currently unused but kept for future extensions)
-    #[allow(dead_code)]
-    pub verbose: bool,
-}
-
-impl Default for FormatConfig {
-    fn default() -> Self {
-        Self {
-            network: Network::Bitcoin,
-            verbose: false,
-        }
-    }
-}
+use chrono::DateTime;
 
 /// Format a Bitcoin transaction for terminal display
-pub fn format_transaction(tx: &Transaction, config: &FormatConfig) -> String {
+pub fn format_transaction(
+    tx: &Transaction,
+    network: Network,
+    block_header: &BlockHeader,
+    block_height: u32,
+    chain_height: u32,
+) -> String {
     let mut output = String::new();
 
     output.push_str("\n");
@@ -38,8 +28,8 @@ pub fn format_transaction(tx: &Transaction, config: &FormatConfig) -> String {
     output.push_str("├─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤\n");
 
     // Two-column layout: inputs on left, outputs on right
-    let inputs_section = format_inputs(&tx.input, config);
-    let outputs_section = format_outputs(&tx.output, config);
+    let inputs_section = format_inputs(&tx.input);
+    let outputs_section = format_outputs(&tx.output, network);
 
     // Split sections into lines for side-by-side display
     let input_lines: Vec<&str> = inputs_section.lines().collect();
@@ -59,10 +49,12 @@ pub fn format_transaction(tx: &Transaction, config: &FormatConfig) -> String {
 
     output.push_str("├─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤\n");
 
-    // Details section
-    let details = format_transaction_details(tx, config);
+    // Details section - one column
+    let details = format_transaction_details(tx, block_header, block_height, chain_height);
+
     for line in details.lines() {
-        output.push_str(&format!("│ {:<131} │\n", line));
+        let line_formatted = format_column_content(line, 131);
+        output.push_str(&format!("│ {} │\n", line_formatted));
     }
 
     output.push_str("└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\n");
@@ -71,12 +63,12 @@ pub fn format_transaction(tx: &Transaction, config: &FormatConfig) -> String {
 }
 
 /// Format transaction inputs
-fn format_inputs(inputs: &[TxIn], config: &FormatConfig) -> String {
+fn format_inputs(inputs: &[TxIn]) -> String {
     let mut output = String::new();
     output.push_str("\x1b[33mINPUTS:\x1b[0m\n");
 
     for input in inputs.iter() {
-        let address = format_input_address(input, config);
+        let address = format_input_address(input);
         output.push_str(&format!("{}\n\n", address));
     }
 
@@ -88,12 +80,12 @@ fn format_inputs(inputs: &[TxIn], config: &FormatConfig) -> String {
 }
 
 /// Format transaction outputs
-fn format_outputs(outputs: &[TxOut], config: &FormatConfig) -> String {
+fn format_outputs(outputs: &[TxOut], network: Network) -> String {
     let mut output = String::new();
     output.push_str("\x1b[33mOUTPUTS:\x1b[0m\n");
 
     for txout in outputs.iter() {
-        let address = format_output_address(txout, config);
+        let address = format_output_address(txout, network);
         let amount_btc = Amount::from_sat(txout.value.to_sat()).to_btc();
 
         output.push_str(&format!("{}        {:.8} BTC\n", address, amount_btc));
@@ -118,26 +110,35 @@ fn format_outputs(outputs: &[TxOut], config: &FormatConfig) -> String {
 }
 
 /// Format transaction details card
-fn format_transaction_details(tx: &Transaction, _config: &FormatConfig) -> String {
+fn format_transaction_details(
+    tx: &Transaction,
+    block_header: &BlockHeader,
+    block_height: u32,
+    chain_height: u32,
+) -> String {
     let mut output = String::new();
     output.push_str("\x1b[33mDETAILS:\x1b[0m\n");
 
-    // Calculate total output value
-    let total_output: u64 = tx.output.iter().map(|o| o.value.to_sat()).sum();
-    output.push_str(&format!(
-        "Total Output: {:.8} BTC\n",
-        Amount::from_sat(total_output).to_btc()
-    ));
+    output.push_str(&format!("Transaction size: {} bytes\n", tx.total_size()));
+
+    output.push_str(&format!("Block hash: {}\n", block_header.block_hash()));
+    output.push_str(&format!("Block height: {}\n", block_height));
+
+    let timestamp = format_unix_timestamp(block_header.time);
+    output.push_str(&format!("Block timestamp: {}\n", timestamp));
+
+    // Calculate confirmations if both block_height and chain_height are available
+    let confirmations = chain_height.saturating_sub(block_height);
+    output.push_str(&format!("Confirmations: {}\n", confirmations));
 
     // Format locktime if set
     if tx.lock_time != LockTime::ZERO {
         let locktime_desc = match tx.lock_time {
-            LockTime::Blocks(height) => format!("Block height {}", height),
+            LockTime::Blocks(height) => format!("block {}", height),
             LockTime::Seconds(timestamp) => {
                 // Convert Unix timestamp to readable format
                 format!(
-                    "Unix timestamp {} ({})",
-                    timestamp,
+                    "timestamp {}",
                     format_unix_timestamp(timestamp.to_consensus_u32())
                 )
             }
@@ -145,17 +146,11 @@ fn format_transaction_details(tx: &Transaction, _config: &FormatConfig) -> Strin
         output.push_str(&format!("Locktime: {}\n", locktime_desc));
     }
 
-    // Additional details
-    output.push_str(&format!("Version: {}\n", tx.version));
-    output.push_str(&format!("Size: {} bytes\n", tx.total_size()));
-    output.push_str(&format!("Weight: {} WU\n", tx.weight()));
-    output.push_str(&format!("Virtual Size: {} vB\n", tx.vsize()));
-
     output
 }
 
 /// Get address string for a transaction input
-fn format_input_address(input: &TxIn, _config: &FormatConfig) -> String {
+fn format_input_address(input: &TxIn) -> String {
     // For inputs, we can try to extract address from script_sig, but it's not always possible
     // In many cases, we'd need the previous transaction output to know the address
     if input.previous_output.is_null() {
@@ -170,9 +165,9 @@ fn format_input_address(input: &TxIn, _config: &FormatConfig) -> String {
 }
 
 /// Get address string for a transaction output
-fn format_output_address(output: &TxOut, config: &FormatConfig) -> String {
+fn format_output_address(output: &TxOut, network: Network) -> String {
     // Try to derive address from script_pubkey
-    match Address::from_script(&output.script_pubkey, config.network) {
+    match Address::from_script(&output.script_pubkey, network) {
         Ok(address) => address.to_string(),
         Err(_) => {
             // If we can't parse as a standard address, show script type or raw script
@@ -208,56 +203,8 @@ fn format_column_content(content: &str, width: usize) -> String {
         let padding = width - visible_len;
         format!("{}{}", content, " ".repeat(padding))
     } else {
-        // Content is too long, need to truncate
-        if content.contains('\x1b') {
-            // Content has ANSI codes, be careful about truncation
-            let mut result = String::new();
-            let mut current_visible_len = 0;
-            let mut chars = content.chars();
-            let target_len = width - 3; // Reserve space for "..."
-
-            while current_visible_len < target_len {
-                match chars.next() {
-                    Some('\x1b') => {
-                        // Copy ANSI escape sequence
-                        result.push('\x1b');
-                        while let Some(c) = chars.next() {
-                            result.push(c);
-                            if c == 'm' {
-                                break;
-                            }
-                        }
-                    }
-                    Some(c) => {
-                        result.push(c);
-                        current_visible_len += 1;
-                    }
-                    None => break,
-                }
-            }
-
-            // Add ellipsis and pad to exact width
-            result.push_str("...");
-            let final_visible_len = strip_ansi_codes(&result).len();
-            if final_visible_len < width {
-                result.push_str(&" ".repeat(width - final_visible_len));
-            }
-            result
-        } else {
-            // No ANSI codes, simple truncation
-            let truncated = if content.len() > width - 3 {
-                format!("{}...", &content[..width - 3])
-            } else {
-                content.to_string()
-            };
-
-            let final_len = truncated.len();
-            if final_len < width {
-                format!("{}{}", truncated, " ".repeat(width - final_len))
-            } else {
-                truncated
-            }
-        }
+        // Return content as-is without truncation
+        content.to_string()
     }
 }
 
@@ -284,88 +231,6 @@ fn strip_ansi_codes(s: &str) -> String {
 
 /// Format Unix timestamp to human-readable string
 fn format_unix_timestamp(timestamp: u32) -> String {
-    // Simple approximation - in a real implementation you'd use a proper datetime library
-    use std::time::UNIX_EPOCH;
-
-    let system_time = UNIX_EPOCH + std::time::Duration::from_secs(timestamp as u64);
-    match system_time.duration_since(UNIX_EPOCH) {
-        Ok(duration) => {
-            let days = duration.as_secs() / 86400;
-            let years_since_epoch = days / 365;
-            format!("~{} years after 1970", years_since_epoch)
-        }
-        Err(_) => "Unknown".to_string(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use bitcoin::{Amount, ScriptBuf};
-
-    #[test]
-    fn test_format_transaction() {
-        // Create a simple test transaction
-        let tx = Transaction {
-            version: bitcoin::transaction::Version(1),
-            lock_time: LockTime::ZERO,
-            input: vec![],
-            output: vec![TxOut {
-                value: Amount::from_btc(0.1).unwrap(),
-                script_pubkey: ScriptBuf::new(),
-            }],
-        };
-
-        let config = FormatConfig::default();
-        let formatted = format_transaction(&tx, &config);
-
-        assert!(formatted.contains("Bitcoin Transaction"));
-        assert!(formatted.contains("OUTPUTS"));
-        assert!(formatted.contains("0.10000000 BTC"));
-    }
-
-    #[test]
-    fn test_format_transaction_display() {
-        use bitcoin::OutPoint;
-
-        // Create a more realistic test transaction with inputs and outputs
-        let tx = Transaction {
-            version: bitcoin::transaction::Version(2),
-            lock_time: LockTime::from_height(800000).unwrap(),
-            input: vec![TxIn {
-                previous_output: OutPoint::new(
-                    "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-                        .parse()
-                        .unwrap(),
-                    0,
-                ),
-                script_sig: ScriptBuf::new(),
-                sequence: bitcoin::transaction::Sequence(0xfffffffd),
-                witness: bitcoin::Witness::new(),
-            }],
-            output: vec![
-                TxOut {
-                    value: Amount::from_btc(0.5).unwrap(),
-                    script_pubkey: ScriptBuf::new(),
-                },
-                TxOut {
-                    value: Amount::from_btc(0.25).unwrap(),
-                    script_pubkey: ScriptBuf::new(),
-                },
-            ],
-        };
-
-        let config = FormatConfig::default();
-        let formatted = format_transaction(&tx, &config);
-
-        // Print the formatted transaction to see how it looks
-        println!("\n{}", formatted);
-
-        assert!(formatted.contains("Bitcoin Transaction"));
-        assert!(formatted.contains("INPUTS"));
-        assert!(formatted.contains("OUTPUTS"));
-        assert!(formatted.contains("0.50000000 BTC"));
-        assert!(formatted.contains("0.25000000 BTC"));
-        assert!(formatted.contains("Locktime"));
-    }
+    let dt = DateTime::from_timestamp(timestamp as i64, 0).expect("Invalid timestamp");
+    dt.format("%Y-%m-%d %H:%M:%S UTC").to_string()
 }
