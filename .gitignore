@@ -42,3 +42,5 @@ corelib
 client.errors.log
 cairo_project.toml
 *.bin
+*.bz2
+*.gz

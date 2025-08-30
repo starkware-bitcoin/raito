@@ -95,81 +95,39 @@ See also:
   <img src="./docs/img/components.svg" alt="components"/>
 </p>
 
-### Milestone 1 - Block header validation
+### Milestone 0 - Full consensus client
 
-Implement a reduced light client that can verify a range of blocks starting at genesis.  
-It does not have to validate execution, just check that the block header fields follow the protocol.
+Implement all Bitcoin consensus checks, as in Bitcoin Core.
 
-Tasks:
+- [x] Block header validation
+- [x] Transaction validation
+- [x] Bitcoin scripts (done in <https://github.com/starkware-bitcoin/shinigami>)
+- [ ] Taproot scripts (WIP)
+- [x] Utreexo accumulator
 
-- [x] block hash computation
-- [x] proof-of-work validation/computation
-- [x] block time validation/computation
-- [x] block difficulty adjustment
-- [x] script for fetching arbitrary block data
-- [x] script for preparing program arguments
-- [x] script for running the program e2e for multiple blocks
+### Milestone 1 - Proving the header chain
 
-### Milestone 2 - Partial transaction validation
+Recursively prove validity of a chain of Bitcoin block headers to get a single succinct proof of chain state and block tree root.
+Combine with block inclusion proof and SPV proof for a particular transaction to get a compressed SPV proof that can be verifier offline.
 
-Extend light client with partial transaction validation, but without UTXO checks.
+- [x] Light client program that validates block headers
+- [x] Proving pipeline
+- [x] Backend providing block inclusion proofs
+- [x] CLI application for fetching and verifying compressed SPV proofs
 
-Tasks:
+See the [Raito SPV client](./crates/raito-spv-client/) documentation.
 
-- [x] reassess validation check list (analyze Bitcoin core codebase)
-- [x] generate & run integration tests e2e instead of Cairo codegen
-- [x] transaction ID calculation
-- [x] transaction root computation
-- [x] validate transaction fee
-- [x] validate coinbase transaction
-- [x] validate that transaction can be mined (locktime, sequence, coinbase maturity)
-- [x] validate segwit specific data (wtxid commitment)
-- [x] validate block weight
-- [x] script that fetches blocks extended with references UTXOs
-- [x] script that runs the program e2e for a span of blocks
+### Milestone 2 - Proving header chain + Utreexo accumulator
 
-### Milestone 3 - Bitcoin script validation
+[Utreexo](./docs/utreexo.md) accumulator is the key component allowing to pass the UTXO set between program instantiations, since we cannot continuously run the client like we do with Bitcoin Core. Proven header chain + Utreexo would enable advanced [assumeutxo](https://bitcoinops.org/en/topics/assumeutxo/), i.e. importing a snapshot of UTXO set from an untrusted party into a full node.
 
-Try to run script validation with external Cairo crate.
+### Milestone 3 - Proving blocks with transactions and scripts
 
-Tasks:
+Real time block proving would unlock non-interactive [witness aggregation](#witness-aggregation) and [UTXO rollups](#l2-solutions).
 
-- [x] Integrate Shinigami-script
+### Milestone 4 - Proving the entire block chain
 
-### Milestone 4 - UTXO set verification
-
-Add inclusion proofs for the UTXOs included in the block.
-
-Tasks:
-
-- [x] isolate unspendable outputs (OP_RETURN, etc)
-- [x] implement cache for UTXOs spent in the same block they are created (*)
-- [x] implement transaction outpoint hashing
-- [x] implement Utreexo accumulator (addition)
-- [x] Utreexo backend that maintains utxo set and Utreexo roots
-- [x] implement Utreexo single inclusion proof verification
-- [x] implement Utreexo single output removal
-- [x] implement Utreexo bridge node that generates individual inclusion proofs
-- [x] implement script that runs the program e2e for a span of blocks
-- [x] implement Utreexo accumulator version compatible with [rustreexo](https://github.com/mit-dci/rustreexo)
-
-### Milestone 5 - Full consensus validation
-
-Validate full block execution over large number of blocks, including the Bitcoin scripts checks and Utreexo proofs.
-
-- [x] consensus logic
-- [ ] consensus logic + utreexo proofs  
-- [ ] consensus logic + utreexo proofs + scripts
-
-### Milestone 6 - Proving
-
-Recursively verify STARK proofs of chain state updates. Still largely tbd. From initial observations it is clear that a series of optimizations will be necessary.
-
-- [ ] sha256 optimization
-- [x] don't use ByteArray when serializing data
-- [ ] blocklevel recursion
-- [ ] consider using garaga msm to batch signature verifications
-- [ ] identify other Cairo code botlenecks
+The ultimate goal — trust minimized [full node synchronization](#bootstrapping-full-nodes).
 
 # Contact
 
