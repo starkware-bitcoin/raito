@@ -5,12 +5,14 @@ use std::{io::Write, path::PathBuf};
 
 use bitcoin::{block::Header as BlockHeader, consensus, MerkleBlock, Transaction, Txid};
 use bzip2::write::BzEncoder;
+use bzip2::read::BzDecoder;
 use bzip2::Compression;
 use cairo_air::CairoProof;
 use raito_spv_core::{bitcoin::BitcoinClient, block_mmr::BlockInclusionProof};
 use serde::{Deserialize, Serialize};
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use tracing::info;
+use std::io::Read;
 
 use crate::{
     proof::{ChainState, CompressedSpvProof},
@@ -133,6 +135,39 @@ pub fn save_compressed_proof_with_bzip2(
 
     info!("Compressed proof written to {}", proof_path.display());
     Ok(())
+}
+
+/// Load a compressed proof from disk that was saved using bincode binary codec with bzip2 compression
+///
+/// - `proof_path`: Path to the bzip2 compressed proof file
+///
+/// This function first decompresses the bzip2 file, then deserializes the bytes
+/// using bincode binary codec, providing the symmetric operation to
+/// `save_compressed_proof_with_bzip2`.
+pub fn load_compressed_proof_from_bzip2(
+    proof_path: &PathBuf,
+) -> Result<CompressedSpvProof, anyhow::Error> {
+    info!(
+        "Loading and decompressing proof from {}",
+        proof_path.display()
+    );
+
+    // Step 1: Read and decompress the file
+    let file = std::fs::File::open(proof_path)?;
+    let mut bz_decoder = BzDecoder::new(file);
+    let mut decompressed_bytes = Vec::new();
+    bz_decoder.read_to_end(&mut decompressed_bytes)?;
+
+    info!(
+        "Decompressed {} bytes, now deserializing...",
+        decompressed_bytes.len()
+    );
+
+    // Step 2: Deserialize the decompressed bytes using bincode
+    let proof: CompressedSpvProof = bincode::deserialize(&decompressed_bytes)?;
+
+    info!("Successfully loaded compressed proof");
+    Ok(proof)
 }
 
 /// Fetch all components required to construct a `CompressedSpvProof`
