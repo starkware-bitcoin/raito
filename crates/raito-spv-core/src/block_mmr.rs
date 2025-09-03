@@ -2,6 +2,7 @@
 
 use std::path::Path;
 use std::sync::Arc;
+#[cfg(feature = "sqlite")]
 use tokio::fs;
 
 use accumulators::hasher::stark_blake::StarkBlakeHasher;
@@ -11,6 +12,7 @@ use accumulators::mmr::{
     PeaksOptions, Proof, ProofOptions, MMR,
 };
 use accumulators::store::memory::InMemoryStore;
+#[cfg(feature = "sqlite")]
 use accumulators::store::sqlite::SQLiteStore;
 use accumulators::store::Store;
 use bitcoin::block::Header as BlockHeader;
@@ -58,6 +60,7 @@ impl BlockMMR {
     }
 
     /// Create MMR from file
+    #[cfg(feature = "sqlite")]
     pub async fn from_file(path: &Path, mmr_id: &str) -> Result<Self, anyhow::Error> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).await?;
@@ -67,6 +70,12 @@ impl BlockMMR {
             Arc::new(SQLiteStore::new(path.to_str().unwrap(), Some(true), Some(mmr_id)).await?);
         let hasher = Arc::new(StarkBlakeHasher::default());
         Ok(Self::new(store, hasher, Some(mmr_id.to_string())))
+    }
+
+    /// Create MMR from file
+    #[cfg(not(feature = "sqlite"))]
+    pub async fn from_file(_path: &Path, _mmr_id: &str) -> Result<Self, anyhow::Error> {
+        Err(anyhow::anyhow!("SQLite support is disabled. Enable the 'sqlite' feature to use this method."))
     }
 
     /// Create in-memory MMR from peaks hashes and elements count

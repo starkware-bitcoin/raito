@@ -3,12 +3,15 @@ name = "raito-spv-core"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+sqlite = ["accumulators/sqlite"]
+
 [dependencies]
 # Async runtime
 tokio.workspace = true
 
 # Merkle mountain range
-accumulators = { git = "https://github.com/m-kus/rust-accumulators", rev = "588711663348fcf22fd4af624d0b0cd3bea709f1", features = ["blake", "memory", "sqlite", "mmr"]}
+accumulators = { git = "https://github.com/maciejka/rust-accumulators", rev = "ee3f20f5ef03de56376c1f0a6bc8c753e9725e33", features = ["blake", "memory", "mmr"]}
 
 # Bitcoin RPC and types
 jsonrpsee.workspace = true
