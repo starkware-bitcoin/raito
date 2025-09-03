@@ -59,8 +59,24 @@ pub async fn run(args: VerifyArgs) -> Result<(), anyhow::Error> {
 
     let config = VerifierConfig::default();
 
+    // Extract variables needed for formatting
+    let transaction = proof.transaction.clone();
+    let block_header = proof.block_header.clone();
+    let chain_state_block_height = proof.chain_state.block_height;    
+    let block_height = proof.block_header_proof.leaf_index as u32;
+
     // Verify the proof
     verify_proof(proof, &config, args.dev).await?;
+
+    // Format and display the transaction with ASCII graphics
+    let formatted_tx = format_transaction(
+        &transaction,
+        Network::Bitcoin,
+        &block_header,
+        block_height,
+        chain_state_block_height,
+    );
+    println!("{}", formatted_tx);
 
     Ok(())
 }
@@ -107,16 +123,6 @@ pub async fn verify_proof(
     verify_subchain_work(block_height, &chain_state, &config)?;
 
     info!("Verification successful!");
-
-    // Format and display the transaction with ASCII graphics
-    let formatted_tx = format_transaction(
-        &transaction,
-        Network::Bitcoin,
-        &block_header,
-        block_height,
-        chain_state.block_height,
-    );
-    println!("{}", formatted_tx);
 
     Ok(())
 }
