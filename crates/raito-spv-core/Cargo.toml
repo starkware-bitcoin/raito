@@ -8,7 +8,10 @@ sqlite = ["accumulators/sqlite"]
 
 [dependencies]
 # Async runtime
-tokio.workspace = true
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+tokio = { version = "1.36", features = ["full"] }
+[target.'cfg(target_family = "wasm")'.dependencies]
+tokio = { version = "1.36", default-features = false, features = ["rt", "macros", "sync", "io-util", "time"] }
 
 # Merkle mountain range
 accumulators = { git = "https://github.com/maciejka/rust-accumulators", rev = "ee3f20f5ef03de56376c1f0a6bc8c753e9725e33", features = ["blake", "memory", "mmr"]}
