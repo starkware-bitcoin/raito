@@ -14,10 +14,7 @@ use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use tracing::info;
 use std::io::Read;
 
-use crate::{
-    proof::{ChainState, CompressedSpvProof},
-    verify::{verify_proof, VerifierConfig},
-};
+use raito_spv_verify::{ChainState, CompressedSpvProof, verify_proof, VerifierConfig};
 
 /// CLI arguments for the `fetch` subcommand
 #[derive(Clone, Debug, clap::Args)]

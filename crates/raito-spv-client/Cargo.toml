@@ -8,6 +8,7 @@ anyhow = { workspace = true }
 
 # Core SPV functionality
 raito-spv-core = { path = "../raito-spv-core" }
+raito-spv-verify = { path = "../raito-spv-verify" }
 
 # Bitcoin RPC and types
 bitcoin = { workspace = true }
