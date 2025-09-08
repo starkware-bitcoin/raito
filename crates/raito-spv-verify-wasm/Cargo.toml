@@ -1,0 +1,34 @@
+[package]
+name = "raito-spv-verify-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Core SPV verification functionality
+raito-spv-verify = { path = "../raito-spv-verify" }
+
+# WASM bindings
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+
+# Serialization for WASM
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde-wasm-bindgen = "0.6"
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging (optional for WASM)
+console_error_panic_hook = "0.1"
+
+# WASM-specific dependency overrides
+getrandom = { version = "0.3", features = ["wasm_js"] } 

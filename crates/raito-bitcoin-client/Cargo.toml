@@ -1,0 +1,29 @@
+[package]
+name = "raito-bitcoin-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Bitcoin types
+bitcoin = { workspace = true }
+bitcoincore-rpc-json = { workspace = true }
+
+# RPC client
+jsonrpsee = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Retry logic
+backoff = { version = "0.4", features = ["futures", "tokio"] }
+
+# Logging
+tracing = { workspace = true } 

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raito SPV Verify WASM - Web Example</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .result {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .loading {
+            color: #6c757d;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>Raito SPV Verify WASM - Web Example</h1>
+    <p>This example demonstrates how to use the WASM bindings in a web browser environment.</p>
+
+    <div class="container">
+        <h2>Configuration</h2>
+        <button id="createDefaultConfig" class="button">Create Default Config</button>
+        <button id="createCustomConfig" class="button">Create Custom Config</button>
+        <div id="configResult" class="result"></div>
+    </div>
+
+    <div class="container">
+        <h2>Proof Verification</h2>
+        <p>Note: This example uses placeholder data for demonstration purposes.</p>
+        <button id="verifyAsync" class="button">Verify Proof (Async)</button>
+        <button id="verifySync" class="button">Verify Proof (Sync)</button>
+        <div id="verificationResult" class="result"></div>
+    </div>
+
+    <div class="container">
+        <h2>Status</h2>
+        <div id="status">Ready to use</div>
+    </div>
+
+    <script type="module">
+        // Import the WASM module
+        import init, { 
+            verify_proof_async, 
+            verify_proof_sync, 
+            create_default_config, 
+            create_custom_config 
+        } from '../pkg/raito_spv_verify_wasm.js';
+
+        // Initialize the WASM module
+        let wasmInitialized = false;
+        
+        async function initializeWasm() {
+            try {
+                await init();
+                wasmInitialized = true;
+                updateStatus('WASM module initialized successfully');
+                enableButtons();
+            } catch (error) {
+                updateStatus(`Failed to initialize WASM: ${error.message}`);
+            }
+        }
+
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+
+        function enableButtons() {
+            document.querySelectorAll('.button').forEach(btn => btn.disabled = false);
+        }
+
+        function disableButtons() {
+            document.querySelectorAll('.button').forEach(btn => btn.disabled = true);
+        }
+
+        function showResult(elementId, content, isError = false, isSuccess = false) {
+            const element = document.getElementById(elementId);
+            element.textContent = content;
+            element.className = 'result';
+            
+            if (isError) {
+                element.classList.add('error');
+            } else if (isSuccess) {
+                element.classList.add('success');
+            }
+        }
+
+        // Example proof data (placeholder)
+        const exampleProof = {
+            chain_state: {
+                block_height: 123456,
+                total_work: "1813388729421943762059264",
+                best_block_hash: "0000000000000000000000000000000000000000000000000000000000000000",
+                current_target: "123456789",
+                epoch_start_time: 1234567890,
+                prev_timestamps: [1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890]
+            },
+            chain_state_proof: {
+                // Placeholder Cairo proof data
+            },
+            block_header: {
+                // Placeholder Bitcoin block header data
+            },
+            block_header_proof: {
+                // Placeholder MMR proof data
+            },
+            transaction: {
+                // Placeholder Bitcoin transaction data
+            },
+            transaction_proof: []
+        };
+
+        // Event handlers
+        document.getElementById('createDefaultConfig').addEventListener('click', async () => {
+            if (!wasmInitialized) {
+                showResult('configResult', 'WASM module not initialized', true);
+                return;
+            }
+
+            try {
+                const config = create_default_config();
+                showResult('configResult', JSON.stringify(config, null, 2), false, true);
+            } catch (error) {
+                showResult('configResult', `Error: ${error.message}`, true);
+            }
+        });
+
+        document.getElementById('createCustomConfig').addEventListener('click', async () => {
+            if (!wasmInitialized) {
+                showResult('configResult', 'WASM module not initialized', true);
+                return;
+            }
+
+            try {
+                const config = create_custom_config(
+                    "1813388729421943762059264",
+                    "0x0001837d8b77b6368e0129ce3f65b5d63863cfab93c47865ee5cbe62922ab8f3",
+                    "0x00f0876bb47895e8c4a6e7043829d7886e3b135e3ef30544fb688ef4e25663ca",
+                    8
+                );
+                showResult('configResult', JSON.stringify(config, null, 2), false, true);
+            } catch (error) {
+                showResult('configResult', `Error: ${error.message}`, true);
+            }
+        });
+
+        document.getElementById('verifyAsync').addEventListener('click', async () => {
+            if (!wasmInitialized) {
+                showResult('verificationResult', 'WASM module not initialized', true);
+                return;
+            }
+
+            try {
+                showResult('verificationResult', 'Verifying proof asynchronously...', false);
+                updateStatus('Verification in progress...');
+                
+                const config = create_default_config();
+                const result = await verify_proof_async(exampleProof, config, true);
+                
+                if (result.success) {
+                    showResult('verificationResult', 'Verification successful!', false, true);
+                    updateStatus('Verification completed successfully');
+                } else {
+                    showResult('verificationResult', `Verification failed: ${result.error.message}`, true);
+                    updateStatus('Verification failed');
+                }
+            } catch (error) {
+                showResult('verificationResult', `Error: ${error.message}`, true);
+                updateStatus('Verification error occurred');
+            }
+        });
+
+        document.getElementById('verifySync').addEventListener('click', async () => {
+            if (!wasmInitialized) {
+                showResult('verificationResult', 'WASM module not initialized', true);
+                return;
+            }
+
+            try {
+                showResult('verificationResult', 'Verifying proof synchronously...', false);
+                updateStatus('Verification in progress (blocking)...');
+                
+                const config = create_default_config();
+                const result = verify_proof_sync(exampleProof, config, true);
+                
+                if (result.success) {
+                    showResult('verificationResult', 'Verification successful!', false, true);
+                    updateStatus('Verification completed successfully');
+                } else {
+                    showResult('verificationResult', `Verification failed: ${result.error.message}`, true);
+                    updateStatus('Verification failed');
+                }
+            } catch (error) {
+                showResult('verificationResult', `Error: ${error.message}`, true);
+                updateStatus('Verification error occurred');
+            }
+        });
+
+        // Initialize on page load
+        disableButtons();
+        updateStatus('Initializing WASM module...');
+        initializeWasm();
+    </script>
+</body>
+</html> 

@@ -7,6 +7,9 @@ edition = "2021"
 # Core SPV functionality
 raito-spv-core = { path = "../raito-spv-core", features = ["sqlite"] }
 
+# Bitcoin client
+raito-bitcoin-client = { path = "../raito-bitcoin-client" }
+
 # Async runtime
 tokio.workspace = true
 # Web framework

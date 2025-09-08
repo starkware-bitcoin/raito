@@ -2,6 +2,9 @@
 resolver = "2"
 members = ["crates/*"]
 
+[patch."https://github.com/m-kus/cairo-vm"]
+cairo-vm = { git = "https://github.com/maciejka/cairo-vm", rev = "19d8a07ce9799a8af9db6f8a14a8accaad900214" }
+
 [workspace.dependencies]
 # Async runtime
 tokio = { version = "1.36", features = ["full"] }

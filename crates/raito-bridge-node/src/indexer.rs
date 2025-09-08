@@ -3,7 +3,7 @@
 use tokio::sync::broadcast;
 use tracing::{error, info};
 
-use raito_spv_core::bitcoin::BitcoinClient;
+use raito_bitcoin_client::BitcoinClient;
 
 use crate::{
     app::AppClient,

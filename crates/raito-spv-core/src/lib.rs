@@ -4,6 +4,5 @@
 //! including Bitcoin RPC client, MMR (Merkle Mountain Range) accumulator, and
 //! sparse roots representation.
 
-pub mod bitcoin;
 pub mod block_mmr;
 pub mod sparse_roots;

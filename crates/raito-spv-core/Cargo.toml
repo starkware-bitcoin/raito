@@ -7,9 +7,10 @@ edition = "2021"
 sqlite = ["accumulators/sqlite"]
 
 [dependencies]
-# Async runtime
+# Async runtime - properly configured for WASM
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-tokio = { version = "1.36", features = ["full"] }
+tokio = { workspace = true }
+
 [target.'cfg(target_family = "wasm")'.dependencies]
 tokio = { version = "1.36", default-features = false, features = ["rt", "macros", "sync", "io-util", "time"] }
 
@@ -17,9 +18,9 @@ tokio = { version = "1.36", default-features = false, features = ["rt", "macros"
 accumulators = { git = "https://github.com/maciejka/rust-accumulators", rev = "ee3f20f5ef03de56376c1f0a6bc8c753e9725e33", features = ["blake", "memory", "mmr"]}
 
 # Bitcoin RPC and types
-jsonrpsee.workspace = true
+#jsonrpsee.workspace = true
 bitcoin.workspace = true
-bitcoincore-rpc-json.workspace = true
+#bitcoincore-rpc-json.workspace = true
 base64.workspace = true
 
 # Serialization
@@ -34,9 +35,6 @@ num-traits.workspace = true
 # Error handling
 thiserror.workspace = true
 anyhow.workspace = true
-
-# Retry logic (for bitcoin client)
-backoff = { version = "0.4", features = ["futures", "tokio"] }
 
 # Logging
 tracing.workspace = true

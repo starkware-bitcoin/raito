@@ -22,6 +22,7 @@ Cargo.lock
 .env
 .env.*
 .venv
+venv
 .python-version
 __pycache__
 .ipynb_checkpoints/

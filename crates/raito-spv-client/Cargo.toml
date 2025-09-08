@@ -10,6 +10,9 @@ anyhow = { workspace = true }
 raito-spv-core = { path = "../raito-spv-core" }
 raito-spv-verify = { path = "../raito-spv-verify" }
 
+# Bitcoin client
+raito-bitcoin-client = { path = "../raito-bitcoin-client" }
+
 # Bitcoin RPC and types
 bitcoin = { workspace = true }
 num-bigint = "0.4.3"
