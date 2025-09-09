@@ -146,4 +146,4 @@ fn decode_truncated_hash(output: &mut Vec<FieldElement>) -> anyhow::Result<Strin
         hash_bytes.remove(0);
     }
     Ok(format!("0x{}", hex::encode(hash_bytes)))
-} 
+}

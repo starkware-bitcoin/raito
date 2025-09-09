@@ -4,18 +4,18 @@
 use std::{io::Write, path::PathBuf};
 
 use bitcoin::{block::Header as BlockHeader, consensus, MerkleBlock, Transaction, Txid};
-use bzip2::write::BzEncoder;
 use bzip2::read::BzDecoder;
+use bzip2::write::BzEncoder;
 use bzip2::Compression;
 use cairo_air::CairoProof;
-use raito_spv_core::block_mmr::BlockInclusionProof;
 use raito_bitcoin_client::BitcoinClient;
+use raito_spv_core::block_mmr::BlockInclusionProof;
 use serde::{Deserialize, Serialize};
+use std::io::Read;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use tracing::info;
-use std::io::Read;
 
-use raito_spv_verify::{ChainState, CompressedSpvProof, verify_proof, VerifierConfig};
+use raito_spv_verify::{verify_proof, ChainState, CompressedSpvProof, VerifierConfig};
 
 /// CLI arguments for the `fetch` subcommand
 #[derive(Clone, Debug, clap::Args)]

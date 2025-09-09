@@ -5,8 +5,8 @@ use bitcoin::{block::Header as BlockHeader, consensus, MerkleBlock, Transaction}
 use cairo_air::utils::{get_verification_output, VerificationOutput};
 use cairo_air::{CairoProof, PreProcessedTraceVariant};
 use raito_spv_core::block_mmr::{BlockInclusionProof, BlockMMR};
-use tracing::info;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::proof::{BootloaderOutput, ChainState, TaskResult};
 use crate::work::verify_subchain_work;
@@ -225,4 +225,4 @@ pub fn verify_chain_state(
     )?;
 
     Ok(block_mmr_hash)
-} 
+}

@@ -231,4 +231,4 @@ fn is_retryable_error(err: &BitcoinClientError) -> bool {
         // Don't retry any other error types (hex decode, bitcoin deserialization, header issues)
         _ => false,
     }
-} 
+}

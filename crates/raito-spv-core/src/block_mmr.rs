@@ -75,7 +75,9 @@ impl BlockMMR {
     /// Create MMR from file
     #[cfg(not(feature = "sqlite"))]
     pub async fn from_file(_path: &Path, _mmr_id: &str) -> Result<Self, anyhow::Error> {
-        Err(anyhow::anyhow!("SQLite support is disabled. Enable the 'sqlite' feature to use this method."))
+        Err(anyhow::anyhow!(
+            "SQLite support is disabled. Enable the 'sqlite' feature to use this method."
+        ))
     }
 
     /// Create in-memory MMR from peaks hashes and elements count

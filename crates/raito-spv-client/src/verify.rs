@@ -1,12 +1,12 @@
 //! CLI wrapper for the verify functionality
 
 use bitcoin::Network;
-use std::path::PathBuf;
 use clap::Args;
+use std::path::PathBuf;
 
-use crate::format::format_transaction;
 use crate::fetch::load_compressed_proof_from_bzip2;
-use raito_spv_verify::{verify_proof, VerifierConfig, CompressedSpvProof};
+use crate::format::format_transaction;
+use raito_spv_verify::{verify_proof, CompressedSpvProof, VerifierConfig};
 
 /// CLI arguments for the `verify` subcommand
 #[derive(Clone, Debug, Args)]
@@ -29,7 +29,7 @@ pub async fn run(args: VerifyArgs) -> Result<(), anyhow::Error> {
     // Extract variables needed for formatting
     let transaction = proof.transaction.clone();
     let block_header = proof.block_header.clone();
-    let chain_state_block_height = proof.chain_state.block_height;    
+    let chain_state_block_height = proof.chain_state.block_height;
     let block_height = proof.block_header_proof.leaf_index as u32;
 
     // Verify the proof

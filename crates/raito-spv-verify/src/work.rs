@@ -55,4 +55,4 @@ fn compute_work_from_target(target: BigUint) -> BigUint {
     )
     .unwrap();
     max_work / (target + BigUint::from(1_u32))
-} 
+}
