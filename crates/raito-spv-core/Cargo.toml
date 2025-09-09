@@ -7,15 +7,8 @@ edition = "2021"
 sqlite = ["accumulators/sqlite"]
 
 [dependencies]
-# Async runtime - properly configured for WASM
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-tokio = { workspace = true }
-
-[target.'cfg(target_family = "wasm")'.dependencies]
-tokio = { version = "1.36", default-features = false, features = ["rt", "macros", "sync", "io-util", "time"] }
-
 # Merkle mountain range
-accumulators = { git = "https://github.com/maciejka/rust-accumulators", rev = "ee3f20f5ef03de56376c1f0a6bc8c753e9725e33", features = ["blake", "memory", "mmr"]}
+accumulators = { git = "https://github.com/maciejka/rust-accumulators", rev = "878d83576e1852f0c8e3ad39ced0b678f9bbb1ba", features = ["blake", "memory", "mmr"]}
 
 # Bitcoin RPC and types
 #jsonrpsee.workspace = true
@@ -33,11 +26,18 @@ num-bigint.workspace = true
 num-traits.workspace = true
 
 # Error handling
-thiserror.workspace = true
-anyhow.workspace = true
+thiserror = "1.0"
+anyhow = "1.0"
 
 # Logging
-tracing.workspace = true
+tracing = "0.1"
+
+# Async runtime - properly configured for WASM
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+tokio = { version = "1.36", features = ["full"] }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+tokio = { version = "1.36", default-features = false, features = ["rt", "macros", "sync", "io-util", "time"] }
 
 [dev-dependencies]
 # Testing

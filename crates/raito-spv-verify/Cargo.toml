@@ -12,6 +12,15 @@ raito-spv-core = { path = "../raito-spv-core" }
 # Bitcoin types
 bitcoin = { workspace = true }
 
+# Logging
+tracing = "0.1"
+
+# Serialization
+hex = "0.4.3"
+serde = { workspace = true }
+num-bigint = "0.4.3"
+starknet-ff = "0.3.7" 
+
 # Stwo-cairo
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "0e90b31", features = [
@@ -22,12 +31,3 @@ cairo-air = { git = "https://github.com/maciejka/stwo-cairo", rev = "cb0525c6d06
 [target.'cfg(target_family = "wasm")'.dependencies]
 stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "0e90b31", features = [], default-features = false }
 cairo-air = { git = "https://github.com/maciejka/stwo-cairo", rev = "cb0525c6d06de29beed171119040ab1a12c8ba61", default-features = false, features = ["std"] }
-
-# Logging
-tracing = "0.1"
-
-# Serialization
-hex = "0.4.3"
-serde = { workspace = true }
-num-bigint = "0.4.3"
-starknet-ff = "0.3.7" 
