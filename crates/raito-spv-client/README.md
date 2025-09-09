@@ -89,7 +89,7 @@ Proofs are written using `bincode` (binary, compact) with bzip2 compression appl
 - `block_header: bitcoin::block::Header`
   - The header of the block containing the transaction.
 - `block_header_proof: BlockInclusionProof`
-  - Inclusion proof of `block_header` in the MMR (from `raito-spv-core`).
+  - Inclusion proof of `block_header` in the MMR (from `raito-spv-mmr`).
 - `transaction: bitcoin::Transaction`
   - The full Bitcoin transaction being proven.
 - `transaction_proof: Vec<u8>`

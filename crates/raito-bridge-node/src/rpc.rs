@@ -13,7 +13,7 @@ use axum::{
 use serde::Deserialize;
 use tower_http::trace::TraceLayer;
 
-use raito_spv_core::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
+use raito_spv_mmr::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
 
 use crate::app::AppClient;
 

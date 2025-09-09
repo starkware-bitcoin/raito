@@ -4,7 +4,7 @@
 use bitcoin::hashes::Hash;
 use bitcoin::{block::Header as BlockHeader, BlockHash, Transaction};
 use cairo_air::CairoProof;
-use raito_spv_core::block_mmr::BlockInclusionProof;
+use raito_spv_mmr::block_mmr::BlockInclusionProof;
 use serde::{Deserialize, Serialize};
 use starknet_ff::FieldElement;
 use stwo_prover::core::vcs::blake2_hash::Blake2sHasher;

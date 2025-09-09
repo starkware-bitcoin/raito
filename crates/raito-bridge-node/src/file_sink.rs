@@ -1,6 +1,6 @@
 //! File sink for sparse roots MMR peaks compatible with Cairo implementation.
 
-use raito_spv_core::sparse_roots::SparseRoots;
+use raito_spv_mmr::sparse_roots::SparseRoots;
 use serde_json;
 use std::path::PathBuf;
 use tokio::fs;

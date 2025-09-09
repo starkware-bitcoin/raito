@@ -1,5 +1,5 @@
 [package]
-name = "raito-spv-core"
+name = "raito-spv-mmr"
 version = "0.1.0"
 edition = "2021"
 

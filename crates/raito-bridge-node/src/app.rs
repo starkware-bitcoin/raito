@@ -6,7 +6,7 @@ use bitcoin::block::Header as BlockHeader;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing::{error, info};
 
-use raito_spv_core::{
+use raito_spv_mmr::{
     block_mmr::{BlockInclusionProof, BlockMMR},
     sparse_roots::SparseRoots,
 };

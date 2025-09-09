@@ -9,7 +9,7 @@ use bzip2::write::BzEncoder;
 use bzip2::Compression;
 use cairo_air::CairoProof;
 use raito_bitcoin_client::BitcoinClient;
-use raito_spv_core::block_mmr::BlockInclusionProof;
+use raito_spv_mmr::block_mmr::BlockInclusionProof;
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;

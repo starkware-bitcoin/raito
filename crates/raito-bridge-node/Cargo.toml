@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # Core SPV functionality
-raito-spv-core = { path = "../raito-spv-core", features = ["sqlite"] }
+raito-spv-mmr = { path = "../raito-spv-mmr", features = ["sqlite"] }
 
 # Bitcoin client
 raito-bitcoin-client = { path = "../raito-bitcoin-client" }
@@ -16,7 +16,7 @@ tokio.workspace = true
 axum = "0.7"
 tower-http = { version = "0.5", features = ["trace"] }
 
-# Bitcoin RPC and types (re-exported from raito-spv-core but needed for specific features)
+# Bitcoin RPC and types (re-exported from raito-spv-mmr but needed for specific features)
 bitcoin.workspace = true
 # Storage
 libmdbx.workspace = true
