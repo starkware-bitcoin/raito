@@ -19,10 +19,6 @@ function handleError(f, args) {
     }
 }
 
-let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
-
-cachedTextDecoder.decode();
-
 let cachedUint8ArrayMemory0 = null;
 
 function getUint8ArrayMemory0() {
@@ -32,9 +28,17 @@ function getUint8ArrayMemory0() {
     return cachedUint8ArrayMemory0;
 }
 
+let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
+
+cachedTextDecoder.decode();
+
+function decodeText(ptr, len) {
+    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
+}
+
 function getStringFromWasm0(ptr, len) {
     ptr = ptr >>> 0;
-    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
+    return decodeText(ptr, len);
 }
 
 function getArrayU8FromWasm0(ptr, len) {
@@ -44,7 +48,7 @@ function getArrayU8FromWasm0(ptr, len) {
 
 let WASM_VECTOR_LEN = 0;
 
-let cachedTextEncoder = new TextEncoder('utf-8');
+const cachedTextEncoder = new TextEncoder('utf-8');
 
 const encodeString = (typeof cachedTextEncoder.encodeInto === 'function'
     ? function (arg, view) {
@@ -154,27 +158,88 @@ module.exports.verify_proof_wasm = function(proof_data) {
 };
 
 /**
+ * Verify an SPV proof with custom configuration
+ * @param {string} proof_data
+ * @param {string} config_data
+ * @param {boolean} dev
+ * @returns {Promise<boolean>}
+ */
+module.exports.verify_proof_with_config = function(proof_data, config_data, dev) {
+    const ptr0 = passStringToWasm0(proof_data, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passStringToWasm0(config_data, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.verify_proof_with_config(ptr0, len0, ptr1, len1, dev);
+    return ret;
+};
+
+/**
+ * Create a default verifier configuration
+ * @returns {any}
+ */
+module.exports.create_default_config = function() {
+    const ret = wasm.create_default_config();
+    return ret;
+};
+
+/**
+ * Create a custom verifier configuration
+ * @param {string} min_work
+ * @param {string} bootloader_hash
+ * @param {string} task_program_hash
+ * @param {number} task_output_size
+ * @returns {any}
+ */
+module.exports.create_custom_config = function(min_work, bootloader_hash, task_program_hash, task_output_size) {
+    const ptr0 = passStringToWasm0(min_work, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passStringToWasm0(bootloader_hash, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passStringToWasm0(task_program_hash, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ret = wasm.create_custom_config(ptr0, len0, ptr1, len1, ptr2, len2, task_output_size);
+    return ret;
+};
+
+/**
  * Initialize panic hook for better error messages in WASM
  */
 module.exports.init = function() {
     wasm.init();
 };
 
-function __wbg_adapter_18(arg0, arg1, arg2) {
-    wasm.closure771_externref_shim(arg0, arg1, arg2);
+/**
+ * Get the version of the WASM module
+ * @returns {string}
+ */
+module.exports.get_version = function() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.get_version();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
+};
+
+function __wbg_adapter_20(arg0, arg1, arg2) {
+    wasm.closure777_externref_shim(arg0, arg1, arg2);
 }
 
-function __wbg_adapter_39(arg0, arg1, arg2, arg3) {
-    wasm.closure1623_externref_shim(arg0, arg1, arg2, arg3);
+function __wbg_adapter_49(arg0, arg1, arg2, arg3) {
+    wasm.closure1630_externref_shim(arg0, arg1, arg2, arg3);
 }
 
-module.exports.__wbg_call_672a4d21634d4a24 = function() { return handleError(function (arg0, arg1) {
-    const ret = arg0.call(arg1);
+module.exports.__wbg_call_f2db6205e5c51dc8 = function() { return handleError(function (arg0, arg1, arg2) {
+    const ret = arg0.call(arg1, arg2);
     return ret;
 }, arguments) };
 
-module.exports.__wbg_call_7cccdd69e0791ae2 = function() { return handleError(function (arg0, arg1, arg2) {
-    const ret = arg0.call(arg1, arg2);
+module.exports.__wbg_call_fbe8be8bf6436ce5 = function() { return handleError(function (arg0, arg1) {
+    const ret = arg0.call(arg1);
     return ret;
 }, arguments) };
 
@@ -190,18 +255,28 @@ module.exports.__wbg_error_7534b8e9a36f1ab4 = function(arg0, arg1) {
     }
 };
 
-module.exports.__wbg_getRandomValues_38097e921c2494c3 = function() { return handleError(function (arg0, arg1) {
+module.exports.__wbg_getRandomValues_38a1ff1ea09f6cc7 = function() { return handleError(function (arg0, arg1) {
     globalThis.crypto.getRandomValues(getArrayU8FromWasm0(arg0, arg1));
 }, arguments) };
 
-module.exports.__wbg_new_23a2665fac83c611 = function(arg0, arg1) {
+module.exports.__wbg_new_07b483f72211fd66 = function() {
+    const ret = new Object();
+    return ret;
+};
+
+module.exports.__wbg_new_8a6f238a6ece86ea = function() {
+    const ret = new Error();
+    return ret;
+};
+
+module.exports.__wbg_new_e30c39c06edaabf2 = function(arg0, arg1) {
     try {
         var state0 = {a: arg0, b: arg1};
         var cb0 = (arg0, arg1) => {
             const a = state0.a;
             state0.a = 0;
             try {
-                return __wbg_adapter_39(a, state0.b, arg0, arg1);
+                return __wbg_adapter_49(a, state0.b, arg0, arg1);
             } finally {
                 state0.a = a;
             }
@@ -213,28 +288,27 @@ module.exports.__wbg_new_23a2665fac83c611 = function(arg0, arg1) {
     }
 };
 
-module.exports.__wbg_new_8a6f238a6ece86ea = function() {
-    const ret = new Error();
-    return ret;
-};
-
-module.exports.__wbg_newnoargs_105ed471475aaf50 = function(arg0, arg1) {
+module.exports.__wbg_newnoargs_ff528e72d35de39a = function(arg0, arg1) {
     const ret = new Function(getStringFromWasm0(arg0, arg1));
     return ret;
 };
 
-module.exports.__wbg_queueMicrotask_97d92b4fcc8a61c5 = function(arg0) {
+module.exports.__wbg_queueMicrotask_46c1df247678729f = function(arg0) {
     queueMicrotask(arg0);
 };
 
-module.exports.__wbg_queueMicrotask_d3219def82552485 = function(arg0) {
+module.exports.__wbg_queueMicrotask_8acf3ccb75ed8d11 = function(arg0) {
     const ret = arg0.queueMicrotask;
     return ret;
 };
 
-module.exports.__wbg_resolve_4851785c9c5f573d = function(arg0) {
+module.exports.__wbg_resolve_0dac8c580ffd4678 = function(arg0) {
     const ret = Promise.resolve(arg0);
     return ret;
+};
+
+module.exports.__wbg_set_3f1d0b984ed272ed = function(arg0, arg1, arg2) {
+    arg0[arg1] = arg2;
 };
 
 module.exports.__wbg_stack_0ed75d68575b0f3c = function(arg0, arg1) {
@@ -245,27 +319,27 @@ module.exports.__wbg_stack_0ed75d68575b0f3c = function(arg0, arg1) {
     getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
 };
 
-module.exports.__wbg_static_accessor_GLOBAL_88a902d13a557d07 = function() {
+module.exports.__wbg_static_accessor_GLOBAL_487c52c58d65314d = function() {
     const ret = typeof global === 'undefined' ? null : global;
     return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
 };
 
-module.exports.__wbg_static_accessor_GLOBAL_THIS_56578be7e9f832b0 = function() {
+module.exports.__wbg_static_accessor_GLOBAL_THIS_ee9704f328b6b291 = function() {
     const ret = typeof globalThis === 'undefined' ? null : globalThis;
     return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
 };
 
-module.exports.__wbg_static_accessor_SELF_37c5d418e4bf5819 = function() {
+module.exports.__wbg_static_accessor_SELF_78c9e3071b912620 = function() {
     const ret = typeof self === 'undefined' ? null : self;
     return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
 };
 
-module.exports.__wbg_static_accessor_WINDOW_5de37043a91a9c40 = function() {
+module.exports.__wbg_static_accessor_WINDOW_a093d21393777366 = function() {
     const ret = typeof window === 'undefined' ? null : window;
     return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
 };
 
-module.exports.__wbg_then_44b73946d2fb3e7d = function(arg0, arg1) {
+module.exports.__wbg_then_db882932c0c714c6 = function(arg0, arg1) {
     const ret = arg0.then(arg1);
     return ret;
 };
@@ -280,8 +354,8 @@ module.exports.__wbindgen_cb_drop = function(arg0) {
     return ret;
 };
 
-module.exports.__wbindgen_closure_wrapper1553 = function(arg0, arg1, arg2) {
-    const ret = makeMutClosure(arg0, arg1, 772, __wbg_adapter_18);
+module.exports.__wbindgen_closure_wrapper1588 = function(arg0, arg1, arg2) {
+    const ret = makeMutClosure(arg0, arg1, 776, __wbg_adapter_20);
     return ret;
 };
 
@@ -303,6 +377,11 @@ module.exports.__wbindgen_is_function = function(arg0) {
 
 module.exports.__wbindgen_is_undefined = function(arg0) {
     const ret = arg0 === undefined;
+    return ret;
+};
+
+module.exports.__wbindgen_number_new = function(arg0) {
+    const ret = arg0;
     return ret;
 };
 

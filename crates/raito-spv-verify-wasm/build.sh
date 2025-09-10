@@ -16,9 +16,9 @@ if ! command -v wasm-pack &> /dev/null; then
     exit 1
 fi
 
-# Build for web browsers
-echo "Building for web browsers..."
-wasm-pack build --release --target web --out-dir pkg-web
+# # Build for web browsers
+# echo "Building for web browsers..."
+# wasm-pack build --release --target web --out-dir pkg-web
 
 # Build for Node.js
 echo "Building for Node.js..."
@@ -30,8 +30,8 @@ rm -rf pkg
 mkdir pkg
 
 # Copy web files
-cp pkg-web/*.wasm pkg/
-cp pkg-web/*.js pkg/
+# cp pkg-web/*.wasm pkg/
+# cp pkg-web/*.js pkg/
 
 # Copy Node.js files (overwrite web files with Node.js versions)
 cp pkg-node/*.js pkg/

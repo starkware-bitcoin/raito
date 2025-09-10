@@ -1,31 +1,11 @@
 {
   "name": "raito-spv-verify-wasm",
   "version": "0.1.0",
-  "description": "WebAssembly bindings for Raito SPV verification",
-  "main": "raito_spv_verify_wasm.js",
-  "module": "raito_spv_verify_wasm.js",
-  "types": "raito_spv_verify_wasm.d.ts",
   "files": [
-    "*.js",
-    "*.wasm",
-    "*.d.ts"
+    "raito_spv_verify_wasm_bg.wasm",
+    "raito_spv_verify_wasm.js",
+    "raito_spv_verify_wasm.d.ts"
   ],
-  "keywords": [
-    "wasm",
-    "bitcoin",
-    "spv",
-    "verification",
-    "cairo",
-    "starknet"
-  ],
-  "author": "Raito Team",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/your-org/raito.git"
-  },
-  "bugs": {
-    "url": "https://github.com/your-org/raito/issues"
-  },
-  "homepage": "https://github.com/your-org/raito#readme"
+  "main": "raito_spv_verify_wasm.js",
+  "types": "raito_spv_verify_wasm.d.ts"
 }

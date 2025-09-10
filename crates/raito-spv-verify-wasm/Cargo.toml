@@ -31,4 +31,4 @@ thiserror = { workspace = true }
 console_error_panic_hook = "0.1"
 
 # WASM-specific dependency overrides
-getrandom = { version = "0.3", features = ["wasm_js"] } 
+getrandom = { version = "0.3", features = ["wasm_js"] }
