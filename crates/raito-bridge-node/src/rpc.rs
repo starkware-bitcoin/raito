@@ -34,6 +34,8 @@ pub struct RpcConfig {
     pub bitcoin_rpc_url: String,
     /// Bitcoin RPC user:password (optional)
     pub bitcoin_rpc_userpwd: Option<String>,
+    /// Raito RPC URL, where the /chainstate-proof/recent_proof endpoint is available
+    pub raito_rpc_url: String,
 }
 
 /// HTTP RPC server that provides endpoints for MMR operations
@@ -174,15 +176,12 @@ pub async fn get_compressed_proof(
     Path(tx_id): Path<String>,
 ) -> Result<Json<CompressedSpvProof>, StatusCode> {
     let txid = bitcoin::Txid::from_str(&tx_id).map_err(|_| StatusCode::BAD_REQUEST)?;
-
-    let raito_rpc_url = format!("http://{}", config.rpc_host);
-
     // Call the fetch_compressed_proof function
     let compressed_proof = fetch_compressed_proof(
         txid,
         config.bitcoin_rpc_url,
         config.bitcoin_rpc_userpwd,
-        raito_rpc_url,
+        config.raito_rpc_url,
         false,
     )
     .await
