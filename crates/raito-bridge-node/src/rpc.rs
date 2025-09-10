@@ -112,7 +112,10 @@ pub async fn generate_proof(
     let proof = app_client
         .generate_block_proof(block_height, query.chain_height)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            error!("Failed to generate block proof for height {}: {}", block_height, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
     Ok(Json(proof))
 }
 
@@ -131,7 +134,10 @@ pub async fn get_roots(
     let sparse_roots = app_client
         .get_sparse_roots(query.chain_height)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            error!("Failed to get sparse roots for chain height {:?}: {}", query.chain_height, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
     Ok(Json(sparse_roots))
 }
 
@@ -144,7 +150,10 @@ pub async fn get_head(State(app_client): State<AppClient>) -> Result<Json<u32>, 
     let block_count = app_client
         .get_block_count()
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            error!("Failed to get block count: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
     Ok(Json(block_count - 1))
 }
 
@@ -159,7 +168,7 @@ pub async fn get_head(State(app_client): State<AppClient>) -> Result<Json<u32>, 
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If proof generation fails
 pub async fn get_compressed_proof(
     State(config): State<RpcConfig>,
-    Path((tx_id)): Path<(String)>,
+    Path(tx_id): Path<String>,
 ) -> Result<Json<CompressedSpvProof>, StatusCode> {
     let txid = bitcoin::Txid::from_str(&tx_id).map_err(|_| StatusCode::BAD_REQUEST)?;
 
@@ -174,7 +183,10 @@ pub async fn get_compressed_proof(
         false,
     )
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|e| {
+        error!("Failed to fetch compressed proof for txid {}: {}", tx_id, e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     Ok(Json(compressed_proof))
 }
