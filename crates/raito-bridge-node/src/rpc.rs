@@ -12,10 +12,8 @@ use axum::{
 };
 use serde::Deserialize;
 use std::str::FromStr;
-use std::str::FromStr;
 use tower_http::trace::TraceLayer;
 
-use raito_spv_client::{fetch::fetch_compressed_proof, proof::CompressedSpvProof};
 use raito_spv_client::{fetch::fetch_compressed_proof, proof::CompressedSpvProof};
 use raito_spv_core::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
 
@@ -64,19 +62,11 @@ impl RpcServer {
         info!("Starting RPC server on {}", self.config.rpc_host);
 
         let inclusion = Router::new()
-        let inclusion = Router::new()
             .route("/block-inclusion-proof/:block_height", get(generate_proof))
             .route("/head", get(get_head))
             .route("/roots", get(get_roots))
             .with_state(self.app_client.clone())
             .layer(TraceLayer::new_for_http());
-
-        let compressed = Router::new()
-            .route("/compressed_spv_proof/:tx_id", get(get_compressed_proof))
-            .with_state(self.config.clone())
-            .layer(TraceLayer::new_for_http());
-
-        let app = Router::new().merge(inclusion).merge(compressed);
 
         let compressed = Router::new()
             .route("/compressed_spv_proof/:tx_id", get(get_compressed_proof))
@@ -131,13 +121,6 @@ pub async fn generate_proof(
             );
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-        .map_err(|e| {
-            error!(
-                "Failed to generate block proof for height {}: {}",
-                block_height, e
-            );
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
     Ok(Json(proof))
 }
 
@@ -163,13 +146,6 @@ pub async fn get_roots(
             );
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-        .map_err(|e| {
-            error!(
-                "Failed to get sparse roots for chain height {:?}: {}",
-                query.chain_height, e
-            );
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
     Ok(Json(sparse_roots))
 }
 
@@ -179,10 +155,6 @@ pub async fn get_roots(
 /// * `Json<u32>` - The current block count in JSON format
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If getting block count fails
 pub async fn get_head(State(app_client): State<AppClient>) -> Result<Json<u32>, StatusCode> {
-    let block_count = app_client.get_block_count().await.map_err(|e| {
-        error!("Failed to get block count: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
     let block_count = app_client.get_block_count().await.map_err(|e| {
         error!("Failed to get block count: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
