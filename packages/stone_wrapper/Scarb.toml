@@ -4,13 +4,7 @@ version = "0.1.0"
 edition = "2024_07"
 
 [executable]
-allow-syscalls = true
 
 [dependencies]
 cairo_execute = "2.11.4"
-stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "120f11fa01001856cb2c30ff045d97aa3ac77224", default-features = false }
-
-[features]
-default = ["stone_adapter"]
-stone_adapter = ["stwo_cairo_air/minimal_verifier", "stwo_cairo_air/qm31_opcode"]
-stone_verifier = ["stwo_cairo_air/poseidon252_verifier"]
+stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "c273eed286f20681d9e94aa7a7125b8fea8d7a85", default-features = false, features = ["poseidon252_verifier"] }

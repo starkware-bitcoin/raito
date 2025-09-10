@@ -1,0 +1,10 @@
+[package]
+name = "stwo_wrapper"
+version = "0.1.0"
+edition = "2024_07"
+
+[executable]
+
+[dependencies]
+cairo_execute = "2.11.4"
+stwo_cairo_air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "120f11fa01001856cb2c30ff045d97aa3ac77224", default-features = false, features = ["minimal_verifier", "qm31_opcode"] }
