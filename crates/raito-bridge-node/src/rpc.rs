@@ -113,7 +113,10 @@ pub async fn generate_proof(
         .generate_block_proof(block_height, query.chain_height)
         .await
         .map_err(|e| {
-            error!("Failed to generate block proof for height {}: {}", block_height, e);
+            error!(
+                "Failed to generate block proof for height {}: {}",
+                block_height, e
+            );
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
     Ok(Json(proof))
@@ -135,7 +138,10 @@ pub async fn get_roots(
         .get_sparse_roots(query.chain_height)
         .await
         .map_err(|e| {
-            error!("Failed to get sparse roots for chain height {:?}: {}", query.chain_height, e);
+            error!(
+                "Failed to get sparse roots for chain height {:?}: {}",
+                query.chain_height, e
+            );
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
     Ok(Json(sparse_roots))
@@ -147,13 +153,10 @@ pub async fn get_roots(
 /// * `Json<u32>` - The current block count in JSON format
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If getting block count fails
 pub async fn get_head(State(app_client): State<AppClient>) -> Result<Json<u32>, StatusCode> {
-    let block_count = app_client
-        .get_block_count()
-        .await
-        .map_err(|e| {
-            error!("Failed to get block count: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let block_count = app_client.get_block_count().await.map_err(|e| {
+        error!("Failed to get block count: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
     Ok(Json(block_count - 1))
 }
 

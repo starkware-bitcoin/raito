@@ -43,7 +43,7 @@ pub enum ApiResponseBody {
     /// Response containing sparse roots after adding a block
     AddBlock(SparseRoots),
     /// Response containing the inclusion proof for a block
-    GenerateBlockProof(BlockInclusionProof)
+    GenerateBlockProof(BlockInclusionProof),
 }
 
 #[derive(Debug, Clone)]
