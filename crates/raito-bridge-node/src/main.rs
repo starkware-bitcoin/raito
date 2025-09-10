@@ -82,8 +82,8 @@ async fn main() {
     let (mut app_server, app_client) = create_app(app_config, shutdown.subscribe());
 
     let indexer_config = IndexerConfig {
-        rpc_url: cli.bitcoin_rpc_url,
-        rpc_userpwd: cli.bitcoin_rpc_userpwd,
+        rpc_url: cli.bitcoin_rpc_url.clone(),
+        rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
         indexing_lag: cli.mmr_block_lag,
         sink_config: SparseRootsSinkConfig {
             output_dir: cli.mmr_roots_dir,
@@ -94,6 +94,8 @@ async fn main() {
 
     let rpc_config = RpcConfig {
         rpc_host: cli.rpc_host,
+        bitcoin_rpc_url: cli.bitcoin_rpc_url,
+        bitcoin_rpc_userpwd: cli.bitcoin_rpc_userpwd,
     };
     let rpc_server = RpcServer::new(rpc_config, app_client.clone(), shutdown.subscribe());
 

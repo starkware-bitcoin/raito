@@ -10,6 +10,7 @@ use raito_spv_core::{
     block_mmr::{BlockInclusionProof, BlockMMR},
     sparse_roots::SparseRoots,
 };
+use raito_spv_client::proof::CompressedSpvProof;
 
 /// Request sent to the application server via the API channel
 pub struct ApiRequest {
@@ -32,6 +33,8 @@ pub enum ApiRequestBody {
     AddBlock(BlockHeader),
     /// Generate an inclusion proof for a block at the given height and chain height (optional)
     GenerateBlockProof((u32, Option<u32>)),
+    /// Fetch a compressed SPV proof for a transaction in a specific block
+    FetchCompressedProof((u32, bitcoin::Txid)),
 }
 
 /// Response body for API requests containing the result data
@@ -44,6 +47,8 @@ pub enum ApiResponseBody {
     AddBlock(SparseRoots),
     /// Response containing the inclusion proof for a block
     GenerateBlockProof(BlockInclusionProof),
+    /// Response containing the compressed SPV proof for a transaction
+    FetchCompressedProof(CompressedSpvProof),
 }
 
 #[derive(Debug, Clone)]
@@ -108,6 +113,12 @@ impl AppServer {
                             let sparse_roots = mmr.get_sparse_roots(None).await?;
                             let res = Ok(ApiResponseBody::AddBlock(sparse_roots));
                             req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to AddBlock request"))?;
+                        }
+                        ApiRequestBody::FetchCompressedProof((block_height, txid)) => {
+                            // This is a placeholder - the actual implementation would need to call fetch_compressed_proof
+                            // For now, we'll return an error indicating this needs to be implemented
+                            let res = Err(anyhow::anyhow!("FetchCompressedProof not yet implemented in AppServer"));
+                            req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to FetchCompressedProof request"))?;
                         }
                     }
                 },
@@ -201,6 +212,21 @@ impl AppClient {
             ApiRequestBody::GenerateBlockProof((block_height, block_count)),
             |response| match response {
                 ApiResponseBody::GenerateBlockProof(proof) => Some(proof),
+                _ => None,
+            },
+        )
+        .await
+    }
+
+    pub async fn fetch_compressed_proof(
+        &self,
+        block_height: u32,
+        txid: bitcoin::Txid,
+    ) -> Result<CompressedSpvProof, anyhow::Error> {
+        self.send_request(
+            ApiRequestBody::FetchCompressedProof((block_height, txid)),
+            |response| match response {
+                ApiResponseBody::FetchCompressedProof(proof) => Some(proof),
                 _ => None,
             },
         )

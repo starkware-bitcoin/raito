@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 # Core SPV functionality
 raito-spv-core = { path = "../raito-spv-core" }
+raito-spv-client = { path = "../raito-spv-client" }
 
 # Async runtime
 tokio.workspace = true
