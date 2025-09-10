@@ -14,9 +14,8 @@ use serde::Deserialize;
 use std::str::FromStr;
 use tower_http::trace::TraceLayer;
 
-use raito_spv_core::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
 use raito_spv_client::{fetch::fetch_compressed_proof, proof::CompressedSpvProof};
-
+use raito_spv_core::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
 
 use crate::app::AppClient;
 
@@ -71,10 +70,8 @@ impl RpcServer {
             .route("/compressed_spv_proof/:tx_id", get(get_compressed_proof))
             .with_state(self.config.clone())
             .layer(TraceLayer::new_for_http());
-            
-        let app = Router::new()
-            .merge(inclusion)
-            .merge(compressed);
+
+        let app = Router::new().merge(inclusion).merge(compressed);
 
         let listener = TcpListener::bind(&self.config.rpc_host).await?;
         let mut rx_shutdown = self.rx_shutdown.resubscribe();
@@ -164,9 +161,7 @@ pub async fn get_compressed_proof(
     State(config): State<RpcConfig>,
     Path((tx_id)): Path<(String)>,
 ) -> Result<Json<CompressedSpvProof>, StatusCode> {
-
-    let txid = bitcoin::Txid::from_str(&tx_id)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let txid = bitcoin::Txid::from_str(&tx_id).map_err(|_| StatusCode::BAD_REQUEST)?;
 
     let raito_rpc_url = format!("http://{}", config.rpc_host);
 

@@ -6,11 +6,11 @@ use bitcoin::block::Header as BlockHeader;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing::{error, info};
 
+use raito_spv_client::proof::CompressedSpvProof;
 use raito_spv_core::{
     block_mmr::{BlockInclusionProof, BlockMMR},
     sparse_roots::SparseRoots,
 };
-use raito_spv_client::proof::CompressedSpvProof;
 
 /// Request sent to the application server via the API channel
 pub struct ApiRequest {
