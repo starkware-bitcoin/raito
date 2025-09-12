@@ -2,32 +2,73 @@
 version = 1
 
 [[package]]
-name = "bounded_int"
-version = "0.1.0"
-source = "git+https://github.com/starkware-libs/stwo-cairo?rev=c273eed286f20681d9e94aa7a7125b8fea8d7a85#c273eed286f20681d9e94aa7a7125b8fea8d7a85"
-
-[[package]]
-name = "stone_wrapper"
+name = "assumevalid"
 version = "0.1.0"
 dependencies = [
+ "consensus",
  "stwo_cairo_air",
+ "utils",
 ]
+
+[[package]]
+name = "bounded_int"
+version = "0.1.0"
+source = "git+https://github.com/starkware-libs/stwo-cairo?rev=120f11fa01001856cb2c30ff045d97aa3ac77224#120f11fa01001856cb2c30ff045d97aa3ac77224"
+
+[[package]]
+name = "client"
+version = "0.1.0"
+dependencies = [
+ "consensus",
+ "utreexo",
+]
+
+[[package]]
+name = "consensus"
+version = "0.1.0"
+dependencies = [
+ "shinigami_engine",
+ "utils",
+]
+
+[[package]]
+name = "ripemd160"
+version = "0.1.0"
+source = "git+https://github.com/j1mbo64/ripemd160_cairo.git#833e07d7d074d4ee51ceb40a5bcb4af2fe6898f3"
+
+[[package]]
+name = "sha1"
+version = "0.1.0"
+source = "git+https://github.com/j1mbo64/sha1_cairo.git#2b65bc00a829bdcc244c140d0f31feda32f8d2c4"
+
+[[package]]
+name = "shinigami_engine"
+version = "0.1.0"
+source = "git+https://github.com/keep-starknet-strange/shinigami.git?rev=1963116#1963116dc6f24eb32d0513c6394ad64da515ceff"
+dependencies = [
+ "ripemd160",
+ "sha1",
+ "shinigami_utils",
+]
+
+[[package]]
+name = "shinigami_utils"
+version = "0.1.0"
+source = "git+https://github.com/keep-starknet-strange/shinigami.git?rev=1963116#1963116dc6f24eb32d0513c6394ad64da515ceff"
 
 [[package]]
 name = "stwo_cairo_air"
 version = "0.1.0"
-source = "git+https://github.com/starkware-libs/stwo-cairo?rev=c273eed286f20681d9e94aa7a7125b8fea8d7a85#c273eed286f20681d9e94aa7a7125b8fea8d7a85"
+source = "git+https://github.com/starkware-libs/stwo-cairo?rev=120f11fa01001856cb2c30ff045d97aa3ac77224#120f11fa01001856cb2c30ff045d97aa3ac77224"
 dependencies = [
- "bounded_int",
  "stwo_constraint_framework",
  "stwo_verifier_core",
- "stwo_verifier_utils",
 ]
 
 [[package]]
 name = "stwo_constraint_framework"
 version = "0.1.0"
-source = "git+https://github.com/starkware-libs/stwo-cairo?rev=c273eed286f20681d9e94aa7a7125b8fea8d7a85#c273eed286f20681d9e94aa7a7125b8fea8d7a85"
+source = "git+https://github.com/starkware-libs/stwo-cairo?rev=120f11fa01001856cb2c30ff045d97aa3ac77224#120f11fa01001856cb2c30ff045d97aa3ac77224"
 dependencies = [
  "stwo_verifier_core",
 ]
@@ -35,13 +76,18 @@ dependencies = [
 [[package]]
 name = "stwo_verifier_core"
 version = "0.1.0"
-source = "git+https://github.com/starkware-libs/stwo-cairo?rev=c273eed286f20681d9e94aa7a7125b8fea8d7a85#c273eed286f20681d9e94aa7a7125b8fea8d7a85"
+source = "git+https://github.com/starkware-libs/stwo-cairo?rev=120f11fa01001856cb2c30ff045d97aa3ac77224#120f11fa01001856cb2c30ff045d97aa3ac77224"
 dependencies = [
  "bounded_int",
- "stwo_verifier_utils",
 ]
 
 [[package]]
-name = "stwo_verifier_utils"
+name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/starkware-libs/stwo-cairo?rev=c273eed286f20681d9e94aa7a7125b8fea8d7a85#c273eed286f20681d9e94aa7a7125b8fea8d7a85"
+
+[[package]]
+name = "utreexo"
+version = "0.1.0"
+dependencies = [
+ "utils",
+]

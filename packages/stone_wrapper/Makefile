@@ -1,8 +1,8 @@
 build:
-	scarb --profile proving build --package stone_wrapper
+	scarb --profile release build --package stone_wrapper
 
 execute:
-	scarb --profile proving execute \
+	scarb execute \
 		--package stone_wrapper \
 		--arguments-file tests/data/stwo_adapter_proof.json \
 		--print-resource-usage
@@ -10,7 +10,7 @@ execute:
 bootload:
 	mkdir -p target
 	python3 ../../scripts/data/generate_program_input.py \
-		--executable ../../target/proving/stone_wrapper.executable.json \
+		--executable target/release/stone_wrapper.executable.json \
 		--args-file tests/data/stwo_adapter_proof.json \
 		--program-hash-function poseidon \
 		--output target/program-input.json
@@ -21,7 +21,7 @@ bootload:
 		--air_private_input target/priv.json \
 		--trace_file $$PWD/target/trace \
 		--memory_file $$PWD/target/memory \
-		--layout all_cairo_stwo \
+		--layout all_cairo \
 		--proof_mode \
 		--disable_trace_padding \
 		--merge_extra_segments

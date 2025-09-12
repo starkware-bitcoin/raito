@@ -8,10 +8,10 @@ install:
 		adapted_stwo
 
 build:
-	scarb --profile proving build --package stwo_wrapper
+	scarb --profile release build --package stwo_wrapper
 
 execute:
-	scarb --profile proving execute \
+	scarb execute \
 		--package stwo_wrapper \
 		--arguments-file tests/data/raito_proof.json \
 		--print-resource-usage
@@ -19,9 +19,9 @@ execute:
 bootload:
 	mkdir -p target
 	python3 ../../scripts/data/generate_program_input.py \
-		--executable ../../target/proving/stwo_wrapper.executable.json \
+		--executable target/release/stwo_wrapper.executable.json \
 		--args-file tests/data/raito_proof.json \
-		--program-hash-function poseidon \
+		--program-hash-function blake \
 		--output target/program-input.json
 	cairo_program_runner \
 		--program ../../bootloaders/simple_bootloader_compiled.json \

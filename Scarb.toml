@@ -1,5 +1,11 @@
 [workspace]
-members = ["packages/stone_wrapper"]
+members = [
+    "packages/assumevalid",
+    "packages/client",
+    "packages/consensus",
+    "packages/utils",
+    "packages/utreexo"
+]
 
 [workspace.package]
 description = "Bitcoin ZK client."
