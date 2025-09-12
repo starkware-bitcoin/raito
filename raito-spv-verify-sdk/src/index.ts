@@ -12,11 +12,10 @@ export interface VerifierConfig {
 }
 
 // Environment detection
-const isNode = typeof window === 'undefined' && typeof global !== 'undefined';
+const isNode = typeof window === 'undefined' && typeof process !== 'undefined' && process.versions && process.versions.node;
 const isBrowser = typeof window !== 'undefined';
 
 // Type declarations for different environments
-declare const require: any;
 
 export class RaitoSpvSdk {
   private wasmModule: any;
@@ -33,14 +32,20 @@ export class RaitoSpvSdk {
     try {
       // Load WASM module based on environment
       if (isNode) {
-        // Node.js environment
-        this.wasmModule = require('raito-spv-verify-wasm');
+        // Node.js environment - use dynamic import for ES modules
+        this.wasmModule = await import('../dist/node/index.js');
       } else if (isBrowser) {
-        // Browser environment
-        this.wasmModule = await import('raito-spv-verify-wasm');
+        // Browser environment - use web version for direct browser usage
+        this.wasmModule = await import('../dist/web/index.js');
       } else {
         throw new Error('Unsupported environment: neither Node.js nor browser detected');
       }
+
+      const start = this.wasmModule.default ?? this.wasmModule.__wbg_init;
+      if (typeof start !== 'function') {
+        throw new Error('WASM initializer not found on module');
+      }
+      await start();
       
       await this.wasmModule.init();
     } catch (error) {

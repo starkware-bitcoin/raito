@@ -15,13 +15,13 @@ This crate provides WebAssembly bindings for the `raito-spv-verify` library, all
 ### For Node.js
 
 ```bash
-npm install raito-spv-verify-wasm
+npm install @raito-stark/spv-verify-wasm
 ```
 
 ### For Web Browsers
 
 ```html
-<script src="https://unpkg.com/raito-spv-verify-wasm@latest/dist/raito_spv_verify_wasm.js"></script>
+<script src="https://unpkg.com/@raito-stark/spv-verify-wasm@latest/dist/raito_spv_verify_wasm.js"></script>
 ```
 
 ## Usage
@@ -29,7 +29,7 @@ npm install raito-spv-verify-wasm
 ### Basic Verification
 
 ```javascript
-import { verify_proof_async, create_default_config } from 'raito-spv-verify-wasm';
+import { verify_proof_async, create_default_config } from '@raito-stark/spv-verify-wasm';
 
 // Create a default verification configuration
 const config = create_default_config();
@@ -51,7 +51,7 @@ try {
 ### Custom Configuration
 
 ```javascript
-import { create_custom_config } from 'raito-spv-verify-wasm';
+import { create_custom_config } from '@raito-stark/spv-verify-wasm';
 
 // Create a custom verification configuration
 const config = create_custom_config(
@@ -65,7 +65,7 @@ const config = create_custom_config(
 ### Synchronous Verification (Blocking)
 
 ```javascript
-import { verify_proof_sync } from 'raito-spv-verify-wasm';
+import { verify_proof_sync } from '@raito-stark/spv-verify-wasm';
 
 // Note: This will block the main thread
 const result = verify_proof_sync(proofData, config, false);
