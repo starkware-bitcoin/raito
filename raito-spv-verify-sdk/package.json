@@ -1,6 +1,6 @@
 {
   "name": "@raito-stark/spv-verify",
-  "version": "0.0.4",
+  "version": "0.0.6",
   "publishConfig": { "access": "public" },
   "description": "Raito SPV verification SDK (WASM + TypeScript)",
   "license": "MIT",
@@ -25,8 +25,7 @@
   },
   "scripts": {
     "build": "npm run build:wasm && npm run build:ts && npm run types:copy",
-    "build:wasm": "npm run build:wasm:bundler && npm run build:wasm:node && npm run build:wasm:web",
-    "build:wasm:bundler": "RUSTFLAGS='--cfg getrandom_backend=\"wasm_js\"' wasm-pack build ../crates/raito-spv-verify-wasm --release --target bundler --out-dir dist/bundler --out-name index && mkdir -p dist/bundler && cp -r ../crates/raito-spv-verify-wasm/dist/bundler/* dist/bundler/",
+    "build:wasm": "npm run build:wasm:node && npm run build:wasm:web",
     "build:wasm:node": "RUSTFLAGS='--cfg getrandom_backend=\"wasm_js\"' wasm-pack build ../crates/raito-spv-verify-wasm --release --target nodejs --out-dir dist/node --out-name index && mkdir -p dist/node && cp -r ../crates/raito-spv-verify-wasm/dist/node/* dist/node/",
     "build:wasm:web": "RUSTFLAGS='--cfg getrandom_backend=\"wasm_js\"' wasm-pack build ../crates/raito-spv-verify-wasm --release --target web --out-dir dist/web --out-name index && mkdir -p dist/web && cp -r ../crates/raito-spv-verify-wasm/dist/web/* dist/web/",
     "build:ts": "tsc -p tsconfig.json",
