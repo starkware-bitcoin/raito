@@ -1,4 +1,4 @@
-BOUND ?= 1000
+BOUND ?= 1073741824
 
 install-stone:
 	wget -O /tmp/stone-prover-linux-x86_64.deb https://github.com/dipdup-io/stone-packaging/releases/latest/download/stone-prover-linux-x86_64.deb
@@ -28,18 +28,17 @@ bootload:
 		--trace_file $$PWD/target/trace \
 		--memory_file $$PWD/target/memory \
 		--layout recursive_with_poseidon \
-		--proof_mode \
-		--disable_trace_padding \
-		--merge_extra_segments
+		--proof_mode
+
 params:
 	python scripts/generate_params.py \
 		--desired-degree-bound ${BOUND} \
-		--last-layer-degree-bound 64 > target/prover_params.json
+		--last-layer-degree-bound 64 > stone_params.json
 
 prove:
 	cpu_air_prover -v=1 \
 		--logtostderr \
-		--parameter_file target/prover_params.json \
+		--parameter_file stone_params.json \
 		--prover_config_file stone_config.json \
 		--private_input_file target/priv.json \
 		--public_input_file target/pub.json \

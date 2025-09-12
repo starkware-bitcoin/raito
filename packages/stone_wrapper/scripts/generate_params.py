@@ -11,10 +11,10 @@ def generate_params(fri_step_list) -> str:
             "fri": {
                 "fri_step_list": fri_step_list,
                 "last_layer_degree_bound": 64,
-                "n_queries": 18,
+                "n_queries": 72,
                 "proof_of_work_bits": 24
             },
-            "log_n_cosets": 4
+            "log_n_cosets": 1
         },
         "use_extension_field": False
     }
