@@ -37,16 +37,14 @@ export class RaitoSpvSdk {
       } else if (isBrowser) {
         // Browser environment - use web version for direct browser usage
         this.wasmModule = await import('../dist/web/index.js');
+        const start = this.wasmModule.default ?? this.wasmModule.__wbg_init;
+        if (typeof start !== 'function') {
+          throw new Error('WASM initializer not found on module');
+        }
+        await start();  
       } else {
         throw new Error('Unsupported environment: neither Node.js nor browser detected');
       }
-
-      const start = this.wasmModule.default ?? this.wasmModule.__wbg_init;
-      if (typeof start !== 'function') {
-        throw new Error('WASM initializer not found on module');
-      }
-      await start();
-      
       await this.wasmModule.init();
     } catch (error) {
       throw new Error(`Failed to initialize WASM module: ${error}`);

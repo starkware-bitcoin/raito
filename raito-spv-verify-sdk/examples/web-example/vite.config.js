@@ -5,7 +5,7 @@ export default defineConfig({
     port: 3000,
     open: true,
     fs: {
-      allow: ['..']
+      allow: ['..', '../..']
     }
   },
   build: {

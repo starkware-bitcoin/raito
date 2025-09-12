@@ -5,7 +5,6 @@ const txidInput = document.getElementById('txid');
 const verifyBtn = document.getElementById('verify-btn');
 const statusDiv = document.getElementById('status');
 const resultsDiv = document.getElementById('results');
-const sdkStatusSpan = document.getElementById('sdk-status');
 
 // SDK instance
 let sdk = null;
@@ -30,7 +29,6 @@ async function init() {
     
     await sdk.init();
     
-    sdkStatusSpan.textContent = 'Initialized ✅';
     statusDiv.textContent = 'SDK ready! Enter a transaction ID and click verify.';
     statusDiv.className = 'status success';
     
@@ -38,7 +36,6 @@ async function init() {
     
   } catch (error) {
     console.error('❌ Failed to initialize SDK:', error);
-    sdkStatusSpan.textContent = 'Failed ❌';
     statusDiv.textContent = `Failed to initialize SDK: ${error.message}`;
     statusDiv.className = 'status error';
   }
@@ -84,20 +81,19 @@ async function verifyTransaction() {
     
     // Display results
     const totalTime = Date.now() - startTime;
+    const proofData = JSON.parse(proof);
+    const chainState = proofData.chain_state;
     
     resultsDiv.innerHTML = `
       <div class="result-item">
         <h3>✅ Verification Result</h3>
         <p><strong>Status:</strong> ${result ? 'Valid' : 'Invalid'}</p>
-        <p><strong>Transaction ID:</strong> <code>${txid}</code></p>
+        <p><strong>Proof Block Height:</strong> ${chainState.block_height}</p>
+        <p><strong>Proof Best Block Hash:</strong> <code>${chainState.best_block_hash}</code></p>
         <p><strong>Proof Length:</strong> ${proof.length} characters</p>
         <p><strong>Fetch Time:</strong> ${fetchTime}ms</p>
         <p><strong>Verify Time:</strong> ${verifyTime}ms</p>
         <p><strong>Total Time:</strong> ${totalTime}ms</p>
-      </div>
-      <div class="result-item">
-        <h3>📄 Proof Preview</h3>
-        <pre><code>${proof.substring(0, 200)}${proof.length > 200 ? '...' : ''}</code></pre>
       </div>
     `;
     

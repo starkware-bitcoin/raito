@@ -8,9 +8,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@raito-stark/spv-verify": "^0.0.4"
+    "@raito-stark/spv-verify": "file:../.."
   },
   "devDependencies": {
     "vite": "^5.0.0"
   }
 }
+
