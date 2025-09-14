@@ -88,8 +88,13 @@ setup: install-system-packages create-venv install-python-dependencies
 install-system-packages:
 	@echo ">>> Updating apt package list and installing system-level Python packages..."
 	sudo apt update
-	sudo apt install -y python3-pip python3.11-venv \
-		# Use -y for non-interactive install
+	@if [ "$$(lsb_release -rs | cut -d. -f1)" -ge "24" ]; then \
+		echo ">>> Detected Ubuntu 24.04+, using python3-venv"; \
+		sudo apt install -y python3-pip python3-venv; \
+	else \
+		echo ">>> Detected Ubuntu < 24.04, using python3.11-venv"; \
+		sudo apt install -y python3-pip python3.11-venv; \
+	fi
 
 create-venv:
 	@echo ">>> Creating Python virtual environment '.venv'..."
