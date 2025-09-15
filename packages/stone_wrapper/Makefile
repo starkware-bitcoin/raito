@@ -1,14 +1,6 @@
-BOOTLOADER_HINTS_REV ?= 5f10bce2da41ac12136ce9d3da49efb8d3a6abbe
-
 install-stone:
 	wget -O /tmp/stone-prover-linux-x86_64.deb https://github.com/dipdup-io/stone-packaging/releases/latest/download/stone-prover-linux-x86_64.deb
 	sudo dpkg -i /tmp/stone-prover-linux-x86_64.deb
-
-install-runner:
-	cargo install \
-		--git ssh://git@github.com/starkware-libs/bootloader-hints.git \
-		--rev $(BOOTLOADER_HINTS_REV) \
-		cairo-program-runner
 
 build:
 	scarb --profile release build --package stone_wrapper
@@ -24,7 +16,7 @@ bootload:
 	python3 ../../scripts/data/generate_program_input.py \
 		--executable target/release/stone_wrapper.executable.json \
 		--args-file tests/data/stwo_adapter_proof.json \
-		--program-hash-function pedersen \
+		--program-hash-function poseidon \
 		--output target/program-input.json
 	cairo_program_runner \
 		--program ../../bootloaders/simple_bootloader_compiled.json \
@@ -41,7 +33,7 @@ pie:
 	python3 ../../scripts/data/generate_program_input.py \
 		--executable target/release/stone_wrapper.executable.json \
 		--args-file tests/data/stwo_adapter_proof.json \
-		--program-hash-function pedersen \
+		--program-hash-function poseidon \
 		--output target/program-input.json
 	cairo_program_runner \
 		--program ../../bootloaders/simple_bootloader_compiled.json \

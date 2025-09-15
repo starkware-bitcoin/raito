@@ -4,7 +4,7 @@
   "pow_hash": "keccak256",
   "commitment_hash": "keccak256_masked160_lsb",
   "verifier_friendly_commitment_hash": "poseidon3",
-  "n_verifier_friendly_commitment_layers": 23,
+  "n_verifier_friendly_commitment_layers": 24,
   "verifier_friendly_channel_updates": true,
   "statement": {
       "page_hash": "pedersen"
@@ -20,7 +20,7 @@
               3,
               3,
               3,
-              2
+              3
           ],
           "last_layer_degree_bound": 64,
           "n_queries": 16,
