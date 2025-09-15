@@ -19,14 +19,14 @@
               3,
               3,
               3,
-              3,
-              3
+	      3,
+	      3
           ],
           "last_layer_degree_bound": 64,
-          "n_queries": 16,
-          "proof_of_work_bits": 32
+          "n_queries": 13,
+          "proof_of_work_bits": 31
       },
-      "log_n_cosets": 4
+      "log_n_cosets": 5
   },
   "use_extension_field": false
 }
