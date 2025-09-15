@@ -1,8 +1,14 @@
-BOUND ?= 1073741824
+BOOTLOADER_HINTS_REV ?= 5f10bce2da41ac12136ce9d3da49efb8d3a6abbe
 
 install-stone:
 	wget -O /tmp/stone-prover-linux-x86_64.deb https://github.com/dipdup-io/stone-packaging/releases/latest/download/stone-prover-linux-x86_64.deb
-	sudo dpkg -i /tmp/stone-prover-linux-x86_64.deb 
+	sudo dpkg -i /tmp/stone-prover-linux-x86_64.deb
+
+install-runner:
+	cargo install \
+		--git ssh://git@github.com/starkware-libs/bootloader-hints.git \
+		--rev $(BOOTLOADER_HINTS_REV) \
+		cairo-program-runner
 
 build:
 	scarb --profile release build --package stone_wrapper
@@ -18,7 +24,7 @@ bootload:
 	python3 ../../scripts/data/generate_program_input.py \
 		--executable target/release/stone_wrapper.executable.json \
 		--args-file tests/data/stwo_adapter_proof.json \
-		--program-hash-function poseidon \
+		--program-hash-function pedersen \
 		--output target/program-input.json
 	cairo_program_runner \
 		--program ../../bootloaders/simple_bootloader_compiled.json \
@@ -29,6 +35,19 @@ bootload:
 		--memory_file $$PWD/target/memory \
 		--layout recursive_with_poseidon \
 		--proof_mode
+
+pie:
+	mkdir -p target
+	python3 ../../scripts/data/generate_program_input.py \
+		--executable target/release/stone_wrapper.executable.json \
+		--args-file tests/data/stwo_adapter_proof.json \
+		--program-hash-function pedersen \
+		--output target/program-input.json
+	cairo_program_runner \
+		--program ../../bootloaders/simple_bootloader_compiled.json \
+		--program_input target/program-input.json \
+		--cairo_pie_output target/cairo_pie.zip \
+		--layout recursive_with_poseidon
 
 prove:
 	cpu_air_prover -v=1 \
