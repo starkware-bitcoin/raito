@@ -48,4 +48,5 @@ prove:
 		--prover_config_file stone_config.json \
 		--private_input_file target/priv.json \
 		--public_input_file target/pub.json \
-		--out_file target/proof.json
+		--out_file target/proof.json \
+		--generate_annotations true
