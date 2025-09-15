@@ -30,11 +30,6 @@ bootload:
 		--layout recursive_with_poseidon \
 		--proof_mode
 
-params:
-	python scripts/generate_params.py \
-		--desired-degree-bound ${BOUND} \
-		--last-layer-degree-bound 64 > stone_params.json
-
 prove:
 	cpu_air_prover -v=1 \
 		--logtostderr \

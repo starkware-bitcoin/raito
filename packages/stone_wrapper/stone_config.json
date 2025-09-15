@@ -4,6 +4,6 @@
         "use_fft_for_eval": false
     },
     "constraint_polynomial_task_size": 256,
-    "n_out_of_memory_merkle_layers": 1,
-    "table_prover_n_tasks_per_segment": 32
+    "n_out_of_memory_merkle_layers": 6,
+    "table_prover_n_tasks_per_segment": 1024
 }
