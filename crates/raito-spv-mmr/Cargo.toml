@@ -8,7 +8,7 @@ sqlite = ["accumulators/sqlite"]
 
 [dependencies]
 # Merkle mountain range
-accumulators = { git = "https://github.com/maciejka/rust-accumulators", rev = "878d83576e1852f0c8e3ad39ced0b678f9bbb1ba", features = ["blake", "memory", "mmr"]}
+accumulators = { git = "https://github.com/maciejka/rust-accumulators", rev = "1fbc79a472f1659f0aa0213de95a914086732204", features = ["blake", "memory", "mmr"]}
 
 # Bitcoin RPC and types
 #jsonrpsee.workspace = true
