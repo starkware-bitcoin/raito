@@ -15,8 +15,8 @@ use serde::Deserialize;
 use std::str::FromStr;
 use tower_http::trace::TraceLayer;
 
+use raito_spv_client::fetch::fetch_compressed_proof;
 use raito_spv_mmr::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
-use raito_spv_client::{fetch::fetch_compressed_proof};
 
 use crate::app::AppClient;
 
