@@ -34,6 +34,9 @@ struct Cli {
     /// Bitcoin RPC user:password (optional)
     #[arg(long, env = "USERPWD")]
     bitcoin_rpc_userpwd: Option<String>,
+    /// Raito RPC URL, where the /chainstate-proof/recent_proof endpoint is available
+    #[arg(long, default_value = "https://api.raito.wtf")]
+    raito_rpc_url: String,
     /// Path to the database storing the MMR accumulator state
     #[arg(long, default_value = "./.mmr_data/mmr.db")]
     mmr_db_path: PathBuf,
@@ -96,6 +99,7 @@ async fn main() {
         rpc_host: cli.rpc_host,
         bitcoin_rpc_url: cli.bitcoin_rpc_url,
         bitcoin_rpc_userpwd: cli.bitcoin_rpc_userpwd,
+        raito_rpc_url: cli.raito_rpc_url,
     };
     let rpc_server = RpcServer::new(rpc_config, app_client.clone(), shutdown.subscribe());
 

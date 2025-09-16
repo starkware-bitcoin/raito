@@ -14,7 +14,7 @@ raito-spv-verify = { path = "../raito-spv-verify" }
 tokio.workspace = true
 # Web framework
 axum = "0.7"
-tower-http = { version = "0.5", features = ["trace"] }
+tower-http = { version = "0.5", features = ["trace", "cors", "compression-gzip"] }
 
 # Bitcoin RPC and types (re-exported from raito-spv-mmr but needed for specific features)
 bitcoin.workspace = true
