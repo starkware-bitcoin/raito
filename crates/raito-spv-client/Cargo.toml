@@ -3,6 +3,10 @@ name = "raito-spv-client"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "raito_spv_client"
+path = "src/lib.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 
