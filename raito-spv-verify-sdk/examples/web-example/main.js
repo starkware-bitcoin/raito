@@ -1,4 +1,4 @@
-import { createRaitoSpvSdk } from '@raito-stark/spv-verify';
+import { createRaitoSpvSdk } from '@starkware-bitcoin/spv-verify';
 
 // DOM elements
 const txidInput = document.getElementById('txid');

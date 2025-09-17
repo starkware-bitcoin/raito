@@ -13,6 +13,6 @@ export default defineConfig({
     sourcemap: true
   },
   optimizeDeps: {
-    exclude: ['@raito-stark/spv-verify']
+    exclude: ['@starkware-bitcoin/spv-verify']
   },
 });

@@ -8,7 +8,7 @@ A comprehensive TypeScript SDK for fetching and verifying compressed SPV (Simpli
 ### Basic Usage
 
 ```javascript
-import { createRaitoSpvSdk } from '@raito-stark/spv-verify';
+import { createRaitoSpvSdk } from '@starkware-bitcoin/spv-verify';
 
 async function verifyTransaction() {
   // Create SDK instance

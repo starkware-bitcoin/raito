@@ -33,7 +33,7 @@ A simple Vite application demonstrating how to use the Raito SPV SDK in a browse
 
 ### SDK Initialization
 ```javascript
-import { createRaitoSpvSdk } from '@raito-stark/spv-verify';
+import { createRaitoSpvSdk } from '@starkware-bitcoin/spv-verify';
 
 const sdk = createRaitoSpvSdk();
 await sdk.init();
