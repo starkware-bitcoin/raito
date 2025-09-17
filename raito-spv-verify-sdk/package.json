@@ -17,9 +17,9 @@
     },
     "./wasm": {
       "types": "./dist/types/wasm.d.ts",
-      "browser": "./dist/bundler/index.js",
+      "browser": "./dist/web/index.js",
       "node": "./dist/node/index.js",
-      "default": "./dist/bundler/index.js"
+      "default": "./dist/web/index.js"
     },
     "./wasm/web": "./dist/web/index.js"
   },
@@ -29,7 +29,7 @@
     "build:wasm:node": "RUSTFLAGS='--cfg getrandom_backend=\"wasm_js\"' wasm-pack build ../crates/raito-spv-verify-wasm --release --target nodejs --out-dir dist/node --out-name index && mkdir -p dist/node && cp -r ../crates/raito-spv-verify-wasm/dist/node/* dist/node/",
     "build:wasm:web": "RUSTFLAGS='--cfg getrandom_backend=\"wasm_js\"' wasm-pack build ../crates/raito-spv-verify-wasm --release --target web --out-dir dist/web --out-name index && mkdir -p dist/web && cp -r ../crates/raito-spv-verify-wasm/dist/web/* dist/web/",
     "build:ts": "tsc -p tsconfig.json",
-    "types:copy": "mkdir -p dist/types && cp dist/bundler/index.d.ts dist/types/wasm.d.ts",
+    "types:copy": "mkdir -p dist/types && cp dist/web/index.d.ts dist/types/wasm.d.ts",
     "prepublishOnly": "npm run build"
   },
   "engines": { "node": ">=18" },
