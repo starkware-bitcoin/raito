@@ -95,7 +95,7 @@ def compress_proof_data(proof_file: Path) -> Optional[Path]:
 
 
 def upload_to_gcs(proof_file: Path, chainstate_data: Dict[str, Any]) -> bool:
-    """Upload compressed proof and chainstate data to Google Cloud Storage as recent_proof."""
+    """Upload compressed proof and chainstate data to Google Cloud Storage as recent_proof and recent_proven_height."""
     if storage is None:
         logger.error(
             "Google Cloud Storage not available. Please install google-cloud-storage package."
@@ -144,6 +144,18 @@ def upload_to_gcs(proof_file: Path, chainstate_data: Dict[str, Any]) -> bool:
         )
 
         logger.debug(f"Successfully uploaded compressed proof to GCS as recent_proof")
+
+        # Upload recent_proven_height file with block height information
+        proven_height_data = {
+            "block_height": chainstate_data["block_height"]
+        }
+        
+        recent_proven_height_blob = bucket.blob("recent_proven_height")
+        recent_proven_height_blob.upload_from_string(
+            json.dumps(proven_height_data, indent=2), content_type="application/json"
+        )
+
+        logger.debug(f"Successfully uploaded block_height to GCS as recent_proven_height")
         return True
 
     except Exception as e:
