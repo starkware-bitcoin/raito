@@ -1,6 +1,6 @@
 {
   "name": "@starkware-bitcoin/spv-verify",
-  "version": "0.0.7",
+  "version": "0.0.9",
   "publishConfig": { "access": "public" },
   "description": "Raito SPV verification SDK (WASM + TypeScript)",
   "license": "MIT",

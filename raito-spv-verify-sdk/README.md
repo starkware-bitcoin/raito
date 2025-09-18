@@ -17,6 +17,10 @@ async function verifyTransaction() {
   // Initialize the SDK (loads WASM module)
   await sdk.init();
   
+  // Fetch recent proven height
+  const recentHeight = await sdk.fetchRecentProvenHeight();
+  console.log('Most recent proven block height:', recentHeight);
+  
   // Fetch and verify a transaction
   const txid = '4f1b987645e596329b985064b1ce33046e4e293a08fd961193c8ddbb1ca219cc';
   
@@ -48,6 +52,12 @@ Creates a new RaitoSpvSdk instance.
 Initializes the SDK by loading the WebAssembly module. Must be called before using other methods.
 
 - **Returns**: Promise that resolves when initialization is complete
+
+#### `fetchRecentProvenHeight(): Promise<number>`
+
+Fetches the most recent proven block height from the Raito API.
+
+- **Returns**: Promise that resolves to the most recent proven block height as a number
 
 #### `fetchProof(txid: string): Promise<string>`
 
@@ -83,6 +93,7 @@ interface VerifierConfig {
 class RaitoSpvSdk {
   constructor(raitoRpcUrl?: string);
   init(): Promise<void>;
+  fetchRecentProvenHeight(): Promise<number>;
   fetchProof(txid: string): Promise<string>;
   verifyProof(proof: string, config?: Partial<VerifierConfig>): Promise<boolean>;
 }

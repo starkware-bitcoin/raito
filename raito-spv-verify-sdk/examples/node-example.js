@@ -24,6 +24,15 @@ async function simpleExample() {
     return;
   }
 
+  // Fetch recent proven height
+  try {
+    console.log('📡 Fetching recent proven height...');
+    const recentHeight = await sdk.fetchRecentProvenHeight();
+    console.log(`✅ Most recent proven block height: ${recentHeight}\n`);
+  } catch (error) {
+    console.error('❌ Failed to fetch recent proven height:', error.message);
+  }
+
   // Fetch and verify the specific transaction
   const txid = '4f1b987645e596329b985064b1ce33046e4e293a08fd961193c8ddbb1ca219cc';
   

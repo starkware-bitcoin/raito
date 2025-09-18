@@ -75,6 +75,28 @@ export class RaitoSpvSdk {
   }
 
   /**
+   * Fetch the most recent proven block height
+   */
+  async fetchRecentProvenHeight(): Promise<number> {
+    try {
+      const url = `${this.raitoRpcUrl}/chainstate-proof/recent_proven_height`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch recent proven height: ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json() as { block_height: number };
+      return data.block_height;
+    } catch (error) {
+      throw new Error(`Failed to fetch recent proven height: ${error}`);
+    }
+  }
+
+  /**
    * Verify a compressed SPV proof
    */
   async verifyProof(
