@@ -12,7 +12,7 @@ jobs:
   markdown:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: |
           sudo gem install mdl
           mdl -s .github/linter/readme_style.rb README.md
@@ -21,7 +21,7 @@ jobs:
   test-cairo:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: software-mansion/setup-scarb@v1
         with:
           scarb-version: "2.12.0"
@@ -31,7 +31,7 @@ jobs:
   test-rust:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master
         with:
           components: rustfmt
@@ -42,7 +42,7 @@ jobs:
   build-wasm:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-04-06
