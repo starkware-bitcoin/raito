@@ -1,12 +1,15 @@
 //! WASM bindings for raito SPV verification
 //! This crate provides WebAssembly bindings for SPV proof verification
 
-use raito_spv_verify::{verify_proof, CompressedSpvProof, VerifierConfig};
+use bitcoin::{block::Header, Transaction};
+use cairo_air::CairoProof;
+use raito_spv_mmr::block_mmr::BlockInclusionProof;
+use raito_spv_verify::{ChainState, CompressedSpvProof, VerifierConfig};
 use wasm_bindgen::prelude::*;
 
 /// Verify an SPV proof from JSON data
 #[wasm_bindgen]
-pub async fn verify_proof_wasm(proof_data: &str) -> Result<bool, JsValue> {
+pub async fn verify_proof(proof_data: &str) -> Result<bool, JsValue> {
     // Parse proof from JSON
     let proof: CompressedSpvProof = serde_json::from_str(proof_data)
         .map_err(|e| JsValue::from_str(&format!("Failed to parse proof: {}", e)))?;
@@ -15,7 +18,7 @@ pub async fn verify_proof_wasm(proof_data: &str) -> Result<bool, JsValue> {
     let config = VerifierConfig::default();
 
     // Verify the proof
-    verify_proof(proof, &config, false)
+    raito_spv_verify::verify_proof(proof, &config, false)
         .await
         .map_err(|e| JsValue::from_str(&format!("Verification failed: {}", e)))?;
 
@@ -38,11 +41,84 @@ pub async fn verify_proof_with_config(
         .map_err(|e| JsValue::from_str(&format!("Failed to parse config: {}", e)))?;
 
     // Verify the proof
-    verify_proof(proof, &config, dev)
+    raito_spv_verify::verify_proof(proof, &config, dev)
         .await
         .map_err(|e| JsValue::from_str(&format!("Verification failed: {}", e)))?;
 
     Ok(true)
+}
+
+/// Verify that a transaction is included in a block header using a Merkle proof
+#[wasm_bindgen]
+pub fn verify_transaction(
+    transaction_data: &str,
+    block_header_data: &str,
+    transaction_proof_data: &[u8],
+) -> Result<bool, JsValue> {
+    // Parse transaction from JSON
+    let transaction: Transaction = serde_json::from_str(transaction_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse transaction: {}", e)))?;
+
+    // Parse block header from JSON
+    let block_header: Header = serde_json::from_str(block_header_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse block header: {}", e)))?;
+
+    let transaction_proof = transaction_proof_data.to_vec();
+
+    // Verify the transaction
+    raito_spv_verify::verify_transaction(&transaction, &block_header, transaction_proof)
+        .map_err(|e| JsValue::from_str(&format!("Transaction verification failed: {}", e)))?;
+
+    Ok(true)
+}
+
+/// Verify that a block header is included in the block MMR using an inclusion proof
+#[wasm_bindgen]
+pub async fn verify_block_header(
+    block_header_data: &str,
+    block_header_proof_data: &str,
+) -> Result<String, JsValue> {
+    // Parse block header from JSON
+    let block_header: Header = serde_json::from_str(block_header_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse block header: {}", e)))?;
+
+    // Parse block header proof from JSON
+    let block_header_proof: BlockInclusionProof = 
+        serde_json::from_str(block_header_proof_data)
+            .map_err(|e| JsValue::from_str(&format!("Failed to parse block header proof: {}", e)))?;
+
+    // Verify the block header and get the MMR root
+    let mmr_root = raito_spv_verify::verify_block_header(&block_header, block_header_proof).await
+        .map_err(|e| JsValue::from_str(&format!("Block header verification failed: {}", e)))?;
+
+    Ok(mmr_root)
+}
+
+/// Verify the Cairo recursive proof and consistency of the bootloader output with chain state
+#[wasm_bindgen]
+pub fn verify_chain_state(
+    chain_state_data: &str,
+    chain_state_proof_data: &str,
+    config_data: &str,
+) -> Result<String, JsValue> {
+    // Parse chain state from JSON
+    let chain_state: ChainState = serde_json::from_str(chain_state_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse chain state: {}", e)))?;
+
+    // Parse chain state proof from JSON
+    let chain_state_proof: CairoProof<stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher> = 
+        serde_json::from_str(chain_state_proof_data)
+            .map_err(|e| JsValue::from_str(&format!("Failed to parse chain state proof: {}", e)))?;
+
+    // Parse config from JSON
+    let config: VerifierConfig = serde_json::from_str(config_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse config: {}", e)))?;
+
+    // Verify the chain state and get the MMR hash
+    let mmr_hash = raito_spv_verify::verify_chain_state(&chain_state, chain_state_proof, &config)
+        .map_err(|e| JsValue::from_str(&format!("Chain state verification failed: {}", e)))?;
+
+    Ok(mmr_hash)
 }
 
 /// Create a default verifier configuration
@@ -67,6 +143,28 @@ pub fn create_custom_config(
         task_output_size,
     };
     serde_wasm_bindgen::to_value(&config).unwrap_or(JsValue::NULL)
+}
+
+/// Verify that there is enough work added on top of the target block
+#[wasm_bindgen]
+pub fn verify_subchain_work(
+    block_height: u32,
+    chain_state_data: &str,
+    config_data: &str,
+) -> Result<bool, JsValue> {
+    // Parse chain state from JSON
+    let chain_state: ChainState = serde_json::from_str(chain_state_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse chain state: {}", e)))?;
+
+    // Parse config from JSON
+    let config: VerifierConfig = serde_json::from_str(config_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse config: {}", e)))?;
+
+    // Verify the subchain work
+    raito_spv_verify::verify_subchain_work(block_height, &chain_state, &config)
+        .map_err(|e| JsValue::from_str(&format!("Subchain work verification failed: {}", e)))?;
+
+    Ok(true)
 }
 
 /// Initialize panic hook for better error messages in WASM

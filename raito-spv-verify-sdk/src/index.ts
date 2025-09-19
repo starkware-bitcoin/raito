@@ -3,12 +3,15 @@
  * Provides verification and fetching capabilities for SPV proofs
  */
 
+import { fetchProof as fetchCompressedProof, verifyProof as verifyCompressedProof, VerifierConfig } from './compressed-spv-proof';
+
 // Type definitions
-export interface VerifierConfig {
-  min_work: string;
-  bootloader_hash: string;
-  task_program_hash: string;
-  task_output_size: number;
+
+export interface BlockInclusionProof {
+  peaks_hashes: string[];
+  siblings_hashes: string[];
+  leaf_index: number;
+  leaf_count: number;
 }
 
 // Environment detection
@@ -55,23 +58,7 @@ export class RaitoSpvSdk {
    * Fetch a complete compressed SPV proof for a transaction as a string
    */
   async fetchProof(txid: string): Promise<string> {
-    // Fetch the compressed SPV proof for the given transaction ID as a string.
-    // This makes a GET request to the Raito RPC endpoint and returns the proof as a plain string.
-    try {
-      const url = `${this.raitoRpcUrl}/compressed_spv_proof/${txid}`;
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'text/plain',
-        },
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch proof: ${response.status} ${response.statusText}`);
-      }
-      return await response.text() as string;
-    } catch (error) {
-      throw new Error(`Failed to fetch proof: ${error}`);
-    }
+    return fetchCompressedProof(this.raitoRpcUrl,txid);
   }
 
   /**
@@ -106,26 +93,81 @@ export class RaitoSpvSdk {
     if (!this.wasmModule) {
       throw new Error('SDK not initialized. Call init() first.');
     }
+    return verifyCompressedProof(this.wasmModule, proof, this.raitoRpcUrl, config);
+  }
 
+
+  /**
+   * Get the current MMR height from the Raito bridge RPC
+   */
+  async getMmrHeight(): Promise<number> {
     try {
-      const verifierConfig = JSON.stringify(this.createVerifierConfig(config));
-      const result = await this.wasmModule.verify_proof_with_config(proof, verifierConfig);
-      return result;
+      const url = `${this.raitoRpcUrl}/head`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch MMR height: ${response.status} ${response.statusText}`);
+      }
+      return await response.json() as number;
     } catch (error) {
-      throw new Error(`Proof verification failed: ${error}`);
+      throw new Error(`Failed to fetch MMR height: ${error}`);
     }
   }
 
   /**
-   * Create verifier configuration with defaults
+   * Fetch the block MMR inclusion proof from the Raito bridge RPC
+   * 
+   * @param blockHeight - Height of the block to prove
+   * @param chainHeight - Current best height (chain head)
+   * @param dev - Whether to use development mode (default: false)
+   * @returns Promise<BlockInclusionProof> - The block inclusion proof
    */
-  private createVerifierConfig(config?: Partial<VerifierConfig>): VerifierConfig {
-    return {
-      min_work: config?.min_work || '1813388729421943762059264',
-      bootloader_hash: config?.bootloader_hash || '0x0001837d8b77b6368e0129ce3f65b5d63863cfab93c47865ee5cbe62922ab8f3',
-      task_program_hash: config?.task_program_hash || '0x00f0876bb47895e8c4a6e7043829d7886e3b135e3ef30544fb688ef4e25663ca',
-      task_output_size: config?.task_output_size || 8,
-    };
+  async fetchBlockProof(
+    blockHeight: number,
+    chainHeight: number,
+    dev: boolean = false
+  ): Promise<BlockInclusionProof> {
+    if (blockHeight > chainHeight) {
+      throw new Error(
+        `Block height ${blockHeight} cannot be greater than chain height ${chainHeight}`
+      );
+    }
+
+    let url: string;
+    if (dev) {
+      console.log('DEV MODE: using local bridge node and default chain height');
+      url = `http://127.0.0.1:5000/block-inclusion-proof/${blockHeight}`;
+    } else {
+      const mmrHeight = await this.getMmrHeight();
+      if (mmrHeight < chainHeight) {
+        throw new Error(
+          `MMR height ${mmrHeight} is less than chain height ${chainHeight}`
+        );
+      }
+      url = `${this.raitoRpcUrl}/block-inclusion-proof/${blockHeight}?chain_height=${chainHeight}`;
+    }
+
+    try {
+      console.log(`Fetching block proof for block height ${blockHeight}...`);
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch block proof: ${response.status} ${response.statusText}`);
+      }
+      
+      return await response.json() as BlockInclusionProof;
+    } catch (error) {
+      throw new Error(`Failed to fetch block proof: ${error}`);
+    }
   }
 }
 

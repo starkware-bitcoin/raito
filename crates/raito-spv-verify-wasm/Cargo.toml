@@ -12,6 +12,13 @@ crate-type = ["cdylib"]
 [dependencies]
 # Core SPV verification functionality
 raito-spv-verify = { path = "../raito-spv-verify" }
+raito-spv-mmr = { path = "../raito-spv-mmr" }
+
+# Bitcoin types
+bitcoin = { workspace = true }
+
+# Stwo-cairo
+cairo-air = { git = "https://github.com/maciejka/stwo-cairo", rev = "e5981958234c4b28fa2b4c3368a0290ec3fc57c2", default-features = false, features = ["std"] }
 
 # WASM bindings
 wasm-bindgen = "0.2"
@@ -29,5 +36,6 @@ thiserror = { workspace = true }
 # Logging (optional for WASM)
 console_error_panic_hook = "0.1"
 
-# WASM-specific dependency overrides
 getrandom = { version = "0.3", features = ["wasm_js"] }
+
+stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "0e90b31", features = [], default-features = false }

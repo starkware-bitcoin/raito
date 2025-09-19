@@ -34,6 +34,32 @@ async function verifyTransaction() {
 }
 ```
 
+### Block Proof Usage
+
+```javascript
+import { createRaitoSpvSdk, fetchBlockProof } from '@starkware-bitcoin/spv-verify';
+
+async function fetchBlockProofExample() {
+  // Create SDK instance
+  const sdk = createRaitoSpvSdk();
+  
+  // Get recent proven height
+  const recentHeight = await sdk.fetchRecentProvenHeight();
+  
+  // Fetch block proof for a specific block (e.g., 100 blocks before recent height)
+  const blockHeight = recentHeight - 100;
+  const blockProof = await sdk.fetchBlockProof(blockHeight, recentHeight);
+  
+  console.log('Block proof:', blockProof);
+  console.log('Leaf index:', blockProof.leaf_index);
+  console.log('Peaks hashes:', blockProof.peaks_hashes);
+  
+  // Or use the standalone function
+  const blockProof2 = await fetchBlockProof(blockHeight, recentHeight);
+  console.log('Same result:', blockProof.leaf_index === blockProof2.leaf_index);
+}
+```
+
 ## API Reference
 
 ### Functions
@@ -74,6 +100,21 @@ Verifies a compressed SPV proof.
 - **`config`**: Optional partial verification configuration to override defaults
 - **Returns**: Promise that resolves to `true` if verification succeeds, `false` otherwise
 
+#### `fetchBlockProof(blockHeight: number, chainHeight: number, dev?: boolean): Promise<BlockInclusionProof>`
+
+Fetches a block MMR inclusion proof from the Raito bridge RPC.
+
+- **`blockHeight`**: Height of the block to prove
+- **`chainHeight`**: Current best height (chain head)
+- **`dev`**: Whether to use development mode (default: false)
+- **Returns**: Promise that resolves to a BlockInclusionProof object
+
+#### `getMmrHeight(): Promise<number>`
+
+Gets the current MMR height from the Raito bridge RPC.
+
+- **Returns**: Promise that resolves to the current MMR height as a number
+
 ### Types
 
 #### `VerifierConfig`
@@ -87,6 +128,17 @@ interface VerifierConfig {
 }
 ```
 
+#### `BlockInclusionProof`
+
+```typescript
+interface BlockInclusionProof {
+  peaks_hashes: string[];
+  siblings_hashes: string[];
+  leaf_index: number;
+  leaf_count: number;
+}
+```
+
 #### `RaitoSpvSdk`
 
 ```typescript
@@ -96,8 +148,22 @@ class RaitoSpvSdk {
   fetchRecentProvenHeight(): Promise<number>;
   fetchProof(txid: string): Promise<string>;
   verifyProof(proof: string, config?: Partial<VerifierConfig>): Promise<boolean>;
+  fetchBlockProof(blockHeight: number, chainHeight: number, dev?: boolean): Promise<BlockInclusionProof>;
+  getMmrHeight(): Promise<number>;
 }
 ```
+
+### Standalone Functions
+
+#### `fetchBlockProof(blockHeight: number, chainHeight: number, raitoRpcUrl?: string, dev?: boolean): Promise<BlockInclusionProof>`
+
+Standalone function to fetch block proof (convenience function).
+
+- **`blockHeight`**: Height of the block to prove
+- **`chainHeight`**: Current best height (chain head)
+- **`raitoRpcUrl`**: URL of the Raito bridge RPC endpoint (default: 'https://api.raito.wtf')
+- **`dev`**: Whether to use development mode (default: false)
+- **Returns**: Promise that resolves to a BlockInclusionProof object
 
 ## Building from Source
 
@@ -127,6 +193,13 @@ The SDK includes complete examples demonstrating different usage patterns:
 ```bash
 # Run the Node.js example
 node examples/node-example.js
+```
+
+### Block Proof Example
+
+```bash
+# Run the block proof example
+node examples/block-proof-example.js
 ```
 
 ### Web Browser Example
