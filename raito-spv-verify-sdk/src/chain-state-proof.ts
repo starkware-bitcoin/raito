@@ -47,7 +47,6 @@ export async function fetchChainStateProof(raitoRpcUrl: string): Promise<string>
       method: 'GET',
       headers: {
         'Accept': 'text/plain',
-        'Accept-Encoding': 'gzip',
       },
     });
     

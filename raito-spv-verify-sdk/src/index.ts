@@ -3,14 +3,14 @@
  * Provides verification and fetching capabilities for SPV proofs
  */
 
-import { fetchBlockProof, getMmrHeight, BlockInclusionProof } from './block-proof';
+import { fetchBlockProof, BlockInclusionProof, BlockHeader, verifyBlockHeader } from './block-proof';
 import * as chainStateProof from './chain-state-proof';
 import * as compressedSpvProof from './compressed-spv-proof';
 import { VerifierConfig } from './config';
 import { importAndInit } from './wasm';
 
 // Re-export types for external usage
-export { BlockInclusionProof } from './block-proof';
+export { BlockInclusionProof, BlockHeader } from './block-proof';
 
 
 // Environment detection
@@ -67,11 +67,18 @@ export class RaitoSpvSdk {
   }
 
 
+
   /**
-   * Get the current MMR height from the Raito bridge RPC
+   * Verify that a block header is included in the block MMR using an inclusion proof
    */
-  async getMmrHeight(): Promise<number> {
-    return getMmrHeight(this.raitoRpcUrl);
+  async verifyBlockHeader(
+    blockHeader: string,
+    blockHeaderProof: string
+  ): Promise<string> {
+    if (!this.wasm) {
+      throw new Error('SDK not initialized. Call init() first.');
+    }
+    return verifyBlockHeader(this.wasm, blockHeader, blockHeaderProof);
   }
 }
 
