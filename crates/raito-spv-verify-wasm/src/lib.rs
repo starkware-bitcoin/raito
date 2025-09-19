@@ -4,7 +4,7 @@
 use bitcoin::{block::Header, Transaction};
 use cairo_air::CairoProof;
 use raito_spv_mmr::block_mmr::BlockInclusionProof;
-use raito_spv_verify::{ChainState, CompressedSpvProof, VerifierConfig};
+use raito_spv_verify::{verify::ChainStateProof, ChainState, CompressedSpvProof, VerifierConfig};
 use wasm_bindgen::prelude::*;
 
 /// Verify an SPV proof from JSON data
@@ -97,26 +97,24 @@ pub async fn verify_block_header(
 /// Verify the Cairo recursive proof and consistency of the bootloader output with chain state
 #[wasm_bindgen]
 pub fn verify_chain_state(
-    chain_state_data: &str,
     chain_state_proof_data: &str,
     config_data: &str,
 ) -> Result<String, JsValue> {
-    // Parse chain state from JSON
-    let chain_state: ChainState = serde_json::from_str(chain_state_data)
-        .map_err(|e| JsValue::from_str(&format!("Failed to parse chain state: {}", e)))?;
-
     // Parse chain state proof from JSON
-    let chain_state_proof: CairoProof<stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher> = 
-        serde_json::from_str(chain_state_proof_data)
-            .map_err(|e| JsValue::from_str(&format!("Failed to parse chain state proof: {}", e)))?;
+    let chain_state_proof: ChainStateProof = serde_json::from_str(chain_state_proof_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse chain state proof: {}", e)))?;
 
     // Parse config from JSON
     let config: VerifierConfig = serde_json::from_str(config_data)
         .map_err(|e| JsValue::from_str(&format!("Failed to parse config: {}", e)))?;
 
     // Verify the chain state and get the MMR hash
-    let mmr_hash = raito_spv_verify::verify_chain_state(&chain_state, chain_state_proof, &config)
-        .map_err(|e| JsValue::from_str(&format!("Chain state verification failed: {}", e)))?;
+    let mmr_hash = raito_spv_verify::verify_chain_state(
+        &chain_state_proof.chain_state,
+        chain_state_proof.chain_state_proof,
+        &config,
+    )
+    .map_err(|e| JsValue::from_str(&format!("Chain state verification failed: {}", e)))?;
 
     Ok(mmr_hash)
 }

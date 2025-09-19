@@ -15,7 +15,7 @@ use std::io::Read;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use tracing::info;
 
-use raito_spv_verify::{verify_proof, ChainState, CompressedSpvProof, VerifierConfig};
+use raito_spv_verify::{verify::ChainStateProof, verify_proof, ChainState, CompressedSpvProof, VerifierConfig};
 
 /// CLI arguments for the `fetch` subcommand
 #[derive(Clone, Debug, clap::Args)]
@@ -45,17 +45,6 @@ pub struct FetchArgs {
     /// Development mode
     #[arg(long, default_value = "false")]
     dev: bool,
-}
-
-/// Chain state and its recursive proof produced by the Raito node
-#[derive(Serialize, Deserialize)]
-pub struct ChainStateProof {
-    /// Canonical chain state snapshot
-    #[serde(rename = "chainstate")]
-    pub chain_state: ChainState,
-    /// Recursive STARK proof attesting `chain_state` and block MMR root validity
-    #[serde(rename = "proof")]
-    pub chain_state_proof: CairoProof<Blake2sMerkleHasher>,
 }
 
 /// Bitcoin transaction inclusion data in a specific block

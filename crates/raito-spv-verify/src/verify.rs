@@ -6,6 +6,7 @@ use cairo_air::utils::{get_verification_output, VerificationOutput};
 use cairo_air::{CairoProof, PreProcessedTraceVariant};
 use raito_spv_mmr::block_mmr::{BlockInclusionProof, BlockMMR};
 use serde::{Deserialize, Serialize};
+use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use tracing::info;
 
 use crate::proof::{BootloaderOutput, ChainState, TaskResult};
@@ -35,6 +36,17 @@ impl Default for VerifierConfig {
             task_output_size: 8,
         }
     }
+}
+
+/// Chain state and its recursive proof produced by the Raito node
+#[derive(Serialize, Deserialize)]
+pub struct ChainStateProof {
+    /// Canonical chain state snapshot
+    #[serde(rename = "chainstate")]
+    pub chain_state: ChainState,
+    /// Recursive STARK proof attesting `chain_state` and block MMR root validity
+    #[serde(rename = "proof")]
+    pub chain_state_proof: CairoProof<Blake2sMerkleHasher>,
 }
 
 /// Verify a compressed SPV proof end-to-end.

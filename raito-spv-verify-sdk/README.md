@@ -60,6 +60,47 @@ async function fetchBlockProofExample() {
 }
 ```
 
+### Chain State Proof Usage
+
+```javascript
+import { createRaitoSpvSdk } from '@starkware-bitcoin/spv-verify';
+import * as chainStateProof from '@starkware-bitcoin/spv-verify/chain-state-proof';
+
+async function chainStateProofExample() {
+  // Create SDK instance
+  const sdk = createRaitoSpvSdk();
+  await sdk.init();
+  
+  // Create default configuration
+  const defaultConfig = await chainStateProof.createDefaultConfig(sdk.wasmModule);
+  console.log('Default config:', defaultConfig);
+  
+  // Create custom configuration
+  const customConfig = await chainStateProof.createCustomConfig(
+    sdk.wasmModule,
+    '1000000000000000000000000000000',
+    '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+    '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+    100
+  );
+  
+  // Fetch chain state proof directly from RPC
+  const chainStateProofString = await chainStateProof.fetchChainStateProof(sdk.raitoRpcUrl);
+  const chainStateProofData = JSON.parse(chainStateProofString);
+  const chainState = chainStateProofData.chainstate;
+  const proofData = JSON.stringify(chainStateProofData.proof);
+  
+  // Verify chain state
+  const mmrHash = await chainStateProof.verifyChainState(sdk.wasmModule, chainState, proofData, customConfig);
+  console.log('Chain state verification MMR hash:', mmrHash);
+  
+  // Verify subchain work
+  const blockHeight = chainState.block_height - 100;
+  const workResult = await chainStateProof.verifySubchainWork(sdk.wasmModule, blockHeight, chainState, defaultConfig);
+  console.log('Subchain work verification:', workResult);
+}
+```
+
 ## API Reference
 
 ### Functions
@@ -115,6 +156,55 @@ Gets the current MMR height from the Raito bridge RPC.
 
 - **Returns**: Promise that resolves to the current MMR height as a number
 
+### Chain State Proof Functions
+
+The chain state proof verification functions are available as standalone functions that can be imported from the `chain-state-proof` module:
+
+#### `fetchChainStateProof(raitoRpcUrl: string): Promise<string>`
+
+Fetches the latest chain state proof from the Raito bridge RPC.
+
+- **`raitoRpcUrl`**: URL of the Raito bridge RPC endpoint
+- **Returns**: Promise that resolves to the chain state proof as a JSON string
+
+#### `verifyChainState(wasmModule: any, chainState: ChainState, chainStateProof: string, config: VerifierConfig): Promise<string>`
+
+Verifies the Cairo recursive proof and consistency of the bootloader output with chain state.
+
+- **`wasmModule`**: The initialized WASM module
+- **`chainState`**: The chain state data to verify
+- **`chainStateProof`**: The chain state proof data (JSON string)
+- **`config`**: The verifier configuration
+- **Returns**: Promise that resolves to the MMR hash on success
+
+#### `verifySubchainWork(wasmModule: any, blockHeight: number, chainState: ChainState, config: VerifierConfig): Promise<boolean>`
+
+Verifies that there is enough work added on top of the target block.
+
+- **`wasmModule`**: The initialized WASM module
+- **`blockHeight`**: Height of the block to verify work for
+- **`chainState`**: The chain state data
+- **`config`**: The verifier configuration
+- **Returns**: Promise that resolves to `true` if verification succeeds
+
+#### `createDefaultConfig(wasmModule: any): Promise<VerifierConfig>`
+
+Creates a default verifier configuration.
+
+- **`wasmModule`**: The initialized WASM module
+- **Returns**: Promise that resolves to the default VerifierConfig
+
+#### `createCustomConfig(wasmModule: any, minWork: string, bootloaderHash: string, taskProgramHash: string, taskOutputSize: number): Promise<VerifierConfig>`
+
+Creates a custom verifier configuration.
+
+- **`wasmModule`**: The initialized WASM module
+- **`minWork`**: Minimum work required for verification
+- **`bootloaderHash`**: Hash of the bootloader program
+- **`taskProgramHash`**: Hash of the task program
+- **`taskOutputSize`**: Size of the task output
+- **Returns**: Promise that resolves to the custom VerifierConfig
+
 ### Types
 
 #### `VerifierConfig`
@@ -138,6 +228,27 @@ interface BlockInclusionProof {
   leaf_count: number;
 }
 ```
+
+#### `ChainState`
+
+```typescript
+interface ChainState {
+  /** The height of the best block in the chain */
+  block_height: number;
+  /** The total accumulated work of the chain as a decimal string */
+  total_work: string;
+  /** The hash of the best block in the chain */
+  best_block_hash: string;
+  /** The current target difficulty as a compact decimal string */
+  current_target: string;
+  /** The start time (UNIX seconds) of the current difficulty epoch */
+  epoch_start_time: number;
+  /** The timestamps (UNIX seconds) of the previous 11 blocks */
+  prev_timestamps: number[];
+}
+```
+
+
 
 #### `RaitoSpvSdk`
 

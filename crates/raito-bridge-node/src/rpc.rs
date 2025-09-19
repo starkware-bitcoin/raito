@@ -68,6 +68,7 @@ impl RpcServer {
             .route("/roots", get(get_roots))
             .with_state(self.app_client.clone())
             .layer(CompressionLayer::new())
+            .layer(CorsLayer::permissive())
             .layer(TraceLayer::new_for_http());
 
         let compressed = Router::new()
