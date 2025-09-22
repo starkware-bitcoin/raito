@@ -1,12 +1,18 @@
 {
   "name": "@starkware-bitcoin/spv-verify",
   "version": "0.0.9",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Raito SPV verification SDK (WASM + TypeScript)",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
-  "files": ["dist/**", "README.md", "LICENSE*"],
+  "files": [
+    "dist/**",
+    "README.md",
+    "LICENSE*"
+  ],
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,10 +38,21 @@
     "types:copy": "mkdir -p dist/types && cp dist/web/index.d.ts dist/types/wasm.d.ts",
     "prepublishOnly": "npm run build"
   },
-  "engines": { "node": ">=18" },
-  "keywords": ["wasm", "rust", "spv", "verification"],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "wasm",
+    "rust",
+    "spv",
+    "verification"
+  ],
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "bitcoin-json-rpc": "^1.4.1",
+    "bitcoinjs-lib": "^6.1.7"
   }
 }

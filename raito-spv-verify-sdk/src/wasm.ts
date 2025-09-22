@@ -6,14 +6,14 @@ export async function importAndInit(): Promise<any> {
     try {
       // Load WASM module based on environment
       
-      let wasmModule: any;
+      let wasm: any;
       if (isNode) {
         // Node.js environment - use dynamic import for ES modules
-        wasmModule = await import('../dist/node/index.js');
+        wasm = await import('../dist/node/index.js');
       } else if (isBrowser) {
         // Browser environment - use web version for direct browser usage
-        wasmModule = await import('../dist/web/index.js');
-        const start = wasmModule.default ?? wasmModule.__wbg_init;
+        wasm = await import('../dist/web/index.js');
+        const start = wasm.default ?? wasm.__wbg_init;
         if (typeof start !== 'function') {
           throw new Error('WASM initializer not found on module');
         }
@@ -21,8 +21,8 @@ export async function importAndInit(): Promise<any> {
       } else {
         throw new Error('Unsupported environment: neither Node.js nor browser detected');
       }
-      await wasmModule.init();
-      return wasmModule;
+      await wasm.init();
+      return wasm;
     } catch (error) {
       throw new Error(`Failed to initialize WASM module: ${error}`);
     }

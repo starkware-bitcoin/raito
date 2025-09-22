@@ -3,28 +3,25 @@
  * Provides verification and fetching capabilities for SPV proofs
  */
 
-import { fetchBlockProof, BlockInclusionProof, BlockHeader, verifyBlockHeader } from './block-proof';
+// import { fetchBlockProof, verifyBlockHeader } from './block-proof';
 import * as chainStateProof from './chain-state-proof';
-import * as compressedSpvProof from './compressed-spv-proof';
-import { VerifierConfig } from './config';
+// import * as compressedSpvProof from './compressed-spv-proof';
+// import { verifyTransaction } from './transaction-proof';
+import { createVerifierConfig, VerifierConfig } from './config';
 import { importAndInit } from './wasm';
 
-// Re-export types for external usage
-export { BlockInclusionProof, BlockHeader } from './block-proof';
-
-
-// Environment detection
-const isNode = typeof window === 'undefined' && typeof process !== 'undefined' && process.versions && process.versions.node;
-const isBrowser = typeof window !== 'undefined';
+// Re-export functions for external usage
+// export { verifyTransaction } from './transaction-proof';
 
 // Type declarations for different environments
-
 export class RaitoSpvSdk {
   private wasm: any;
   private raitoRpcUrl: string;
+  private config: string;
 
-  constructor(raitoRpcUrl: string = 'https://api.raito.wtf') {
+  constructor(raitoRpcUrl: string = 'https://api.raito.wtf', config: VerifierConfig) {
     this.raitoRpcUrl = raitoRpcUrl;
+    this.config = JSON.stringify(config);
   }
 
   /**
@@ -33,14 +30,6 @@ export class RaitoSpvSdk {
   async init(): Promise<void> {
     this.wasm = importAndInit()
   }
-
-  /**
-   * Fetch a complete compressed SPV proof for a transaction as a string
-   */
-  async fetchProof(txid: string): Promise<string> {
-    return compressedSpvProof.fetchProof(this.raitoRpcUrl, txid);
-  }
-
 
    /**
    * Fetch the most recent proven block height
@@ -53,38 +42,16 @@ export class RaitoSpvSdk {
     }
   }
 
-  /**
-   * Verify a compressed SPV proof
-   */
-  async verifyProof(
-    proof: string,
-    config?: Partial<VerifierConfig>
-  ): Promise<boolean> {
-    if (!this.wasm) {
-      throw new Error('SDK not initialized. Call init() first.');
-    }
-    return compressedSpvProof.verifyProof(this.wasm, proof, config);
-  }
-
-
-
-  /**
-   * Verify that a block header is included in the block MMR using an inclusion proof
-   */
-  async verifyBlockHeader(
-    blockHeader: string,
-    blockHeaderProof: string
-  ): Promise<string> {
-    if (!this.wasm) {
-      throw new Error('SDK not initialized. Call init() first.');
-    }
-    return verifyBlockHeader(this.wasm, blockHeader, blockHeaderProof);
+  async verifyRecentChainState(): Promise<boolean> {
+    const proof = await chainStateProof.fetchProof(this.raitoRpcUrl);
+    const chainState = await chainStateProof.verifyChainState(this.wasm, proof, this.config);
+    return chainState === 'true';
   }
 }
 
 /**
  * Create a new RaitoSpvSdk instance
  */
-export function createRaitoSpvSdk(raitoRpcUrl?: string): RaitoSpvSdk {
-  return new RaitoSpvSdk(raitoRpcUrl);
+export function createRaitoSpvSdk(raitoRpcUrl?: string, config?: Partial<VerifierConfig>): RaitoSpvSdk {
+  return new RaitoSpvSdk(raitoRpcUrl, createVerifierConfig(config));
 }

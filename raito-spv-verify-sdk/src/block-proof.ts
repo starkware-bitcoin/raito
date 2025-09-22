@@ -43,16 +43,12 @@ export async function fetchBlockProof(
  * @returns Promise<string> - The computed block MMR root on success
  */
 export async function verifyBlockHeader(
-  wasmModule: any,
+  wasm: any,
   blockHeader: string,
   blockHeaderProof: string
 ): Promise<string> {
-  if (!wasmModule) {
-    throw new Error('WASM module not initialized');
-  }
-
   try {
-    const result = await wasmModule.verify_block_header(blockHeader, blockHeaderProof);
+    const result = await wasm.verify_block_header(blockHeader, blockHeaderProof);
     return result;
   } catch (error) {
     throw new Error(`Block header verification failed: ${error}`);

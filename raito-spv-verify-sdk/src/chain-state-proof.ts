@@ -41,7 +41,7 @@ export async function fetchRecentProvenHeight(raitoRpcUrl: string): Promise<numb
  * @param raitoRpcUrl - URL of the Raito bridge RPC endpoint
  * @returns Promise that resolves to the chain state proof as a string
  */
-export async function fetchChainStateProof(raitoRpcUrl: string): Promise<string> {
+export async function fetchProof(raitoRpcUrl: string): Promise<string> {
     const url = `${raitoRpcUrl}/chainstate-proof/recent_proof`;
     const response = await fetch(url, {
       method: 'GET',
@@ -65,15 +65,30 @@ export async function fetchChainStateProof(raitoRpcUrl: string): Promise<string>
  * @returns Promise that resolves to the MMR hash on success
  */
 export async function verifyChainState(
-  wasmModule: any,
-  chainStateProof: string,
-  config: Partial<VerifierConfig>
-): Promise<string> {
-  const verifierConfig = JSON.stringify(createVerifierConfig(config));
-  
-  const result = await wasmModule.verify_chain_state(chainStateProof, verifierConfig);
-  return result;
+  wasm: any,
+  proof: string,
+  config: string
+): Promise<String> {
+  // Use regexp to extract the "chainstate" object from the proof string and parse it as JSON
+  const match = proof.match(/"chainstate"\s*:\s*({.*?})(,|\s*})/s);
+  let chainstate = null;
+  if (match && match[1]) {
+    try {
+      chainstate = JSON.parse(match[1]);
+    } catch (e) {
+      throw new Error("Failed to parse chainstate from proof: " + e);
+    }
+  }
 
+
+  console.log('chainstate:', chainstate);
+  console.log('wasm:', wasm);
+  try {
+    const result = wasm.verify_chain_state(proof, config);
+    return result;
+  } catch (e) {
+    throw new Error("Failed to verify chain state: " + e);
+  }
 }
 
 
