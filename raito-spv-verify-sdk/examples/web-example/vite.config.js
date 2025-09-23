@@ -5,14 +5,14 @@ export default defineConfig({
     port: 3000,
     open: true,
     fs: {
-      allow: ['..', '../..']
-    }
+      allow: ['..', '../..'],
+    },
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
   },
   optimizeDeps: {
-    exclude: ['@starkware-bitcoin/spv-verify']
+    exclude: ['@starkware-bitcoin/spv-verify'],
   },
 });

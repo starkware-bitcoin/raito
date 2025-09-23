@@ -1,6 +1,6 @@
 /**
  * Fetch a transaction inclusion proof from the Raito bridge RPC
- * 
+ *
  * @param raitoRpcUrl - URL of the Raito bridge RPC endpoint
  * @param txId - Transaction ID to fetch proof for
  * @returns Promise<string> - The transaction inclusion proof as JSON string
@@ -10,12 +10,12 @@ export async function fetchTransactionProof(
   txId: string
 ): Promise<string> {
   const url = `${raitoRpcUrl}/transaction-proof/${txId}`;
-  
+
   try {
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
     });
 
@@ -31,7 +31,7 @@ export async function fetchTransactionProof(
 
 /**
  * Verify a transaction inclusion proof using WASM
- * 
+ *
  * @param wasm - The initialized WASM module
  * @param transactionProofData - The transaction inclusion proof as JSON string
  * @returns boolean - True if the transaction is verified to be included in the block

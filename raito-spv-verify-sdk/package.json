@@ -36,6 +36,8 @@
     "build:wasm:web": "RUSTFLAGS='--cfg getrandom_backend=\"wasm_js\"' wasm-pack build ../crates/raito-spv-verify-wasm --release --target web --out-dir dist/web --out-name index && mkdir -p dist/web && cp -r ../crates/raito-spv-verify-wasm/dist/web/* dist/web/",
     "build:ts": "tsc -p tsconfig.json",
     "types:copy": "mkdir -p dist/types && cp dist/web/index.d.ts dist/types/wasm.d.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "prepublishOnly": "npm run build"
   },
   "engines": {
@@ -49,6 +51,7 @@
   ],
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "prettier": "^3.0.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {

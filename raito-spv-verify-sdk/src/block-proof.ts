@@ -1,4 +1,4 @@
-import { BlockHeader } from "./bitcoin";
+import { BlockHeader } from './bitcoin';
 
 export interface BlockProofVerificationResult {
   mmrRoot: string;
@@ -7,7 +7,7 @@ export interface BlockProofVerificationResult {
 
 /**
  * Fetch the block MMR inclusion proof from the Raito bridge RPC
- * 
+ *
  * @param raitoRpcUrl - The Raito RPC URL
  * @param blockHeight - Height of the block to prove
  * @param chainHeight - Current best height (chain head)
@@ -30,20 +30,22 @@ export async function fetchBlockProof(
   const response = await fetch(url, {
     method: 'GET',
     headers: {
-      'Accept': 'application/json',
+      Accept: 'application/json',
     },
   });
-  
+
   if (!response.ok) {
-    throw new Error(`Failed to fetch block proof: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Failed to fetch block proof: ${response.status} ${response.statusText}`
+    );
   }
-  
+
   return await response.text();
 }
 
 /**
  * Verify that a block header is included in the block MMR using an inclusion proof
- * 
+ *
  * @param wasmModule - The initialized WASM module
  * @param blockHeader - The block header to verify as JSON string
  * @param blockHeaderProof - The block inclusion proof as JSON string
@@ -60,4 +62,3 @@ export async function verifyBlockHeader(
     throw new Error(`Block header verification failed: ${error}`);
   }
 }
-
