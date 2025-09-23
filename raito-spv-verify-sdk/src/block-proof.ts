@@ -6,6 +6,35 @@ export interface BlockProofVerificationResult {
 }
 
 /**
+ * Fetch a block header from the Raito bridge RPC
+ *
+ * @param raitoRpcUrl - The Raito RPC URL
+ * @param blockHeight - Height of the block to fetch
+ * @returns Promise<BlockHeader> - The block header as a JSON object
+ */
+export async function fetchBlockHeader(
+  raitoRpcUrl: string,
+  blockHeight: number
+): Promise<BlockHeader> {
+  const url = `${raitoRpcUrl}/block-header/${blockHeight}`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch block header: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return await response.json();
+}
+
+
+/**
  * Fetch the block MMR inclusion proof from the Raito bridge RPC
  *
  * @param raitoRpcUrl - The Raito RPC URL

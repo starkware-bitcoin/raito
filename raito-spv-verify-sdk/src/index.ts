@@ -98,9 +98,8 @@ export class RaitoSpvSdk {
     );
 
     if (!blockHeader) {
-      throw new Error('Block header is required');
-      // console.log(`Fetching block header from Bitcoin node for height ${blockHeight}...`);
-      // blockHeader = (await this.bitcoin.getBlockHeaderByHeight(blockHeight)).header;
+      console.log(`Fetching block header from Raito bridge RPC for height ${blockHeight}...`);
+      blockHeader = await blockProof.fetchBlockHeader(this.raitoRpcUrl, blockHeight);
     }
 
     const blockMmrRoot = await this.wasm.verify_block_header(

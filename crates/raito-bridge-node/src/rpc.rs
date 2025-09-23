@@ -18,6 +18,8 @@ use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLay
 use raito_spv_client::fetch::{fetch_compressed_proof, fetch_transaction_proof};
 use raito_spv_verify::TransactionInclusionProof;
 use raito_spv_mmr::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
+use raito_bitcoin_client::BitcoinClient;
+use bitcoin::block::Header as BlockHeader;
 
 use crate::app::AppClient;
 
@@ -75,6 +77,7 @@ impl RpcServer {
         let compressed = Router::new()
             .route("/compressed_spv_proof/:tx_id", get(get_compressed_proof))
             .route("/transaction-proof/:tx_id", get(get_transaction_proof))
+            .route("/block-header/:block_height", get(get_block_header))
             .with_state(self.config.clone())
             .layer(CompressionLayer::new())
             .layer(CorsLayer::permissive())
@@ -167,6 +170,40 @@ pub async fn get_head(State(app_client): State<AppClient>) -> Result<Json<u32>, 
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     Ok(Json(block_count - 1))
+}
+
+/// Get a block header by block height
+///
+/// # Arguments
+/// * `block_height` - The block height to get the header for
+///
+/// # Returns
+/// * `Json<BlockHeader>` - The block header in JSON format
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If fetching the block header fails
+pub async fn get_block_header(
+    State(config): State<RpcConfig>,
+    Path(block_height): Path<u32>,
+) -> Result<Json<BlockHeader>, StatusCode> {
+    let bitcoin_client = BitcoinClient::new(
+        config.bitcoin_rpc_url.clone(),
+        config.bitcoin_rpc_userpwd.clone(),
+    ).map_err(|e| {
+        error!("Failed to create Bitcoin client: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let (block_header, _block_hash) = bitcoin_client
+        .get_block_header_by_height(block_height)
+        .await
+        .map_err(|e| {
+            error!(
+                "Failed to get block header for height {}: {}",
+                block_height, e
+            );
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(block_header))
 }
 
 /// Get a compressed SPV proof for a transaction in a specific block

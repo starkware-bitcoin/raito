@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+target/
+
+# Generated files
+*.d.ts.map
+*.js.map
+
+# Package files
+package-lock.json
+yarn.lock
+
+# Documentation
+*.md
+
+# Config files that shouldn't be formatted
+*.json
