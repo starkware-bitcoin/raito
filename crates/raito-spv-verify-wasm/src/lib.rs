@@ -1,10 +1,10 @@
 //! WASM bindings for raito SPV verification
 //! This crate provides WebAssembly bindings for SPV proof verification
 
-use bitcoin::{block::Header, Transaction};
-use cairo_air::CairoProof;
+use bitcoin::block::Header;
 use raito_spv_mmr::block_mmr::BlockInclusionProof;
-use raito_spv_verify::{verify::ChainStateProof, ChainState, CompressedSpvProof, VerifierConfig};
+use raito_spv_verify::{verify::ChainStateProof, CompressedSpvProof, VerifierConfig, TransactionInclusionProof};
+use raito_spv_verify::ChainState;
 use wasm_bindgen::prelude::*;
 
 /// Verify an SPV proof from JSON data

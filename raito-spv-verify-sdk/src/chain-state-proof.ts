@@ -19,12 +19,14 @@ export interface ChainState {
 }
 
 export interface ChainStateProofVerificationResult {
-  mmrHash: string;
+  mmrRoot: string;
   chainState: ChainState;
 }
 
 /**
  * Fetch the most recent proven block height from the Raito API
+ * @param raitoRpcUrl - URL of the Raito bridge RPC endpoint
+ * @returns Promise that resolves to the recent proven height
  */
 export async function fetchRecentProvenHeight(raitoRpcUrl: string): Promise<number> {
     const url = `${raitoRpcUrl}/chainstate-proof/recent_proven_height`;
@@ -65,7 +67,7 @@ export async function fetchProof(raitoRpcUrl: string): Promise<string> {
 /**
  * Verify the Cairo recursive proof and consistency of the bootloader output with chain state
  * @param wasmModule - The initialized WASM module
- * @param chainStateProof - The chain state proof data
+ * @param proof - The chain state proof data
  * @param config - The verifier configuration
  * @returns Promise that resolves to the MMR hash on success
  */
@@ -86,7 +88,7 @@ export async function verifyChainState(
   }
   try {
     const mmrHash = wasm.verify_chain_state(proof, config);    
-    return { mmrHash, chainState };
+    return { mmrRoot: mmrHash, chainState };
   } catch (e) {
     throw new Error("Failed to verify chain state: " + e);
   }

@@ -52,7 +52,5 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "bitcoin-json-rpc": "^1.4.1",
-    "bitcoinjs-lib": "^6.1.7"
   }
 }
