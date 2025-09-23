@@ -33,7 +33,6 @@ export async function fetchBlockHeader(
   return await response.json();
 }
 
-
 /**
  * Fetch the block MMR inclusion proof from the Raito bridge RPC
  *

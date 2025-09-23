@@ -98,8 +98,13 @@ export class RaitoSpvSdk {
     );
 
     if (!blockHeader) {
-      console.log(`Fetching block header from Raito bridge RPC for height ${blockHeight}...`);
-      blockHeader = await blockProof.fetchBlockHeader(this.raitoRpcUrl, blockHeight);
+      console.log(
+        `Fetching block header from Raito bridge RPC for height ${blockHeight}...`
+      );
+      blockHeader = await blockProof.fetchBlockHeader(
+        this.raitoRpcUrl,
+        blockHeight
+      );
     }
 
     const blockMmrRoot = await this.wasm.verify_block_header(
