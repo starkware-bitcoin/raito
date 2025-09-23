@@ -80,12 +80,12 @@ pub async fn verify_block_header(
         .map_err(|e| JsValue::from_str(&format!("Failed to parse block header: {}", e)))?;
 
     // Parse block header proof from JSON
-    let block_header_proof: BlockInclusionProof = 
-        serde_json::from_str(block_header_proof_data)
-            .map_err(|e| JsValue::from_str(&format!("Failed to parse block header proof: {}", e)))?;
+    let block_header_proof: BlockInclusionProof = serde_json::from_str(block_header_proof_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse block header proof: {}", e)))?;
 
     // Verify the block header and get the MMR root
-    let mmr_root = raito_spv_verify::verify_block_header(&block_header, block_header_proof).await
+    let mmr_root = raito_spv_verify::verify_block_header(&block_header, block_header_proof)
+        .await
         .map_err(|e| JsValue::from_str(&format!("Block header verification failed: {}", e)))?;
 
     Ok(mmr_root)

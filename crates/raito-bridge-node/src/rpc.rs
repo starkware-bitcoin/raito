@@ -15,7 +15,8 @@ use serde::Deserialize;
 use std::str::FromStr;
 use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
 
-use raito_spv_client::fetch::{fetch_compressed_proof, fetch_transaction_proof, TransactionInclusionProof};
+use raito_spv_client::fetch::{fetch_compressed_proof, fetch_transaction_proof};
+use raito_spv_verify::TransactionInclusionProof;
 use raito_spv_mmr::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
 
 use crate::app::AppClient;
@@ -208,16 +209,16 @@ pub async fn get_transaction_proof(
 ) -> Result<Json<TransactionInclusionProof>, StatusCode> {
     let txid = bitcoin::Txid::from_str(&tx_id).map_err(|_| StatusCode::BAD_REQUEST)?;
     // Call the fetch_transaction_proof function
-    let transaction_proof = fetch_transaction_proof(
-        txid,
-        config.bitcoin_rpc_url,
-        config.bitcoin_rpc_userpwd,
-    )
-    .await
-    .map_err(|e| {
-        error!("Failed to fetch transaction proof for txid {}: {}", tx_id, e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let transaction_proof =
+        fetch_transaction_proof(txid, config.bitcoin_rpc_url, config.bitcoin_rpc_userpwd)
+            .await
+            .map_err(|e| {
+                error!(
+                    "Failed to fetch transaction proof for txid {}: {}",
+                    tx_id, e
+                );
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
 
     Ok(Json(transaction_proof))
 }
