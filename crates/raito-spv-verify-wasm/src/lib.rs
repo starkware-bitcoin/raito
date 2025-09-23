@@ -3,8 +3,10 @@
 
 use bitcoin::block::Header;
 use raito_spv_mmr::block_mmr::BlockInclusionProof;
-use raito_spv_verify::{verify::ChainStateProof, CompressedSpvProof, VerifierConfig, TransactionInclusionProof};
 use raito_spv_verify::ChainState;
+use raito_spv_verify::{
+    verify::ChainStateProof, CompressedSpvProof, TransactionInclusionProof, VerifierConfig,
+};
 use wasm_bindgen::prelude::*;
 
 /// Verify an SPV proof from JSON data

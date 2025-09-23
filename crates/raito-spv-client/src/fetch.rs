@@ -13,8 +13,8 @@ use std::io::Read;
 use tracing::info;
 
 use raito_spv_verify::{
-    verify::ChainStateProof, verify_proof, CompressedSpvProof,
-    TransactionInclusionProof, VerifierConfig,
+    verify::ChainStateProof, verify_proof, CompressedSpvProof, TransactionInclusionProof,
+    VerifierConfig,
 };
 
 /// CLI arguments for the `fetch` subcommand

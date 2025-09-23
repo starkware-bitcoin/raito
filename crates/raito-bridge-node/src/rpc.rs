@@ -15,11 +15,11 @@ use serde::Deserialize;
 use std::str::FromStr;
 use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
 
-use raito_spv_client::fetch::{fetch_compressed_proof, fetch_transaction_proof};
-use raito_spv_verify::TransactionInclusionProof;
-use raito_spv_mmr::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
-use raito_bitcoin_client::BitcoinClient;
 use bitcoin::block::Header as BlockHeader;
+use raito_bitcoin_client::BitcoinClient;
+use raito_spv_client::fetch::{fetch_compressed_proof, fetch_transaction_proof};
+use raito_spv_mmr::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
+use raito_spv_verify::TransactionInclusionProof;
 
 use crate::app::AppClient;
 
@@ -187,7 +187,8 @@ pub async fn get_block_header(
     let bitcoin_client = BitcoinClient::new(
         config.bitcoin_rpc_url.clone(),
         config.bitcoin_rpc_userpwd.clone(),
-    ).map_err(|e| {
+    )
+    .map_err(|e| {
         error!("Failed to create Bitcoin client: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
