@@ -56,6 +56,10 @@ jobs:
         run: |
           cd raito-spv-verify-sdk
           npm install
+      - name: Check code formatting
+        run: |
+          cd raito-spv-verify-sdk
+          npm run format:check
       - name: Build WASM package
         run: |
           cd raito-spv-verify-sdk
