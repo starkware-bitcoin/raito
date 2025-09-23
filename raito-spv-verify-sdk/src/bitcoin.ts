@@ -12,6 +12,7 @@ export interface BlockHeader {
   time: number;                // u32
   bits: number;                // u32
   nonce: number;               // u32
+  blockHash(): BlockHash;     // method to calculate block hash
 }
 
 export interface OutPoint { txid: Txid; vout: number; }
@@ -50,11 +51,15 @@ export interface GetBlockHeaderResult {
   nextblockhash?: string;
 }
 
-export interface MerkleBlock {
-  header: BlockHeader;
+export interface PartialMerkleTree {
   tx_count: number;   // u32 (total transactions in block)
   hashes: string[];   // big-endian 32-byte hex (txids + internals)
   flags: Uint8Array;  // raw bits
+}
+
+export interface MerkleBlock {
+  header: BlockHeader;
+  txn: PartialMerkleTree;
 }
 
 // -------- Constants & helpers --------
@@ -124,17 +129,63 @@ function readVarBytes(b: Buffer, o: number): { bytes: Buffer; size: number } {
   return { bytes: b.subarray(start, end), size: vi + len };
 }
 
+// Helper function to encode BlockHeader to 80-byte buffer (little-endian)
+function encodeBlockHeaderToBytes(header: BlockHeader): Buffer {
+  const buf = Buffer.alloc(80);
+  buf.writeInt32LE(header.version, 0);
+  
+  // Convert big-endian hex hashes to little-endian bytes
+  const prevBlockHash = Buffer.from(header.prev_blockhash, 'hex').reverse();
+  const merkleRoot = Buffer.from(header.merkle_root, 'hex').reverse();
+  
+  prevBlockHash.copy(buf, 4);
+  merkleRoot.copy(buf, 36);
+  
+  buf.writeUInt32LE(header.time, 68);
+  buf.writeUInt32LE(header.bits, 72);
+  buf.writeUInt32LE(header.nonce, 76);
+  
+  return buf;
+}
+
+// BlockHeader class that implements the interface with block_hash method
+export class BlockHeaderImpl implements BlockHeader {
+  version: number;
+  prev_blockhash: BlockHash;
+  merkle_root: string;
+  time: number;
+  bits: number;
+  nonce: number;
+
+  constructor(header: Omit<BlockHeader, 'blockHash'>) {
+    this.version = header.version;
+    this.prev_blockhash = header.prev_blockhash;
+    this.merkle_root = header.merkle_root;
+    this.time = header.time;
+    this.bits = header.bits;
+    this.nonce = header.nonce;
+  }
+
+  blockHash(): BlockHash {
+    // Use bitcoinjs-lib Block class to calculate the hash
+    const headerBytes = encodeBlockHeaderToBytes(this);
+    const block = bitcoinjs.Block.fromBuffer(headerBytes);
+    const hashBuffer = block.getHash();
+    return hashLEtoBEHex(hashBuffer);
+  }
+}
+
 function decodeBlockHeaderFromHex(hex: string): BlockHeader {
   const b = hexToBuf(hex);
   if (b.length !== 80) throw new Error(`Invalid block header length: ${b.length}`);
-  return {
+  return new BlockHeaderImpl({
     version: readI32LE(b, 0),
     prev_blockhash: hashLEtoBEHex(b.subarray(4, 36)),
     merkle_root:    hashLEtoBEHex(b.subarray(36, 68)),
     time:  readU32LE(b, 68),
     bits:  readU32LE(b, 72),
     nonce: readU32LE(b, 76),
-  };
+  });
 }
 
 function decodeMerkleBlockFromHex(hex: string): MerkleBlock {
@@ -154,7 +205,82 @@ function decodeMerkleBlockFromHex(hex: string): MerkleBlock {
 
   const { bytes: flags, size: viF } = readVarBytes(b, off); off += viF;
 
-  return { header, tx_count, hashes, flags: new Uint8Array(flags) };
+  const txn: PartialMerkleTree = {
+    tx_count,
+    hashes,
+    flags: new Uint8Array(flags)
+  };
+
+  return { header, txn };
+}
+
+// Helper function to serialize PartialMerkleTree to the format expected by Rust
+function serializePartialMerkleTree(txn: PartialMerkleTree): Uint8Array {
+  // Calculate total size needed
+  const txCountSize = 4; // u32
+  const nHashesSize = txn.hashes.length < 0xfd ? 1 : txn.hashes.length < 0xffff ? 3 : 5; // CompactSize
+  const hashesSize = txn.hashes.length * 32; // 32 bytes per hash
+  const flagsSize = txn.flags.length < 0xfd ? 1 : txn.flags.length < 0xffff ? 3 : 5; // CompactSize
+  const flagsDataSize = txn.flags.length;
+  
+  const totalSize = txCountSize + nHashesSize + hashesSize + flagsSize + flagsDataSize;
+  const buffer = new Uint8Array(totalSize);
+  let offset = 0;
+
+  // Write tx_count (u32 little-endian)
+  buffer[offset] = txn.tx_count & 0xff;
+  buffer[offset + 1] = (txn.tx_count >> 8) & 0xff;
+  buffer[offset + 2] = (txn.tx_count >> 16) & 0xff;
+  buffer[offset + 3] = (txn.tx_count >> 24) & 0xff;
+  offset += 4;
+
+  // Write number of hashes (CompactSize)
+  if (txn.hashes.length < 0xfd) {
+    buffer[offset] = txn.hashes.length;
+    offset += 1;
+  } else if (txn.hashes.length < 0xffff) {
+    buffer[offset] = 0xfd;
+    buffer[offset + 1] = txn.hashes.length & 0xff;
+    buffer[offset + 2] = (txn.hashes.length >> 8) & 0xff;
+    offset += 3;
+  } else {
+    buffer[offset] = 0xfe;
+    buffer[offset + 1] = txn.hashes.length & 0xff;
+    buffer[offset + 2] = (txn.hashes.length >> 8) & 0xff;
+    buffer[offset + 3] = (txn.hashes.length >> 16) & 0xff;
+    buffer[offset + 4] = (txn.hashes.length >> 24) & 0xff;
+    offset += 5;
+  }
+
+  // Write hashes (little-endian, 32 bytes each)
+  for (const hash of txn.hashes) {
+    const hashBytes = Buffer.from(hash, 'hex').reverse(); // Convert big-endian hex to little-endian bytes
+    buffer.set(hashBytes, offset);
+    offset += 32;
+  }
+
+  // Write flags length (CompactSize)
+  if (txn.flags.length < 0xfd) {
+    buffer[offset] = txn.flags.length;
+    offset += 1;
+  } else if (txn.flags.length < 0xffff) {
+    buffer[offset] = 0xfd;
+    buffer[offset + 1] = txn.flags.length & 0xff;
+    buffer[offset + 2] = (txn.flags.length >> 8) & 0xff;
+    offset += 3;
+  } else {
+    buffer[offset] = 0xfe;
+    buffer[offset + 1] = txn.flags.length & 0xff;
+    buffer[offset + 2] = (txn.flags.length >> 8) & 0xff;
+    buffer[offset + 3] = (txn.flags.length >> 16) & 0xff;
+    buffer[offset + 4] = (txn.flags.length >> 24) & 0xff;
+    offset += 5;
+  }
+
+  // Write flags data
+  buffer.set(txn.flags, offset);
+
+  return buffer;
 }
 
 // -------- Transaction decoder (bitcoinjs-lib) --------
@@ -239,6 +365,12 @@ export class BitcoinCoreClient {
     const params = blockHash ? [[txid], blockHash] : [[txid]];
     const hex = await this.raw<string>('gettxoutproof', params);
     return decodeMerkleBlockFromHex(hex);
+  }
+
+  /** gettxoutproof([txid], [blockhash]) -> PartialMerkleTree serialized for Rust */
+  async getTransactionInclusionProofData(txid: Txid, blockHash?: BlockHash): Promise<Uint8Array> {
+    const merkleBlock = await this.getTransactionInclusionProof(txid, blockHash);
+    return serializePartialMerkleTree(merkleBlock.txn);
   }
 
   /** getblockcount() */

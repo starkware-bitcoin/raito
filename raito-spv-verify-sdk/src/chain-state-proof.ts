@@ -1,4 +1,4 @@
-import { createVerifierConfig, VerifierConfig } from "./config";
+import { createVerifierConfig, VerifierConfig } from "./config.js";
 
 /**
  * Snapshot of the consensus chain state used to validate block inclusion
@@ -16,6 +16,11 @@ export interface ChainState {
   epoch_start_time: number;
   /** The timestamps (UNIX seconds) of the previous 11 blocks */
   prev_timestamps: number[];
+}
+
+export interface ChainStateProofVerificationResult {
+  mmrHash: string;
+  chainState: ChainState;
 }
 
 /**
@@ -46,7 +51,7 @@ export async function fetchProof(raitoRpcUrl: string): Promise<string> {
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'Accept': 'text/plain',
+        'Accept': 'application/json',
       },
     });
     
@@ -68,24 +73,20 @@ export async function verifyChainState(
   wasm: any,
   proof: string,
   config: string
-): Promise<String> {
+): Promise<ChainStateProofVerificationResult> {
   // Use regexp to extract the "chainstate" object from the proof string and parse it as JSON
   const match = proof.match(/"chainstate"\s*:\s*({.*?})(,|\s*})/s);
-  let chainstate = null;
+  let chainState = null;
   if (match && match[1]) {
     try {
-      chainstate = JSON.parse(match[1]);
+      chainState = JSON.parse(match[1]);
     } catch (e) {
       throw new Error("Failed to parse chainstate from proof: " + e);
     }
   }
-
-
-  console.log('chainstate:', chainstate);
-  console.log('wasm:', wasm);
   try {
-    const result = wasm.verify_chain_state(proof, config);
-    return result;
+    const mmrHash = wasm.verify_chain_state(proof, config);    
+    return { mmrHash, chainState };
   } catch (e) {
     throw new Error("Failed to verify chain state: " + e);
   }

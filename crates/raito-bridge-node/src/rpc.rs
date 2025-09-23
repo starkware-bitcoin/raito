@@ -15,7 +15,7 @@ use serde::Deserialize;
 use std::str::FromStr;
 use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
 
-use raito_spv_client::fetch::fetch_compressed_proof;
+use raito_spv_client::fetch::{fetch_compressed_proof, fetch_transaction_proof, TransactionInclusionProof};
 use raito_spv_mmr::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
 
 use crate::app::AppClient;
@@ -73,6 +73,7 @@ impl RpcServer {
 
         let compressed = Router::new()
             .route("/compressed_spv_proof/:tx_id", get(get_compressed_proof))
+            .route("/transaction-proof/:tx_id", get(get_transaction_proof))
             .with_state(self.config.clone())
             .layer(CompressionLayer::new())
             .layer(CorsLayer::permissive())
@@ -193,4 +194,30 @@ pub async fn get_compressed_proof(
     })?;
 
     Ok(Json(compressed_proof))
+}
+
+/// Get a transaction inclusion proof for a specific transaction
+///
+/// # Returns
+/// * `Json<TransactionInclusionProof>` - The transaction inclusion proof in JSON format
+/// * `StatusCode::BAD_REQUEST` - If the transaction ID is invalid
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If proof generation fails
+pub async fn get_transaction_proof(
+    State(config): State<RpcConfig>,
+    Path(tx_id): Path<String>,
+) -> Result<Json<TransactionInclusionProof>, StatusCode> {
+    let txid = bitcoin::Txid::from_str(&tx_id).map_err(|_| StatusCode::BAD_REQUEST)?;
+    // Call the fetch_transaction_proof function
+    let transaction_proof = fetch_transaction_proof(
+        txid,
+        config.bitcoin_rpc_url,
+        config.bitcoin_rpc_userpwd,
+    )
+    .await
+    .map_err(|e| {
+        error!("Failed to fetch transaction proof for txid {}: {}", tx_id, e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(transaction_proof))
 }

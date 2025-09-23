@@ -15,7 +15,7 @@ use std::io::Read;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use tracing::info;
 
-use raito_spv_verify::{verify::ChainStateProof, verify_proof, ChainState, CompressedSpvProof, VerifierConfig};
+use raito_spv_verify::{verify::ChainStateProof, verify_proof, ChainState, CompressedSpvProof, TransactionInclusionProof, VerifierConfig};
 
 /// CLI arguments for the `fetch` subcommand
 #[derive(Clone, Debug, clap::Args)]
@@ -45,19 +45,6 @@ pub struct FetchArgs {
     /// Development mode
     #[arg(long, default_value = "false")]
     dev: bool,
-}
-
-/// Bitcoin transaction inclusion data in a specific block
-#[derive(Serialize, Deserialize)]
-pub struct TransactionInclusionProof {
-    /// The full Bitcoin transaction being proven
-    pub transaction: Transaction,
-    /// Encoded PartialMerkleTree containing the Merkle path for the transaction
-    pub transaction_proof: Vec<u8>,
-    /// Header of the block that includes the transaction
-    pub block_header: BlockHeader,
-    /// Height of the block that includes the transaction
-    pub block_height: u32,
 }
 
 /// Run the `fetch` subcommand: build a compressed proof and write it to disk

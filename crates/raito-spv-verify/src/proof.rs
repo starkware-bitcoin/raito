@@ -13,6 +13,19 @@ use starknet_ff::FieldElement;
 use stwo_prover::core::vcs::blake2_hash::Blake2sHasher;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 
+/// Bitcoin transaction inclusion data in a specific block
+#[derive(Serialize, Deserialize)]
+pub struct TransactionInclusionProof {
+    /// The full Bitcoin transaction being proven
+    pub transaction: Transaction,
+    /// Encoded PartialMerkleTree containing the Merkle path for the transaction
+    pub transaction_proof: Vec<u8>,
+    /// Header of the block that includes the transaction
+    pub block_header: BlockHeader,
+    /// Height of the block that includes the transaction
+    pub block_height: u32,
+}
+
 /// A compact, self-contained proof that a Bitcoin transaction is included
 /// in a specific block and that the block is part of a valid chain state.
 #[derive(Serialize, Deserialize)]

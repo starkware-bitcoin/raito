@@ -51,19 +51,16 @@ pub async fn verify_proof_with_config(
 /// Verify that a transaction is included in a block header using a Merkle proof
 #[wasm_bindgen]
 pub fn verify_transaction(
-    transaction_data: &str,
-    block_header_data: &str,
-    transaction_proof_data: &[u8],
+    transaction_proof_data: &str, // contains serialized TransactionInclusionProof
 ) -> Result<bool, JsValue> {
     // Parse transaction from JSON
-    let transaction: Transaction = serde_json::from_str(transaction_data)
-        .map_err(|e| JsValue::from_str(&format!("Failed to parse transaction: {}", e)))?;
-
-    // Parse block header from JSON
-    let block_header: Header = serde_json::from_str(block_header_data)
-        .map_err(|e| JsValue::from_str(&format!("Failed to parse block header: {}", e)))?;
-
-    let transaction_proof = transaction_proof_data.to_vec();
+    let TransactionInclusionProof {
+        transaction,
+        transaction_proof,
+        block_header,
+        block_height,
+    } = serde_json::from_str(transaction_proof_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse transaction proof: {}", e)))?;
 
     // Verify the transaction
     raito_spv_verify::verify_transaction(&transaction, &block_header, transaction_proof)

@@ -7,6 +7,6 @@ pub mod proof;
 pub mod verify;
 pub mod work;
 
-pub use proof::{BootloaderOutput, ChainState, CompressedSpvProof, TaskResult};
+pub use proof::{BootloaderOutput, ChainState, CompressedSpvProof, TaskResult, TransactionInclusionProof};
 pub use verify::{verify_proof, verify_transaction, verify_block_header, verify_chain_state, VerifierConfig};
 pub use work::verify_subchain_work;
