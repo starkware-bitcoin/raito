@@ -5,227 +5,124 @@ A comprehensive TypeScript SDK for fetching and verifying compressed SPV (Simpli
 
 ## Usage
 
-### Basic Usage
+### Quick Start
 
-```javascript
+```typescript
 import { createRaitoSpvSdk } from '@starkware-bitcoin/spv-verify';
 
-async function verifyTransaction() {
-  // Create SDK instance
+async function main() {
   const sdk = createRaitoSpvSdk();
-  
-  // Initialize the SDK (loads WASM module)
   await sdk.init();
-  
-  // Fetch recent proven height
+
   const recentHeight = await sdk.fetchRecentProvenHeight();
   console.log('Most recent proven block height:', recentHeight);
-  
-  // Fetch and verify a transaction
-  const txid = '4f1b987645e596329b985064b1ce33046e4e293a08fd961193c8ddbb1ca219cc';
-  
-  // Fetch the proof from Raito API
-  const proof = await sdk.fetchProof(txid);
 
-  // Verify the proof
-  const isValid = await sdk.verifyProof(proof);
+  const chainStateResult = await sdk.verifyRecentChainState();
+  console.log('MMR root:', chainStateResult.mmrRoot);
+  console.log('Chain state height:', chainStateResult.chainState.block_height);
 
-  console.log('Verification result:', isValid ? 'Valid' : 'Invalid');
-}
-```
-
-### Block Proof Usage
-
-```javascript
-import { createRaitoSpvSdk, fetchBlockProof } from '@starkware-bitcoin/spv-verify';
-
-async function fetchBlockProofExample() {
-  // Create SDK instance
-  const sdk = createRaitoSpvSdk();
-  
-  // Get recent proven height
-  const recentHeight = await sdk.fetchRecentProvenHeight();
-  
-  // Fetch block proof for a specific block (e.g., 100 blocks before recent height)
-  const blockHeight = recentHeight - 100;
-  const blockProof = await sdk.fetchBlockProof(blockHeight, recentHeight);
-  
-  console.log('Block proof:', blockProof);
-  console.log('Leaf index:', blockProof.leaf_index);
-  console.log('Peaks hashes:', blockProof.peaks_hashes);
-  
-  // Or use the standalone function
-  const blockProof2 = await fetchBlockProof(blockHeight, recentHeight);
-  console.log('Same result:', blockProof.leaf_index === blockProof2.leaf_index);
-}
-```
-
-### Chain State Proof Usage
-
-```javascript
-import { createRaitoSpvSdk } from '@starkware-bitcoin/spv-verify';
-import * as chainStateProof from '@starkware-bitcoin/spv-verify/chain-state-proof';
-
-async function chainStateProofExample() {
-  // Create SDK instance
-  const sdk = createRaitoSpvSdk();
-  await sdk.init();
-  
-  // Create default configuration
-  const defaultConfig = await chainStateProof.createDefaultConfig(sdk.wasmModule);
-  console.log('Default config:', defaultConfig);
-  
-  // Create custom configuration
-  const customConfig = await chainStateProof.createCustomConfig(
-    sdk.wasmModule,
-    '1000000000000000000000000000000',
-    '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-    '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-    100
+  const blockHeader = await sdk.verifyBlockHeader(
+    chainStateResult.chainState.block_height
   );
-  
-  // Fetch chain state proof directly from RPC
-  const chainStateProofString = await chainStateProof.fetchChainStateProof(sdk.raitoRpcUrl);
-  const chainStateProofData = JSON.parse(chainStateProofString);
-  const chainState = chainStateProofData.chainstate;
-  const proofData = JSON.stringify(chainStateProofData.proof);
-  
-  // Verify chain state
-  const mmrHash = await chainStateProof.verifyChainState(sdk.wasmModule, chainState, proofData, customConfig);
-  console.log('Chain state verification MMR hash:', mmrHash);
-  
-  // Verify subchain work
-  const blockHeight = chainState.block_height - 100;
-  const workResult = await chainStateProof.verifySubchainWork(sdk.wasmModule, blockHeight, chainState, defaultConfig);
-  console.log('Subchain work verification:', workResult);
+  console.log('Verified block header prev hash:', blockHeader.prev_blockhash);
+
+  const txid = '4f1b987645e596329b985064b1ce33046e4e293a08fd961193c8ddbb1ca219cc';
+  const transaction = await sdk.verifyTransaction(txid);
+  console.log('First output value (sats):', transaction.output[0]?.value);
 }
+
+main().catch(console.error);
 ```
+
+### Custom RPC URL and Verifier Configuration
+
+You can direct the SDK to another bridge endpoint or tweak the verifier
+configuration that is passed to the WASM backend:
+
+```typescript
+const sdk = createRaitoSpvSdk('https://api.raito.wtf', {
+  min_work: '1813388729421943762059264',
+  bootloader_hash:
+    '0x0001837d8b77b6368e0129ce3f65b5d63863cfab93c47865ee5cbe62922ab8f3',
+  task_program_hash:
+    '0x00f0876bb47895e8c4a6e7043829d7886e3b135e3ef30544fb688ef4e25663ca',
+  task_output_size: 8,
+});
+```
+
+All fields are optional; omitted values fall back to the defaults shown above.
+
+### Verifying Recent Chain State
+
+- `verifyRecentChainState()` downloads the latest recursive proof from the Raito
+  bridge RPC, verifies it with WASM, and caches the result.
+- The returned object contains both the verified `mmrRoot` and the parsed
+  `chainState` snapshot (including the most recent proven `block_height`).
+- Subsequent calls reuse the cached result until a new instance of the SDK is
+  created.
+
+### Verifying Block Headers
+
+- Call `verifyBlockHeader(blockHeight)` to fetch the inclusion proof and block
+  header for that height. The SDK matches the MMR root with the previously
+  verified chain state before returning the header.
+- You can supply a `blockHeader` object as the second argument if you already
+  have the header; the SDK will skip the fetch and only verify the proof.
+
+### Verifying Transactions
+
+- `verifyTransaction(txid)` retrieves the merkle proof from the bridge, verifies
+  it with WASM, and ensures the enclosing block header is part of the verified
+  MMR tree.
+- The method returns the decoded transaction object, which is cached so repeated
+  checks of the same `txid` are free.
 
 ## API Reference
 
-### Functions
+### `createRaitoSpvSdk(raitoRpcUrl?, config?)`
 
-#### `createRaitoSpvSdk(raitoRpcUrl?)`
+- **`raitoRpcUrl`** (optional): custom bridge RPC endpoint. Defaults to
+  `https://api.raito.wtf`.
+- **`config`** (optional): partial verifier configuration. Missing fields fall
+  back to the default verifier settings bundled with the SDK.
+- **Returns**: a configured `RaitoSpvSdk` instance.
 
-Creates a new RaitoSpvSdk instance.
-
-- **`raitoRpcUrl`**: Optional custom Raito RPC endpoint URL (defaults to 'https://api.raito.wtf')
-- **Returns**: RaitoSpvSdk instance
-
-### RaitoSpvSdk Class
+### `RaitoSpvSdk`
 
 #### `init(): Promise<void>`
 
-Initializes the SDK by loading the WebAssembly module. Must be called before using other methods.
-
-- **Returns**: Promise that resolves when initialization is complete
+Loads and initialises the WASM module. Call once before using the other
+methods.
 
 #### `fetchRecentProvenHeight(): Promise<number>`
 
-Fetches the most recent proven block height from the Raito API.
+Fetches the most recent proven Bitcoin block height available from the bridge
+API.
 
-- **Returns**: Promise that resolves to the most recent proven block height as a number
+#### `verifyRecentChainState(): Promise<ChainStateProofVerificationResult>`
 
-#### `fetchProof(txid: string): Promise<string>`
+Downloads and verifies the latest recursive proof. Returns an object with the
+verified MMR root and the parsed `chainState` snapshot. Results are cached per
+SDK instance.
 
-Fetches a compressed SPV proof for a given transaction ID from the Raito API.
+#### `verifyBlockHeader(blockHeight: number, blockHeader?: BlockHeader): Promise<BlockHeader>`
 
-- **`txid`**: Bitcoin transaction ID (hex string)
-- **Returns**: Promise that resolves to the proof data as a JSON string
+Verifies that the block header at `blockHeight` is included in the proven MMR.
+Optionally accepts a pre-fetched header to avoid an extra RPC round trip.
 
-#### `verifyProof(proof: string, config?: Partial<VerifierConfig>): Promise<boolean>`
+#### `verifyTransaction(txid: string): Promise<Transaction>`
 
-Verifies a compressed SPV proof.
-
-- **`proof`**: The compressed SPV proof data (JSON string)
-- **`config`**: Optional partial verification configuration to override defaults
-- **Returns**: Promise that resolves to `true` if verification succeeds, `false` otherwise
-
-#### `fetchBlockProof(blockHeight: number, chainHeight: number, dev?: boolean): Promise<BlockInclusionProof>`
-
-Fetches a block MMR inclusion proof from the Raito bridge RPC.
-
-- **`blockHeight`**: Height of the block to prove
-- **`chainHeight`**: Current best height (chain head)
-- **`dev`**: Whether to use development mode (default: false)
-- **Returns**: Promise that resolves to a BlockInclusionProof object
-
-#### `getMmrHeight(): Promise<number>`
-
-Gets the current MMR height from the Raito bridge RPC.
-
-- **Returns**: Promise that resolves to the current MMR height as a number
-
-### Chain State Proof Functions
-
-The chain state proof verification functions are available as standalone functions that can be imported from the `chain-state-proof` module:
-
-#### `fetchChainStateProof(raitoRpcUrl: string): Promise<string>`
-
-Fetches the latest chain state proof from the Raito bridge RPC.
-
-- **`raitoRpcUrl`**: URL of the Raito bridge RPC endpoint
-- **Returns**: Promise that resolves to the chain state proof as a JSON string
-
-#### `verifyChainState(wasmModule: any, chainState: ChainState, chainStateProof: string, config: VerifierConfig): Promise<string>`
-
-Verifies the Cairo recursive proof and consistency of the bootloader output with chain state.
-
-- **`wasmModule`**: The initialized WASM module
-- **`chainState`**: The chain state data to verify
-- **`chainStateProof`**: The chain state proof data (JSON string)
-- **`config`**: The verifier configuration
-- **Returns**: Promise that resolves to the MMR hash on success
-
-#### `verifySubchainWork(wasmModule: any, blockHeight: number, chainState: ChainState, config: VerifierConfig): Promise<boolean>`
-
-Verifies that there is enough work added on top of the target block.
-
-- **`wasmModule`**: The initialized WASM module
-- **`blockHeight`**: Height of the block to verify work for
-- **`chainState`**: The chain state data
-- **`config`**: The verifier configuration
-- **Returns**: Promise that resolves to `true` if verification succeeds
-
-#### `createDefaultConfig(wasmModule: any): Promise<VerifierConfig>`
-
-Creates a default verifier configuration.
-
-- **`wasmModule`**: The initialized WASM module
-- **Returns**: Promise that resolves to the default VerifierConfig
-
-#### `createCustomConfig(wasmModule: any, minWork: string, bootloaderHash: string, taskProgramHash: string, taskOutputSize: number): Promise<VerifierConfig>`
-
-Creates a custom verifier configuration.
-
-- **`wasmModule`**: The initialized WASM module
-- **`minWork`**: Minimum work required for verification
-- **`bootloaderHash`**: Hash of the bootloader program
-- **`taskProgramHash`**: Hash of the task program
-- **`taskOutputSize`**: Size of the task output
-- **Returns**: Promise that resolves to the custom VerifierConfig
+Verifies the merkle proof for `txid`, ensures the enclosing block header is in
+the MMR, and returns the parsed transaction data.
 
 ### Types
 
-#### `VerifierConfig`
+#### `ChainStateProofVerificationResult`
 
 ```typescript
-interface VerifierConfig {
-  min_work: string;
-  bootloader_hash: string;
-  task_program_hash: string;
-  task_output_size: number;
-}
-```
-
-#### `BlockInclusionProof`
-
-```typescript
-interface BlockInclusionProof {
-  peaks_hashes: string[];
-  siblings_hashes: string[];
-  leaf_index: number;
-  leaf_count: number;
+interface ChainStateProofVerificationResult {
+  mmrRoot: string;
+  chainState: ChainState;
 }
 ```
 
@@ -233,48 +130,46 @@ interface BlockInclusionProof {
 
 ```typescript
 interface ChainState {
-  /** The height of the best block in the chain */
   block_height: number;
-  /** The total accumulated work of the chain as a decimal string */
   total_work: string;
-  /** The hash of the best block in the chain */
   best_block_hash: string;
-  /** The current target difficulty as a compact decimal string */
   current_target: string;
-  /** The start time (UNIX seconds) of the current difficulty epoch */
   epoch_start_time: number;
-  /** The timestamps (UNIX seconds) of the previous 11 blocks */
   prev_timestamps: number[];
 }
 ```
 
-
-
-#### `RaitoSpvSdk`
+#### `BlockHeader`
 
 ```typescript
-class RaitoSpvSdk {
-  constructor(raitoRpcUrl?: string);
-  init(): Promise<void>;
-  fetchRecentProvenHeight(): Promise<number>;
-  fetchProof(txid: string): Promise<string>;
-  verifyProof(proof: string, config?: Partial<VerifierConfig>): Promise<boolean>;
-  fetchBlockProof(blockHeight: number, chainHeight: number, dev?: boolean): Promise<BlockInclusionProof>;
-  getMmrHeight(): Promise<number>;
+interface BlockHeader {
+  version: number;
+  prev_blockhash: string;
+  merkle_root: string;
+  time: number;
+  bits: number;
+  nonce: number;
 }
 ```
 
-### Standalone Functions
+#### `Transaction`
 
-#### `fetchBlockProof(blockHeight: number, chainHeight: number, raitoRpcUrl?: string, dev?: boolean): Promise<BlockInclusionProof>`
-
-Standalone function to fetch block proof (convenience function).
-
-- **`blockHeight`**: Height of the block to prove
-- **`chainHeight`**: Current best height (chain head)
-- **`raitoRpcUrl`**: URL of the Raito bridge RPC endpoint (default: 'https://api.raito.wtf')
-- **`dev`**: Whether to use development mode (default: false)
-- **Returns**: Promise that resolves to a BlockInclusionProof object
+```typescript
+interface Transaction {
+  version: number;
+  lock_time: number;
+  input: Array<{
+    previous_output: { txid: string; vout: number };
+    script_sig: string;
+    sequence: number;
+    witness: string[];
+  }>;
+  output: Array<{
+    value: bigint;
+    script_pubkey: string;
+  }>;
+}
+```
 
 ## Building from Source
 
