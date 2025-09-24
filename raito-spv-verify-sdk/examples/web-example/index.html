@@ -18,7 +18,33 @@
 
       <main>
         <div class="demo-section">
+          <h2>Chain State Verification</h2>
+          <p>Verify the most recent proven chain state</p>
+          <div class="input-group">
+            <button id="verify-chainstate-btn">
+              Verify Recent Chain State
+            </button>
+          </div>
+        </div>
+
+        <div class="demo-section">
+          <h2>Block Header Verification</h2>
+          <p>Verify a specific block header against the chain state</p>
+          <div class="input-group">
+            <label for="block-height">Block Height:</label>
+            <input
+              type="number"
+              id="block-height"
+              placeholder="Enter block height"
+              value="840000"
+            />
+            <button id="verify-block-btn">Verify Block Header</button>
+          </div>
+        </div>
+
+        <div class="demo-section">
           <h2>Transaction Verification</h2>
+          <p>Verify a transaction inclusion in a block</p>
           <div class="input-group">
             <label for="txid">Transaction ID:</label>
             <input
@@ -27,13 +53,15 @@
               placeholder="Enter Bitcoin transaction ID"
               value="4f1b987645e596329b985064b1ce33046e4e293a08fd961193c8ddbb1ca219cc"
             />
-            <button id="verify-btn">Verify Transaction</button>
+            <button id="verify-transaction-btn">Verify Transaction</button>
           </div>
         </div>
 
         <div class="demo-section">
           <h2>Results</h2>
-          <div id="status" class="status">Ready to verify...</div>
+          <div id="status" class="status">
+            Ready to verify chain state, blocks, and transactions...
+          </div>
           <div id="results" class="results"></div>
         </div>
       </main>
