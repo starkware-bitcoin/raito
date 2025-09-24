@@ -6,19 +6,24 @@
 import * as chainStateProof from './chain-state-proof.js';
 import * as blockProof from './block-proof.js';
 import * as transactionProof from './transaction-proof.js';
-import { ChainStateProofVerificationResult } from './chain-state-proof.js';
 import { createVerifierConfig, VerifierConfig } from './config.js';
 import { importAndInit } from './wasm.js';
-import * as bitcoin from './bitcoin.js';
 import { BlockHeader, Transaction } from './bitcoin.js';
 import { BlockProofVerificationResult } from './block-proof.js';
+
+export * as chainStateProof from './chain-state-proof.js';
+export * as blockProof from './block-proof.js';
+export * as transactionProof from './transaction-proof.js';
+export type { VerifierConfig } from './config.js';
 
 // Type declarations for different environments
 export class RaitoSpvSdk {
   private wasm: any;
   private raitoRpcUrl: string;
   private config: string;
-  private chainStateFact: ChainStateProofVerificationResult | undefined;
+  private chainStateFact:
+    | chainStateProof.ChainStateProofVerificationResult
+    | undefined;
   private blockHeaderFacts: Map<number, BlockHeader> = new Map();
 
   private transactionFacts: Map<string, Transaction> = new Map();
@@ -54,7 +59,7 @@ export class RaitoSpvSdk {
     }
   }
 
-  async verifyRecentChainState(): Promise<ChainStateProofVerificationResult> {
+  async verifyRecentChainState(): Promise<chainStateProof.ChainStateProofVerificationResult> {
     if (this.chainStateFact) {
       console.log('Using cached chain state verification result');
       return this.chainStateFact;

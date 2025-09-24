@@ -1,6 +1,6 @@
 {
   "name": "@starkware-bitcoin/spv-verify",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "publishConfig": {
     "access": "public"
   },
@@ -23,19 +23,19 @@
     },
     "./wasm": {
       "types": "./dist/types/wasm.d.ts",
-      "browser": "./dist/web/index.js",
+      "browser": "./dist/bundler/index.js",
       "node": "./dist/node/index.js",
-      "default": "./dist/web/index.js"
+      "default": "./dist/bundler/index.js"
     },
-    "./wasm/web": "./dist/web/index.js"
+    "./wasm/web": "./dist/bundler/index.js"
   },
   "scripts": {
     "build": "npm run build:wasm && npm run build:ts && npm run types:copy",
-    "build:wasm": "npm run build:wasm:node && npm run build:wasm:web",
+    "build:wasm": "npm run build:wasm:node && npm run build:wasm:bundler",
     "build:wasm:node": "RUSTFLAGS='--cfg getrandom_backend=\"wasm_js\"' wasm-pack build ../crates/raito-spv-verify-wasm --release --target nodejs --out-dir dist/node --out-name index && mkdir -p dist/node && cp -r ../crates/raito-spv-verify-wasm/dist/node/* dist/node/",
-    "build:wasm:web": "RUSTFLAGS='--cfg getrandom_backend=\"wasm_js\"' wasm-pack build ../crates/raito-spv-verify-wasm --release --target web --out-dir dist/web --out-name index && mkdir -p dist/web && cp -r ../crates/raito-spv-verify-wasm/dist/web/* dist/web/",
+    "build:wasm:bundler": "RUSTFLAGS='--cfg getrandom_backend=\"wasm_js\"' wasm-pack build ../crates/raito-spv-verify-wasm --release --target bundler --out-dir dist/bundler --out-name index && mkdir -p dist/bundler && cp -r ../crates/raito-spv-verify-wasm/dist/bundler/* dist/bundler/",
     "build:ts": "tsc -p tsconfig.json",
-    "types:copy": "mkdir -p dist/types && cp dist/web/index.d.ts dist/types/wasm.d.ts",
+    "types:copy": "mkdir -p dist/types && cp dist/bundler/index.d.ts dist/types/wasm.d.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepublishOnly": "npm run build"

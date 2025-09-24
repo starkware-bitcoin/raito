@@ -1,35 +1,40 @@
-export async function importAndInit(): Promise<any> {
-  // Environment detection
-  const isNode =
-    typeof window === 'undefined' &&
-    typeof process !== 'undefined' &&
-    process.versions &&
-    process.versions.node;
+let once: Promise<any> | null = null;
+
+export async function importAndInit() {
+  if (once) return once;
+
   const isBrowser = typeof window !== 'undefined';
+  const isNode = !isBrowser && !!process?.versions?.node;
+  const isEdge = !isBrowser && !isNode && process?.env?.NEXT_RUNTIME === 'edge';
 
-  try {
-    // Load WASM module based on environment
-
-    let wasm: any;
-    if (isNode) {
-      // Node.js environment - use dynamic import for ES modules
-      wasm = await import('../dist/node/index.js');
-    } else if (isBrowser) {
-      // Browser environment - use web version for direct browser usage
-      wasm = await import('../dist/web/index.js');
-      const start = wasm.default ?? wasm.__wbg_init;
-      if (typeof start !== 'function') {
-        throw new Error('WASM initializer not found on module');
+  const load = async () => {
+    try {
+      if (isNode && !isEdge) {
+        const mod = await import(
+          /* webpackIgnore: true */ '../dist/node/index.js'
+        );
+        const initSync =
+          (mod as any).initSync ?? (mod as any).__wbg_init ?? null;
+        if (typeof initSync === 'function') initSync();
+        return mod;
+      } else {
+        const mod = await import('../dist/bundler/index.js');
+        const wasmUrl = new URL(
+          '../dist/bundler/index_bg.wasm',
+          import.meta.url
+        );
+        const init = (mod as any).default ?? (mod as any).init;
+        if (typeof init !== 'function')
+          throw new Error('Browser/Edge initializer not found');
+        await init(wasmUrl);
+        return mod;
       }
-      await start();
-    } else {
-      throw new Error(
-        'Unsupported environment: neither Node.js nor browser detected'
-      );
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      throw new Error('Failed to initialize WASM module', { cause: e });
     }
-    await wasm.init();
-    return wasm;
-  } catch (error) {
-    throw new Error(`Failed to initialize WASM module: ${error}`);
-  }
+  };
+
+  once = load();
+  return once;
 }
