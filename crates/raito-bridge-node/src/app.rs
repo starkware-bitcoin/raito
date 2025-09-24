@@ -2,14 +2,17 @@
 
 use std::path::PathBuf;
 
-use bitcoin::block::Header as BlockHeader;
+use bitcoin::{block::Header as BlockHeader, Txid};
+use raito_bitcoin_client::BitcoinClient;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing::{error, info};
 
+use raito_spv_client::fetch::fetch_transaction_proof;
 use raito_spv_mmr::{
     block_mmr::{BlockInclusionProof, BlockMMR},
     sparse_roots::SparseRoots,
 };
+use raito_spv_verify::TransactionInclusionProof;
 
 /// Request sent to the application server via the API channel
 pub struct ApiRequest {
@@ -32,6 +35,10 @@ pub enum ApiRequestBody {
     AddBlock(BlockHeader),
     /// Generate an inclusion proof for a block at the given height and chain height (optional)
     GenerateBlockProof((u32, Option<u32>)),
+    /// Get a Bitcoin block header by height
+    GetBlockHeader(u32),
+    /// Get a Bitcoin transaction proof by transaction id
+    GetTransactionProof(Txid),
 }
 
 /// Response body for API requests containing the result data
@@ -44,6 +51,10 @@ pub enum ApiResponseBody {
     AddBlock(SparseRoots),
     /// Response containing the inclusion proof for a block
     GenerateBlockProof(BlockInclusionProof),
+    /// Response containing the block header for a given height
+    GetBlockHeader(BlockHeader),
+    /// Response containing the transaction inclusion proof
+    GetTransactionProof(TransactionInclusionProof),
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +63,10 @@ pub struct AppConfig {
     pub mmr_db_path: PathBuf,
     /// Api requests channel capacity
     pub api_requests_capacity: usize,
+    /// Bitcoin RPC URL used for fetching Bitcoin data
+    pub bitcoin_rpc_url: String,
+    /// Bitcoin RPC user:password (optional) used for fetching Bitcoin data
+    pub bitcoin_rpc_userpwd: Option<String>,
 }
 
 /// The main application server that processes API requests and manages the MMR accumulator
@@ -108,6 +123,38 @@ impl AppServer {
                             let sparse_roots = mmr.get_sparse_roots(None).await?;
                             let res = Ok(ApiResponseBody::AddBlock(sparse_roots));
                             req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to AddBlock request"))?;
+                        }
+                        ApiRequestBody::GetBlockHeader(block_height) => {
+                            let res = async {
+                                let bitcoin_client = BitcoinClient::new(
+                                    self.config.bitcoin_rpc_url.clone(),
+                                    self.config.bitcoin_rpc_userpwd.clone(),
+                                )?;
+
+                                let (block_header, _block_hash) = bitcoin_client
+                                    .get_block_header_by_height(block_height)
+                                    .await?;
+
+                                Ok(ApiResponseBody::GetBlockHeader(block_header))
+                            }
+                            .await;
+
+                            req.tx_response
+                                .send(res)
+                                .map_err(|_| anyhow::anyhow!("Failed to send response to GetBlockHeader request"))?;
+                        }
+                        ApiRequestBody::GetTransactionProof(txid) => {
+                            let res = fetch_transaction_proof(
+                                txid,
+                                self.config.bitcoin_rpc_url.clone(),
+                                self.config.bitcoin_rpc_userpwd.clone(),
+                            )
+                            .await
+                            .map(ApiResponseBody::GetTransactionProof);
+
+                            req.tx_response
+                                .send(res)
+                                .map_err(|_| anyhow::anyhow!("Failed to send response to GetTransactionProof request"))?;
                         }
                     }
                 },
@@ -201,6 +248,31 @@ impl AppClient {
             ApiRequestBody::GenerateBlockProof((block_height, block_count)),
             |response| match response {
                 ApiResponseBody::GenerateBlockProof(proof) => Some(proof),
+                _ => None,
+            },
+        )
+        .await
+    }
+
+    pub async fn get_block_header(&self, block_height: u32) -> Result<BlockHeader, anyhow::Error> {
+        self.send_request(
+            ApiRequestBody::GetBlockHeader(block_height),
+            |response| match response {
+                ApiResponseBody::GetBlockHeader(block_header) => Some(block_header),
+                _ => None,
+            },
+        )
+        .await
+    }
+
+    pub async fn get_transaction_proof(
+        &self,
+        txid: Txid,
+    ) -> Result<TransactionInclusionProof, anyhow::Error> {
+        self.send_request(
+            ApiRequestBody::GetTransactionProof(txid),
+            |response| match response {
+                ApiResponseBody::GetTransactionProof(proof) => Some(proof),
                 _ => None,
             },
         )

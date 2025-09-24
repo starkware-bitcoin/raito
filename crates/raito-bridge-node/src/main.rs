@@ -81,6 +81,8 @@ async fn main() {
     let app_config = AppConfig {
         mmr_db_path: cli.mmr_db_path,
         api_requests_capacity: 1000,
+        bitcoin_rpc_url: cli.bitcoin_rpc_url.clone(),
+        bitcoin_rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
     };
     let (mut app_server, app_client) = create_app(app_config, shutdown.subscribe());
 

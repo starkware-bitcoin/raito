@@ -16,8 +16,7 @@ use std::str::FromStr;
 use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
 
 use bitcoin::block::Header as BlockHeader;
-use raito_bitcoin_client::BitcoinClient;
-use raito_spv_client::fetch::{fetch_compressed_proof, fetch_transaction_proof};
+use raito_spv_client::fetch::fetch_compressed_proof;
 use raito_spv_mmr::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
 use raito_spv_verify::TransactionInclusionProof;
 
@@ -69,6 +68,8 @@ impl RpcServer {
             .route("/block-inclusion-proof/:block_height", get(generate_proof))
             .route("/head", get(get_head))
             .route("/roots", get(get_roots))
+            .route("/transaction-proof/:tx_id", get(get_transaction_proof))
+            .route("/block-header/:block_height", get(get_block_header))
             .with_state(self.app_client.clone())
             .layer(CompressionLayer::new())
             .layer(CorsLayer::permissive())
@@ -76,8 +77,6 @@ impl RpcServer {
 
         let compressed = Router::new()
             .route("/compressed_spv_proof/:tx_id", get(get_compressed_proof))
-            .route("/transaction-proof/:tx_id", get(get_transaction_proof))
-            .route("/block-header/:block_height", get(get_block_header))
             .with_state(self.config.clone())
             .layer(CompressionLayer::new())
             .layer(CorsLayer::permissive())
@@ -181,20 +180,11 @@ pub async fn get_head(State(app_client): State<AppClient>) -> Result<Json<u32>, 
 /// * `Json<BlockHeader>` - The block header in JSON format
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If fetching the block header fails
 pub async fn get_block_header(
-    State(config): State<RpcConfig>,
+    State(app_client): State<AppClient>,
     Path(block_height): Path<u32>,
 ) -> Result<Json<BlockHeader>, StatusCode> {
-    let bitcoin_client = BitcoinClient::new(
-        config.bitcoin_rpc_url.clone(),
-        config.bitcoin_rpc_userpwd.clone(),
-    )
-    .map_err(|e| {
-        error!("Failed to create Bitcoin client: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    let (block_header, _block_hash) = bitcoin_client
-        .get_block_header_by_height(block_height)
+    let block_header = app_client
+        .get_block_header(block_height)
         .await
         .map_err(|e| {
             error!(
@@ -242,21 +232,17 @@ pub async fn get_compressed_proof(
 /// * `StatusCode::BAD_REQUEST` - If the transaction ID is invalid
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If proof generation fails
 pub async fn get_transaction_proof(
-    State(config): State<RpcConfig>,
+    State(app_client): State<AppClient>,
     Path(tx_id): Path<String>,
 ) -> Result<Json<TransactionInclusionProof>, StatusCode> {
     let txid = bitcoin::Txid::from_str(&tx_id).map_err(|_| StatusCode::BAD_REQUEST)?;
-    // Call the fetch_transaction_proof function
-    let transaction_proof =
-        fetch_transaction_proof(txid, config.bitcoin_rpc_url, config.bitcoin_rpc_userpwd)
-            .await
-            .map_err(|e| {
-                error!(
-                    "Failed to fetch transaction proof for txid {}: {}",
-                    tx_id, e
-                );
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+    let transaction_proof = app_client.get_transaction_proof(txid).await.map_err(|e| {
+        error!(
+            "Failed to fetch transaction proof for txid {}: {}",
+            tx_id, e
+        );
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     Ok(Json(transaction_proof))
 }
