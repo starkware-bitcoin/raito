@@ -7,11 +7,42 @@ A comprehensive TypeScript SDK for fetching and verifying compressed SPV (Simpli
 
 ### Quick Start
 
+#### Using the Singleton Pattern (Recommended)
+
+```typescript
+import { getRaitoSpvSdk } from '@starkware-bitcoin/spv-verify';
+
+async function main() {
+  const sdk = getRaitoSpvSdk(); // Gets singleton instance
+  await sdk.init();
+
+  const recentHeight = await sdk.fetchRecentProvenHeight();
+  console.log('Most recent proven block height:', recentHeight);
+
+  const chainStateResult = await sdk.verifyRecentChainState();
+  console.log('MMR root:', chainStateResult.mmrRoot);
+  console.log('Chain state height:', chainStateResult.chainState.block_height);
+
+  const blockHeader = await sdk.verifyBlockHeader(
+    chainStateResult.chainState.block_height
+  );
+  console.log('Verified block header prev hash:', blockHeader.prev_blockhash);
+
+  const txid = '4f1b987645e596329b985064b1ce33046e4e293a08fd961193c8ddbb1ca219cc';
+  const transaction = await sdk.verifyTransaction(txid);
+  console.log('First output value (sats):', transaction.output[0]?.value);
+}
+
+main().catch(console.error);
+```
+
+#### Using Direct Instantiation
+
 ```typescript
 import { createRaitoSpvSdk } from '@starkware-bitcoin/spv-verify';
 
 async function main() {
-  const sdk = createRaitoSpvSdk();
+  const sdk = createRaitoSpvSdk(); // Creates new instance
   await sdk.init();
 
   const recentHeight = await sdk.fetchRecentProvenHeight();
@@ -39,6 +70,22 @@ main().catch(console.error);
 You can direct the SDK to another bridge endpoint or tweak the verifier
 configuration that is passed to the WASM backend:
 
+#### Using Singleton with Custom Configuration
+
+```typescript
+// Configuration is only used when creating the singleton instance
+const sdk = getRaitoSpvSdk('https://api.raito.wtf', {
+  min_work: '1813388729421943762059264',
+  bootloader_hash:
+    '0x0001837d8b77b6368e0129ce3f65b5d63863cfab93c47865ee5cbe62922ab8f3',
+  task_program_hash:
+    '0x00f0876bb47895e8c4a6e7043829d7886e3b135e3ef30544fb688ef4e25663ca',
+  task_output_size: 8,
+});
+```
+
+#### Using Direct Instantiation with Custom Configuration
+
 ```typescript
 const sdk = createRaitoSpvSdk('https://api.raito.wtf', {
   min_work: '1813388729421943762059264',
@@ -51,6 +98,17 @@ const sdk = createRaitoSpvSdk('https://api.raito.wtf', {
 ```
 
 All fields are optional; omitted values fall back to the defaults shown above.
+
+### Singleton Pattern Benefits
+
+The singleton pattern is recommended for most use cases because it:
+
+- **Prevents multiple WASM initializations**: Avoids the overhead of loading the WASM module multiple times
+- **Maintains state consistency**: Ensures all parts of your application use the same SDK instance with shared cache
+- **Reduces memory usage**: Only one instance exists throughout your application lifecycle
+- **Simplifies configuration**: Set up the SDK once and use it everywhere
+
+Use `resetRaitoSpvSdk()` if you need to reinitialize with different parameters or for testing purposes.
 
 ### Verifying Recent Chain State
 
@@ -79,13 +137,31 @@ All fields are optional; omitted values fall back to the defaults shown above.
 
 ## API Reference
 
-### `createRaitoSpvSdk(raitoRpcUrl?, config?)`
+### `getRaitoSpvSdk(raitoRpcUrl?, config?)`
+
+Gets the singleton instance of RaitoSpvSdk. If no instance exists, creates one with the provided parameters.
 
 - **`raitoRpcUrl`** (optional): custom bridge RPC endpoint. Defaults to
   `https://api.raito.wtf`.
 - **`config`** (optional): partial verifier configuration. Missing fields fall
   back to the default verifier settings bundled with the SDK.
-- **Returns**: a configured `RaitoSpvSdk` instance.
+- **Returns**: the singleton `RaitoSpvSdk` instance.
+
+### `createRaitoSpvSdk(raitoRpcUrl?, config?)`
+
+Creates a new instance of RaitoSpvSdk.
+
+- **`raitoRpcUrl`** (optional): custom bridge RPC endpoint. Defaults to
+  `https://api.raito.wtf`.
+- **`config`** (optional): partial verifier configuration. Missing fields fall
+  back to the default verifier settings bundled with the SDK.
+- **Returns**: a new `RaitoSpvSdk` instance.
+
+### `resetRaitoSpvSdk()`
+
+Resets the singleton instance. Useful for testing or reinitialization with different parameters.
+
+- **Returns**: `void`
 
 ### `RaitoSpvSdk`
 

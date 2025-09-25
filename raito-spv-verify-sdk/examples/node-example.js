@@ -1,4 +1,4 @@
-import { RaitoSpvSdk, createRaitoSpvSdk } from '../dist/index.js';
+import { getRaitoSpvSdk } from '../dist/index.js';
 
 async function simpleExample() {
   console.log('🚀 Raito SPV TypeScript SDK - Node Example');
@@ -6,7 +6,7 @@ async function simpleExample() {
 
   // Create SDK instance with default config and default RPC URL
   console.log('Creating SDK instance...');
-  const sdk = createRaitoSpvSdk();
+  const sdk = getRaitoSpvSdk();
   console.log('✅ SDK instance created\n');
 
   // Initialize SDK (loads WASM)

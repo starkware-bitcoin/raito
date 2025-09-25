@@ -1,4 +1,4 @@
-import { createRaitoSpvSdk } from '@starkware-bitcoin/spv-verify';
+import { getRaitoSpvSdk } from '@starkware-bitcoin/spv-verify';
 
 // DOM elements
 const txidInput = document.getElementById('txid');
@@ -24,8 +24,8 @@ async function init() {
   try {
     // Create SDK instance
     console.log('Creating SDK instance...');
-    sdk = createRaitoSpvSdk();
-
+    sdk = getRaitoSpvSdk();
+``
     // Initialize SDK
     console.log('Initializing SDK...');
     statusDiv.textContent = 'Initializing SDK...';

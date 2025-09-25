@@ -174,3 +174,29 @@ export function createRaitoSpvSdk(
 ): RaitoSpvSdk {
   return new RaitoSpvSdk(raitoRpcUrl, createVerifierConfig(config));
 }
+
+// Singleton instance
+let sdk: RaitoSpvSdk | undefined;
+/**
+ * Gets the singleton instance of RaitoSpvSdk
+ * If no instance exists, creates one with default parameters
+ * @param raitoRpcUrl Optional RPC URL for initialization
+ * @param config Optional config for initialization
+ * @returns The singleton RaitoSpvSdk instance
+ */
+export function getRaitoSpvSdk(
+  raitoRpcUrl?: string,
+  config?: Partial<VerifierConfig>
+): RaitoSpvSdk {
+  if (!sdk) {
+    sdk = createRaitoSpvSdk(raitoRpcUrl, config);
+  }
+  return sdk;
+}
+
+/**
+ * Resets the singleton instance (useful for testing or reinitialization)
+ */
+export function resetRaitoSpvSdk(): void {
+  sdk = undefined;
+}
