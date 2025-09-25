@@ -25,7 +25,7 @@ async function init() {
     // Create SDK instance
     console.log('Creating SDK instance...');
     sdk = getRaitoSpvSdk();
-``
+    ``;
     // Initialize SDK
     console.log('Initializing SDK...');
     statusDiv.textContent = 'Initializing SDK...';
