@@ -1,6 +1,5 @@
 //! HTTP RPC server providing REST endpoints for MMR proof generation and block count queries.
 
-use raito_spv_verify::CompressedSpvProof;
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use tracing::{error, info};
@@ -16,7 +15,6 @@ use std::str::FromStr;
 use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
 
 use bitcoin::block::Header as BlockHeader;
-use raito_spv_client::fetch::fetch_compressed_proof;
 use raito_spv_mmr::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
 use raito_spv_verify::TransactionInclusionProof;
 
@@ -33,12 +31,6 @@ pub struct ChainHeightQuery {
 pub struct RpcConfig {
     /// Host and port binding for the RPC server (e.g., "127.0.0.1:5000")
     pub rpc_host: String,
-    /// Bitcoin RPC URL
-    pub bitcoin_rpc_url: String,
-    /// Bitcoin RPC user:password (optional)
-    pub bitcoin_rpc_userpwd: Option<String>,
-    /// Raito RPC URL, where the /chainstate-proof/recent_proof endpoint is available
-    pub raito_rpc_url: String,
 }
 
 /// HTTP RPC server that provides endpoints for MMR operations
@@ -64,7 +56,7 @@ impl RpcServer {
     async fn run_inner(&self) -> Result<(), std::io::Error> {
         info!("Starting RPC server on {}", self.config.rpc_host);
 
-        let inclusion = Router::new()
+        let app = Router::new()
             .route("/block-inclusion-proof/:block_height", get(generate_proof))
             .route("/head", get(get_head))
             .route("/roots", get(get_roots))
@@ -74,15 +66,6 @@ impl RpcServer {
             .layer(CompressionLayer::new())
             .layer(CorsLayer::permissive())
             .layer(TraceLayer::new_for_http());
-
-        let compressed = Router::new()
-            .route("/compressed_spv_proof/:tx_id", get(get_compressed_proof))
-            .with_state(self.config.clone())
-            .layer(CompressionLayer::new())
-            .layer(CorsLayer::permissive())
-            .layer(TraceLayer::new_for_http());
-
-        let app = Router::new().merge(inclusion).merge(compressed);
 
         let listener = TcpListener::bind(&self.config.rpc_host).await?;
         let mut rx_shutdown = self.rx_shutdown.resubscribe();
@@ -195,34 +178,6 @@ pub async fn get_block_header(
         })?;
 
     Ok(Json(block_header))
-}
-
-/// Get a compressed SPV proof for a transaction in a specific block
-///
-/// # Returns
-/// * `Json<CompressedSpvProof>` - The compressed SPV proof in JSON format
-/// * `StatusCode::BAD_REQUEST` - If the transaction ID is invalid
-/// * `StatusCode::INTERNAL_SERVER_ERROR` - If proof generation fails
-pub async fn get_compressed_proof(
-    State(config): State<RpcConfig>,
-    Path(tx_id): Path<String>,
-) -> Result<Json<CompressedSpvProof>, StatusCode> {
-    let txid = bitcoin::Txid::from_str(&tx_id).map_err(|_| StatusCode::BAD_REQUEST)?;
-    // Call the fetch_compressed_proof function
-    let compressed_proof = fetch_compressed_proof(
-        txid,
-        config.bitcoin_rpc_url,
-        config.bitcoin_rpc_userpwd,
-        config.raito_rpc_url,
-        false,
-    )
-    .await
-    .map_err(|e| {
-        error!("Failed to fetch compressed proof for txid {}: {}", tx_id, e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    Ok(Json(compressed_proof))
 }
 
 /// Get a transaction inclusion proof for a specific transaction
