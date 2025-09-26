@@ -159,8 +159,6 @@ export class RaitoSpvSdk {
       );
     }
 
-
-
     this.blockHeaderFacts.set(blockHeight, blockHeader);
     console.log(
       `Block header verified for height ${blockHeight} - MMR Root: ${blockMmrRoot.substring(
