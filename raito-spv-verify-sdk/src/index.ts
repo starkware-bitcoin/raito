@@ -16,6 +16,14 @@ export * as blockProof from './block-proof.js';
 export * as transactionProof from './transaction-proof.js';
 export type { VerifierConfig } from './config.js';
 
+/**
+ * Configuration object for RaitoSpvSdk
+ */
+export interface RaitoSpvSdkConfig {
+  raitoRpcUrl: string;
+  verifierConfig: Partial<VerifierConfig>;
+}
+
 // Type declarations for different environments
 export class RaitoSpvSdk {
   private wasm: any;
@@ -34,6 +42,7 @@ export class RaitoSpvSdk {
   ) {
     console.log('Initializing RaitoSpvSdk...');
     console.log(`RPC URL: ${raitoRpcUrl}`);
+    console.log(`Config: ${JSON.stringify(config)}`);
     this.raitoRpcUrl = raitoRpcUrl;
     this.config = JSON.stringify(config);
     console.log('RaitoSpvSdk initialized successfully');
@@ -138,6 +147,20 @@ export class RaitoSpvSdk {
       throw new Error('Mismatched block MMR roots');
     }
 
+    console.log(`Verifying subchain work for block ${blockHeight}...`);
+    const hasEnoughWork = this.wasm.verify_subchain_work(
+      blockHeight,
+      JSON.stringify(chainState),
+      this.config
+    );
+    if (!hasEnoughWork) {
+      throw new Error(
+        `Not enough work on top of block ${blockHeight} according to verifier config`
+      );
+    }
+
+
+
     this.blockHeaderFacts.set(blockHeight, blockHeader);
     console.log(
       `Block header verified for height ${blockHeight} - MMR Root: ${blockMmrRoot.substring(
@@ -183,10 +206,11 @@ export class RaitoSpvSdk {
 }
 
 export function createRaitoSpvSdk(
-  raitoRpcUrl?: string,
-  config?: Partial<VerifierConfig>
+  config?: Partial<RaitoSpvSdkConfig>
 ): RaitoSpvSdk {
-  return new RaitoSpvSdk(raitoRpcUrl, createVerifierConfig(config));
+  const raitoRpcUrl = config?.raitoRpcUrl || 'https://api.raito.wtf';
+  const verifierConfig = createVerifierConfig(config?.verifierConfig);
+  return new RaitoSpvSdk(raitoRpcUrl, verifierConfig);
 }
 
 // Singleton instance
@@ -194,16 +218,14 @@ let sdk: RaitoSpvSdk | undefined;
 /**
  * Gets the singleton instance of RaitoSpvSdk
  * If no instance exists, creates one with default parameters
- * @param raitoRpcUrl Optional RPC URL for initialization
  * @param config Optional config for initialization
  * @returns The singleton RaitoSpvSdk instance
  */
 export function getRaitoSpvSdk(
-  raitoRpcUrl?: string,
-  config?: Partial<VerifierConfig>
+  config?: Partial<RaitoSpvSdkConfig>
 ): RaitoSpvSdk {
   if (!sdk) {
-    sdk = createRaitoSpvSdk(raitoRpcUrl, config);
+    sdk = createRaitoSpvSdk(config);
   }
   return sdk;
 }

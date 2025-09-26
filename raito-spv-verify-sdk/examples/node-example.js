@@ -6,7 +6,9 @@ async function simpleExample() {
 
   // Create SDK instance with default config and default RPC URL
   console.log('Creating SDK instance...');
-  const sdk = getRaitoSpvSdk();
+  const sdk = getRaitoSpvSdk({
+    verifierConfig: { min_work: '0' }
+  });
   console.log('✅ SDK instance created\n');
 
   // Initialize SDK (loads WASM)

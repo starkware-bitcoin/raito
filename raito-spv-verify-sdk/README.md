@@ -74,30 +74,36 @@ configuration that is passed to the WASM backend:
 
 ```typescript
 // Configuration is only used when creating the singleton instance
-const sdk = getRaitoSpvSdk('https://api.raito.wtf', {
-  min_work: '1813388729421943762059264',
-  bootloader_hash:
-    '0x0001837d8b77b6368e0129ce3f65b5d63863cfab93c47865ee5cbe62922ab8f3',
-  task_program_hash:
-    '0x00f0876bb47895e8c4a6e7043829d7886e3b135e3ef30544fb688ef4e25663ca',
-  task_output_size: 8,
+const sdk = getRaitoSpvSdk({
+  raitoRpcUrl: 'https://api.raito.wtf',
+  verifierConfig: {
+    min_work: '1813388729421943762059264',
+    bootloader_hash:
+      '0x0001837d8b77b6368e0129ce3f65b5d63863cfab93c47865ee5cbe62922ab8f3',
+    task_program_hash:
+      '0x00f0876bb47895e8c4a6e7043829d7886e3b135e3ef30544fb688ef4e25663ca',
+    task_output_size: 8,
+  }
 });
 ```
 
 #### Using Direct Instantiation with Custom Configuration
 
 ```typescript
-const sdk = createRaitoSpvSdk('https://api.raito.wtf', {
-  min_work: '1813388729421943762059264',
-  bootloader_hash:
-    '0x0001837d8b77b6368e0129ce3f65b5d63863cfab93c47865ee5cbe62922ab8f3',
-  task_program_hash:
-    '0x00f0876bb47895e8c4a6e7043829d7886e3b135e3ef30544fb688ef4e25663ca',
-  task_output_size: 8,
+const sdk = createRaitoSpvSdk({
+  raitoRpcUrl: 'https://api.raito.wtf',
+  verifierConfig: {
+    min_work: '1813388729421943762059264',
+    bootloader_hash:
+      '0x0001837d8b77b6368e0129ce3f65b5d63863cfab93c47865ee5cbe62922ab8f3',
+    task_program_hash:
+      '0x00f0876bb47895e8c4a6e7043829d7886e3b135e3ef30544fb688ef4e25663ca',
+    task_output_size: 8,
+  }
 });
 ```
 
-All fields are optional; omitted values fall back to the defaults shown above.
+All fields in the configuration object are optional; omitted values fall back to the defaults shown above.
 
 ### Singleton Pattern Benefits
 
@@ -137,24 +143,22 @@ Use `resetRaitoSpvSdk()` if you need to reinitialize with different parameters o
 
 ## API Reference
 
-### `getRaitoSpvSdk(raitoRpcUrl?, config?)`
+### `getRaitoSpvSdk(config?)`
 
 Gets the singleton instance of RaitoSpvSdk. If no instance exists, creates one with the provided parameters.
 
-- **`raitoRpcUrl`** (optional): custom bridge RPC endpoint. Defaults to
-  `https://api.raito.wtf`.
-- **`config`** (optional): partial verifier configuration. Missing fields fall
-  back to the default verifier settings bundled with the SDK.
+- **`config`** (optional): `Partial<RaitoSpvSdkConfig>` configuration object. Contains:
+  - **`raitoRpcUrl`** (optional): custom bridge RPC endpoint. Defaults to `https://api.raito.wtf`.
+  - **`verifierConfig`** (optional): partial verifier configuration. Missing fields fall back to the default verifier settings bundled with the SDK.
 - **Returns**: the singleton `RaitoSpvSdk` instance.
 
-### `createRaitoSpvSdk(raitoRpcUrl?, config?)`
+### `createRaitoSpvSdk(config?)`
 
 Creates a new instance of RaitoSpvSdk.
 
-- **`raitoRpcUrl`** (optional): custom bridge RPC endpoint. Defaults to
-  `https://api.raito.wtf`.
-- **`config`** (optional): partial verifier configuration. Missing fields fall
-  back to the default verifier settings bundled with the SDK.
+- **`config`** (optional): `Partial<RaitoSpvSdkConfig>` configuration object. Contains:
+  - **`raitoRpcUrl`** (optional): custom bridge RPC endpoint. Defaults to `https://api.raito.wtf`.
+  - **`verifierConfig`** (optional): partial verifier configuration. Missing fields fall back to the default verifier settings bundled with the SDK.
 - **Returns**: a new `RaitoSpvSdk` instance.
 
 ### `resetRaitoSpvSdk()`
@@ -192,6 +196,33 @@ Verifies the merkle proof for `txid`, ensures the enclosing block header is in
 the MMR, and returns the parsed transaction data.
 
 ### Types
+
+#### `RaitoSpvSdkConfig`
+
+```typescript
+interface RaitoSpvSdkConfig {
+  raitoRpcUrl: string;
+  verifierConfig: Partial<VerifierConfig>;
+}
+```
+
+Configuration object for initializing the RaitoSpvSdk. Both fields are required when using the full config object, but when passed to `getRaitoSpvSdk()` or `createRaitoSpvSdk()`, you can use `Partial<RaitoSpvSdkConfig>` to make all fields optional.
+
+- **`raitoRpcUrl`**: The RPC endpoint URL for the Raito bridge API
+- **`verifierConfig`**: Partial verifier configuration that will be merged with defaults
+
+#### `VerifierConfig`
+
+```typescript
+interface VerifierConfig {
+  min_work: string;
+  bootloader_hash: string;
+  task_program_hash: string;
+  task_output_size: number;
+}
+```
+
+Verifier configuration passed to the WASM backend for proof verification.
 
 #### `ChainStateProofVerificationResult`
 
