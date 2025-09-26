@@ -93,8 +93,22 @@ export class RaitoSpvSdk {
 
     console.log(`Verifying block header for height ${blockHeight}...`);
 
-    const { mmrRoot: chainStateMmrRoot, chainState } =
-      await this.verifyRecentChainState();
+    let { mmrRoot: chainStateMmrRoot, chainState } = await (async () => {
+      let result = await this.verifyRecentChainState();
+      if (blockHeight > result.chainState.block_height) {
+        console.log(
+          `Chain state is not up to date, trying to fetch latest chain state...`
+        );
+        this.chainStateFact = undefined;
+        result = await this.verifyRecentChainState();
+        if (blockHeight > result.chainState.block_height) {
+          throw new Error(
+            `Block height ${blockHeight} cannot be greater than latest proven chain height ${result.chainState.block_height}`
+          );
+        }
+      }
+      return result;
+    })();
 
     const proof = await blockProof.fetchBlockProof(
       this.raitoRpcUrl,
