@@ -43,12 +43,12 @@ pub enum ApiRequestBody {
 
 /// Response body for API requests containing the result data
 pub enum ApiResponseBody {
+    /// Empty response
+    Empty,
     /// Response containing the current block count
     GetBlockCount(u32),
     /// Response containing the sparse roots for a given block count
     GetSparseRoots(SparseRoots),
-    /// Response containing sparse roots after adding a block
-    AddBlock(SparseRoots),
     /// Response containing the inclusion proof for a block
     GenerateBlockProof(BlockInclusionProof),
     /// Response containing the block header for a given height
@@ -59,8 +59,8 @@ pub enum ApiResponseBody {
 
 #[derive(Debug, Clone)]
 pub struct AppConfig {
-    /// Path to the database storing the MMR accumulator state
-    pub mmr_db_path: PathBuf,
+    /// Path to the database storing the app state
+    pub db_path: PathBuf,
     /// Api requests channel capacity
     pub api_requests_capacity: usize,
     /// Bitcoin RPC URL used for fetching Bitcoin data
@@ -99,7 +99,7 @@ impl AppServer {
         info!("App server started");
 
         // We need to specify mmr_id to have deterministic keys in the database
-        let mut mmr = BlockMMR::from_file(&self.config.mmr_db_path, "blocks").await?;
+        let mut mmr = BlockMMR::from_file(&self.config.db_path, "blocks").await?;
 
         loop {
             tokio::select! {
@@ -120,8 +120,7 @@ impl AppServer {
                         ApiRequestBody::AddBlock(block_header) => {
                             // This is a local-only method, so we treat errors differently here
                             mmr.add_block_header(&block_header).await?;
-                            let sparse_roots = mmr.get_sparse_roots(None).await?;
-                            let res = Ok(ApiResponseBody::AddBlock(sparse_roots));
+                            let res = Ok(ApiResponseBody::Empty);
                             req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to AddBlock request"))?;
                         }
                         ApiRequestBody::GetBlockHeader(block_height) => {
@@ -228,11 +227,11 @@ impl AppClient {
         .await
     }
 
-    pub async fn add_block(&self, block_header: BlockHeader) -> Result<SparseRoots, anyhow::Error> {
+    pub async fn add_block(&self, block_header: BlockHeader) -> Result<(), anyhow::Error> {
         self.send_request(
             ApiRequestBody::AddBlock(block_header),
             |response| match response {
-                ApiResponseBody::AddBlock(sparse_roots) => Some(sparse_roots),
+                ApiResponseBody::Empty => Some(()),
                 _ => None,
             },
         )

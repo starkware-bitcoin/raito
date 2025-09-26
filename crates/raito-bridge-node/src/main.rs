@@ -9,14 +9,12 @@ use tracing_subscriber::filter::EnvFilter;
 
 use crate::{
     app::{create_app, AppConfig},
-    file_sink::SparseRootsSinkConfig,
     indexer::{Indexer, IndexerConfig},
     rpc::{RpcConfig, RpcServer},
     shutdown::Shutdown,
 };
 
 mod app;
-mod file_sink;
 mod indexer;
 mod rpc;
 mod shutdown;
@@ -34,15 +32,9 @@ struct Cli {
     /// Bitcoin RPC user:password (optional)
     #[arg(long, env = "USERPWD")]
     bitcoin_rpc_userpwd: Option<String>,
-    /// Path to the database storing the MMR accumulator state
+    /// Path to the database storing the app state
     #[arg(long, default_value = "./.mmr_data/mmr.db")]
-    mmr_db_path: PathBuf,
-    /// Output directory for sparse roots JSON files
-    #[arg(long, default_value = "./.mmr_data/roots")]
-    mmr_roots_dir: PathBuf,
-    /// Number of blocks per sparse roots shard directory
-    #[arg(long, default_value = "10000")]
-    mmr_shard_size: u32,
+    db_path: PathBuf,
     /// Indexing lag in blocks, to address potential reorgs
     #[arg(long, default_value = "1")]
     mmr_block_lag: u32,
@@ -76,7 +68,7 @@ async fn main() {
     let shutdown = Shutdown::default();
 
     let app_config = AppConfig {
-        mmr_db_path: cli.mmr_db_path,
+        db_path: cli.db_path,
         api_requests_capacity: 1000,
         bitcoin_rpc_url: cli.bitcoin_rpc_url.clone(),
         bitcoin_rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
@@ -87,10 +79,6 @@ async fn main() {
         rpc_url: cli.bitcoin_rpc_url.clone(),
         rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
         indexing_lag: cli.mmr_block_lag,
-        sink_config: SparseRootsSinkConfig {
-            output_dir: cli.mmr_roots_dir,
-            shard_size: cli.mmr_shard_size,
-        },
     };
     let mut indexer = Indexer::new(indexer_config, app_client.clone(), shutdown.subscribe());
 

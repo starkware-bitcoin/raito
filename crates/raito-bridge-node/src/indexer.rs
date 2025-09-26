@@ -5,10 +5,7 @@ use tracing::{error, info};
 
 use raito_bitcoin_client::BitcoinClient;
 
-use crate::{
-    app::AppClient,
-    file_sink::{SparseRootsSink, SparseRootsSinkConfig},
-};
+use crate::app::AppClient;
 
 /// Bitcoin block indexer that builds MMR accumulator and generates sparse roots
 pub struct Indexer {
@@ -28,8 +25,6 @@ pub struct IndexerConfig {
     pub rpc_userpwd: Option<String>,
     /// Indexing lag in blocks
     pub indexing_lag: u32,
-    /// Output directory for sparse roots JSON files
-    pub sink_config: SparseRootsSinkConfig,
 }
 
 impl Indexer {
@@ -55,17 +50,12 @@ impl Indexer {
         let mut next_block_height = self.app_client.get_block_count().await?;
         info!("Current MMR blocks count: {}", next_block_height);
 
-        // Initialize the sparse roots sink
-        let mut sink = SparseRootsSink::new(self.config.sink_config.clone()).await?;
-
         loop {
             tokio::select! {
                 res = bitcoin_client.wait_block_header(next_block_height, self.config.indexing_lag) => {
                     match res {
                         Ok((block_header, block_hash)) => {
-                            // Add new block to the MMR accumulator and get resulting sparse roots
-                            let roots = self.app_client.add_block(block_header).await?;
-                            sink.write_sparse_roots(&roots).await?;
+                            self.app_client.add_block(block_header).await?;
                             info!("Block #{} {} processed", next_block_height, block_hash);
                             next_block_height += 1;
                         },
