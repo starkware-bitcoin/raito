@@ -1,0 +1,59 @@
+{
+  "version": "1.0",
+  "block_height": 870000,
+  "block_hash": "00000000000000000002a23d6df20eecec15b21d32c75833cce28f42c4f3870a",
+  "proof_type": "STARK",
+  "proof": {
+    "stark_proof": {
+      "w": [
+        "0x1a2b3c4d5e6f7890123456789abcdef0123456789abcdef0123456789abcdef",
+        "0x2b3c4d5e6f7890123456789abcdef0123456789abcdef0123456789abcdef01",
+        "0x3c4d5e6f7890123456789abcdef0123456789abcdef0123456789abcdef0123"
+      ],
+      "proof_values": [
+        "0x4d5e6f7890123456789abcdef0123456789abcdef0123456789abcdef012345",
+        "0x5e6f7890123456789abcdef0123456789abcdef0123456789abcdef01234567",
+        "0x6f7890123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+      ],
+      "fri_proof": {
+        "commit_phase_merkle_roots": [
+          "0x7890123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+          "0x90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd"
+        ],
+        "query_phase": {
+          "queries": [
+            {
+              "leaf_elements": "0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+              "proof": "0xbcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789a"
+            }
+          ]
+        }
+      }
+    },
+    "public_inputs": {
+      "block_height": 870000,
+      "prev_block_hash": "0x00000000000000000002b5d213c78cc70c4b5a446c8d5e1f2c8d8f3a4b5c6d7e",
+      "merkle_root": "0xdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abc",
+      "timestamp": 1704067200,
+      "bits": "0x1a2b3c4d",
+      "nonce": "0x5e6f7890"
+    }
+  },
+  "verification_key": {
+    "field_generator": "0x03",
+    "stark_config": {
+      "security_level": 100,
+      "fri_config": {
+        "log_blowup_factor": 2,
+        "num_queries": 28,
+        "proof_of_work_bits": 16
+      }
+    }
+  },
+  "metadata": {
+    "generated_at": "2024-01-01T00:00:00Z",
+    "generator": "raito-prover-v1.0.0",
+    "verification_time_ms": 250,
+    "proof_size_bytes": 65536
+  }
+} 

@@ -19,14 +19,25 @@ export async function importAndInit() {
         return mod;
       } else {
         const mod = await import('../dist/bundler/index.js');
-        const wasmUrl = new URL(
-          '../dist/bundler/index_bg.wasm',
-          import.meta.url
-        );
-        const init = (mod as any).default ?? (mod as any).init;
-        if (typeof init !== 'function')
-          throw new Error('Browser/Edge initializer not found');
-        await init(wasmUrl);
+        const init =
+          (mod as any).default ?? (mod as any).init ?? (mod as any).__wbg_init;
+
+        if (typeof init === 'function') {
+          const wasmBytes = await import('../dist/bundler/index_bg.wasm');
+
+          if (
+            wasmBytes &&
+            typeof wasmBytes === 'object' &&
+            wasmBytes !== null &&
+            'default' in wasmBytes
+          ) {
+            const response = new Response(wasmBytes.default as any);
+            await init(response);
+          } else {
+            await init();
+          }
+        }
+
         return mod;
       }
     } catch (err) {
