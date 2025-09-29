@@ -26,6 +26,13 @@ pub struct ChainHeightQuery {
     pub chain_height: Option<u32>,
 }
 
+/// Query parameters for block headers retrieval
+#[derive(Debug, Deserialize)]
+pub struct BlockHeadersQuery {
+    pub offset: Option<u32>,
+    pub size: Option<u32>,
+}
+
 /// Configuration for the RPC server
 #[derive(Clone)]
 pub struct RpcConfig {
@@ -60,6 +67,7 @@ impl RpcServer {
             .route("/block-inclusion-proof/:block_height", get(generate_proof))
             .route("/head", get(get_head))
             .route("/roots", get(get_roots))
+            .route("/headers", get(get_block_headers))
             .route("/transaction-proof/:tx_id", get(get_transaction_proof))
             .route("/block-header/:block_height", get(get_block_header))
             .with_state(self.app_client.clone())
@@ -178,6 +186,33 @@ pub async fn get_block_header(
         })?;
 
     Ok(Json(block_header))
+}
+
+/// Get a range of block headers from the MMR
+///
+/// # Arguments
+/// * `offset` - The starting block height to get the headers for
+/// * `size` - The number of blocks to get the headers for
+/// # Returns
+/// * `Json<Vec<BlockHeader>>>` - The block headers in JSON format
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If fetching the block headers fails
+pub async fn get_block_headers(
+    State(app_client): State<AppClient>,
+    Query(query): Query<BlockHeadersQuery>,
+) -> Result<Json<Vec<BlockHeader>>, StatusCode> {
+    let offset = query.offset.unwrap_or(0);
+    let size = query.size.unwrap_or(10);
+    let block_headers = app_client
+        .get_block_headers(offset, size)
+        .await
+        .map_err(|e| {
+            error!(
+                "Failed to get {} block headers for offset {}: {}",
+                size, offset, e
+            );
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    Ok(Json(block_headers))
 }
 
 /// Get a transaction inclusion proof for a specific transaction
