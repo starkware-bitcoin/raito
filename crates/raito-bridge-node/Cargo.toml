@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# Accumulators
+accumulators.workspace = true
 # Core SPV functionality
 raito-spv-mmr = { path = "../raito-spv-mmr", features = ["sqlite"] }
 # Bitcoin client
@@ -12,6 +14,7 @@ raito-spv-client = { path = "../raito-spv-client" }
 raito-spv-verify = { path = "../raito-spv-verify" }
 # Async runtime
 tokio.workspace = true
+async-trait.workspace = true
 # Web framework
 axum = "0.7"
 tower-http = { version = "0.5", features = ["trace", "cors", "compression-gzip"] }
@@ -19,7 +22,7 @@ tower-http = { version = "0.5", features = ["trace", "cors", "compression-gzip"]
 # Bitcoin RPC and types (re-exported from raito-spv-mmr but needed for specific features)
 bitcoin.workspace = true
 # Storage
-libmdbx.workspace = true
+sqlx.workspace = true
 # CLI
 clap.workspace = true
 dotenv.workspace = true

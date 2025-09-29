@@ -1,9 +1,9 @@
 //! Application server and client for managing MMR accumulator operations via async message passing.
 
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
+use accumulators::hasher::stark_blake::StarkBlakeHasher;
 use bitcoin::{block::Header as BlockHeader, Txid};
-use raito_bitcoin_client::BitcoinClient;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing::{error, info};
 
@@ -13,6 +13,8 @@ use raito_spv_mmr::{
     sparse_roots::SparseRoots,
 };
 use raito_spv_verify::TransactionInclusionProof;
+
+use crate::store::AppStore;
 
 /// Request sent to the application server via the API channel
 pub struct ApiRequest {
@@ -31,8 +33,6 @@ pub enum ApiRequestBody {
     /// Get MMR sparse roots for a given chain height (optional)
     /// The chain height is the number of blocks in the MMR minus one
     GetSparseRoots(Option<u32>),
-    /// Add a new block header to the MMR
-    AddBlock(BlockHeader),
     /// Generate an inclusion proof for a block at the given height and chain height (optional)
     GenerateBlockProof((u32, Option<u32>)),
     /// Get a Bitcoin block header by height
@@ -43,8 +43,6 @@ pub enum ApiRequestBody {
 
 /// Response body for API requests containing the result data
 pub enum ApiResponseBody {
-    /// Empty response
-    Empty,
     /// Response containing the current block count
     GetBlockCount(u32),
     /// Response containing the sparse roots for a given block count
@@ -99,7 +97,12 @@ impl AppServer {
         info!("App server started");
 
         // We need to specify mmr_id to have deterministic keys in the database
-        let mut mmr = BlockMMR::from_file(&self.config.db_path, "blocks").await?;
+        let mmr_id = Some("blocks".to_string());
+        let store = Arc::new(
+            AppStore::multiple_concurrent_readers(&self.config.db_path, mmr_id.clone()).await?,
+        );
+        let hasher = Arc::new(StarkBlakeHasher::default());
+        let mmr = BlockMMR::new(store, hasher, mmr_id);
 
         loop {
             tokio::select! {
@@ -117,30 +120,9 @@ impl AppServer {
                             let res = mmr.generate_proof(block_height, chain_height).await.map(|proof| ApiResponseBody::GenerateBlockProof(proof));
                             req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to GenerateBlockProof request"))?;
                         }
-                        ApiRequestBody::AddBlock(block_header) => {
-                            // This is a local-only method, so we treat errors differently here
-                            mmr.add_block_header(&block_header).await?;
-                            let res = Ok(ApiResponseBody::Empty);
-                            req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to AddBlock request"))?;
-                        }
                         ApiRequestBody::GetBlockHeader(block_height) => {
-                            let res = async {
-                                let bitcoin_client = BitcoinClient::new(
-                                    self.config.bitcoin_rpc_url.clone(),
-                                    self.config.bitcoin_rpc_userpwd.clone(),
-                                )?;
-
-                                let (block_header, _block_hash) = bitcoin_client
-                                    .get_block_header_by_height(block_height)
-                                    .await?;
-
-                                Ok(ApiResponseBody::GetBlockHeader(block_header))
-                            }
-                            .await;
-
-                            req.tx_response
-                                .send(res)
-                                .map_err(|_| anyhow::anyhow!("Failed to send response to GetBlockHeader request"))?;
+                            let res = mmr.get_block_headers(block_height, 1).await.map(|block_headers| ApiResponseBody::GetBlockHeader(block_headers[0]));
+                            req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to GetBlockHeader request"))?;
                         }
                         ApiRequestBody::GetTransactionProof(txid) => {
                             let res = fetch_transaction_proof(
@@ -221,17 +203,6 @@ impl AppClient {
             ApiRequestBody::GetSparseRoots(block_count),
             |response| match response {
                 ApiResponseBody::GetSparseRoots(sparse_roots) => Some(sparse_roots),
-                _ => None,
-            },
-        )
-        .await
-    }
-
-    pub async fn add_block(&self, block_header: BlockHeader) -> Result<(), anyhow::Error> {
-        self.send_request(
-            ApiRequestBody::AddBlock(block_header),
-            |response| match response {
-                ApiResponseBody::Empty => Some(()),
                 _ => None,
             },
         )

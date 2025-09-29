@@ -7,8 +7,10 @@ edition = "2021"
 sqlite = ["accumulators/sqlite"]
 
 [dependencies]
+async-trait.workspace = true
+
 # Merkle mountain range
-accumulators = { git = "https://github.com/maciejka/rust-accumulators", rev = "1fbc79a472f1659f0aa0213de95a914086732204", features = ["blake", "memory", "mmr"]}
+accumulators.workspace = true
 
 # Bitcoin RPC and types
 #jsonrpsee.workspace = true
@@ -42,4 +44,4 @@ tokio = { version = "1.36", default-features = false, features = ["rt", "macros"
 [dev-dependencies]
 # Testing
 mockall.workspace = true
-tempfile.workspace = true 
+tempfile.workspace = true
