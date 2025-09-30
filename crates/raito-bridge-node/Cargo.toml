@@ -10,7 +10,6 @@ accumulators.workspace = true
 raito-spv-mmr = { path = "../raito-spv-mmr", features = ["sqlite"] }
 # Bitcoin client
 raito-bitcoin-client = { path = "../raito-bitcoin-client" }
-raito-spv-client = { path = "../raito-spv-client" }
 raito-spv-verify = { path = "../raito-spv-verify" }
 # Async runtime
 tokio.workspace = true

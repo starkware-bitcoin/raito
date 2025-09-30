@@ -39,6 +39,7 @@ pub const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 pub const CHAIN_HEIGHT_UPDATE_INTERVAL: Duration = Duration::from_secs(10);
 
 /// Bitcoin RPC client
+#[derive(Debug)]
 pub struct BitcoinClient {
     client: HttpClient,
     chain_height: u32,

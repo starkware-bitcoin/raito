@@ -6,6 +6,7 @@ use accumulators::store::{sqlite::SQLiteStore, Store as AccumulatorsStore, Store
 use async_trait::async_trait;
 use bitcoin::block::Header as BlockHeader;
 use bitcoin::consensus::{Decodable, Encodable};
+use bitcoin::BlockHash;
 use raito_spv_mmr::block_mmr::BlockMMRStore;
 use sqlx::sqlite::{
     SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous,
@@ -157,6 +158,16 @@ impl BlockMMRStore for AppStore {
                     .map_err(|e| StoreError::Custom(Box::new(e)))
             })
             .collect()
+    }
+
+    /// Get the height of a block by its hash
+    async fn get_block_height(&self, block_hash: &BlockHash) -> Result<u32, StoreError> {
+        let mut conn = self.0.acquire_connection().await?;
+        let row = sqlx::query("SELECT height FROM block_headers WHERE hash = ?")
+            .bind(block_hash.to_string())
+            .fetch_optional(conn.deref_mut())
+            .await?;
+        row.map(|row| row.get("height")).ok_or(StoreError::GetError)
     }
 }
 

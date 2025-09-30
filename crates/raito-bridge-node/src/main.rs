@@ -8,13 +8,11 @@ use tracing::{error, info, subscriber::set_global_default};
 use tracing_subscriber::filter::EnvFilter;
 
 use crate::{
-    app::{create_app, AppConfig},
     indexer::{Indexer, IndexerConfig},
     rpc::{RpcConfig, RpcServer},
     shutdown::Shutdown,
 };
 
-mod app;
 mod indexer;
 mod rpc;
 mod shutdown;
@@ -36,6 +34,9 @@ struct Cli {
     /// Path to the database storing the app state
     #[arg(long, default_value = "./.mmr_data/mmr.db")]
     db_path: PathBuf,
+    /// MMR ID
+    #[arg(long, default_value = "blocks")]
+    mmr_id: String,
     /// Indexing lag in blocks, to address potential reorgs
     #[arg(long, default_value = "1")]
     mmr_block_lag: u32,
@@ -71,33 +72,28 @@ async fn main() {
     let indexer_config = IndexerConfig {
         rpc_url: cli.bitcoin_rpc_url.clone(),
         rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
+        mmr_id: cli.mmr_id.clone(),
         mmr_db_path: cli.db_path.clone(),
         indexing_lag: cli.mmr_block_lag,
     };
     let mut indexer = Indexer::new(indexer_config, shutdown.subscribe());
 
-    let app_config = AppConfig {
-        db_path: cli.db_path.clone(),
-        api_requests_capacity: 1000,
-        bitcoin_rpc_url: cli.bitcoin_rpc_url.clone(),
-        bitcoin_rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
-    };
-    let (mut app_server, app_client) = create_app(app_config, shutdown.subscribe());
-
     let rpc_config = RpcConfig {
         rpc_host: cli.rpc_host,
+        mmr_id: cli.mmr_id,
+        mmr_db_path: cli.db_path.clone(),
+        rpc_url: cli.bitcoin_rpc_url.clone(),
+        rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
     };
-    let rpc_server = RpcServer::new(rpc_config, app_client.clone(), shutdown.subscribe());
+    let rpc_server = RpcServer::new(rpc_config, shutdown.subscribe());
 
     // Launching threads for each component
     let indexer_handle = tokio::spawn(async move { indexer.run().await });
-    let app_handle = tokio::spawn(async move { app_server.run().await });
     let rpc_handle = tokio::spawn(async move { rpc_server.run().await });
     let shutdown_handle = tokio::spawn(async move { shutdown.run().await });
 
     // If at least one component exits with an error, the node will exit with an error
     match tokio::try_join!(
-        flatten(app_handle),
         flatten(indexer_handle),
         flatten(rpc_handle),
         flatten(shutdown_handle)

@@ -1,5 +1,7 @@
 //! HTTP RPC server providing REST endpoints for MMR proof generation and block count queries.
 
+use accumulators::hasher::stark_blake::StarkBlakeHasher;
+use raito_bitcoin_client::BitcoinClient;
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use tracing::{error, info};
@@ -11,14 +13,17 @@ use axum::{
     Json, Router,
 };
 use serde::Deserialize;
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr, sync::Arc};
 use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
 
-use bitcoin::block::Header as BlockHeader;
-use raito_spv_mmr::{block_mmr::BlockInclusionProof, sparse_roots::SparseRoots};
+use bitcoin::{block::Header as BlockHeader, consensus, MerkleBlock};
+use raito_spv_mmr::{
+    block_mmr::{BlockInclusionProof, BlockMMR},
+    sparse_roots::SparseRoots,
+};
 use raito_spv_verify::TransactionInclusionProof;
 
-use crate::app::AppClient;
+use crate::store::AppStore;
 
 /// Query parameters for block inclusion proof generation and roots retrieval
 #[derive(Debug, Deserialize)]
@@ -38,30 +43,58 @@ pub struct BlockHeadersQuery {
 pub struct RpcConfig {
     /// Host and port binding for the RPC server (e.g., "127.0.0.1:5000")
     pub rpc_host: String,
+    /// MMR ID
+    pub mmr_id: String,
+    /// Path to the database storing the MMR accumulator
+    pub mmr_db_path: PathBuf,
+    /// Bitcoin RPC URL
+    pub rpc_url: String,
+    /// Bitcoin RPC user:password (optional)
+    pub rpc_userpwd: Option<String>,
 }
 
 /// HTTP RPC server that provides endpoints for MMR operations
 pub struct RpcServer {
     config: RpcConfig,
-    app_client: AppClient,
     rx_shutdown: broadcast::Receiver<()>,
 }
 
+#[derive(Debug, Clone)]
+pub struct AppState {
+    mmr: Arc<BlockMMR>,
+    bitcoin_client: Arc<BitcoinClient>,
+}
+
+impl AppState {
+    pub async fn new(config: RpcConfig) -> Result<Self, anyhow::Error> {
+        let mmr_id = Some(config.mmr_id.clone());
+        let store =
+            AppStore::multiple_concurrent_readers(&config.mmr_db_path, mmr_id.clone()).await?;
+        let hasher = StarkBlakeHasher::default();
+        let mmr = BlockMMR::new(Arc::new(store), Arc::new(hasher), mmr_id);
+        let bitcoin_client =
+            BitcoinClient::new(config.rpc_url.clone(), config.rpc_userpwd.clone())?;
+        Ok(Self {
+            mmr: Arc::new(mmr),
+            bitcoin_client: Arc::new(bitcoin_client),
+        })
+    }
+}
+
 impl RpcServer {
-    pub fn new(
-        config: RpcConfig,
-        app_client: AppClient,
-        rx_shutdown: broadcast::Receiver<()>,
-    ) -> Self {
+    pub fn new(config: RpcConfig, rx_shutdown: broadcast::Receiver<()>) -> Self {
         Self {
             config,
-            app_client,
             rx_shutdown,
         }
     }
 
     async fn run_inner(&self) -> Result<(), std::io::Error> {
         info!("Starting RPC server on {}", self.config.rpc_host);
+
+        let app_state = AppState::new(self.config.clone())
+            .await
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         let app = Router::new()
             .route("/block-inclusion-proof/:block_height", get(generate_proof))
@@ -70,7 +103,7 @@ impl RpcServer {
             .route("/headers", get(get_block_headers))
             .route("/transaction-proof/:tx_id", get(get_transaction_proof))
             .route("/block-header/:block_height", get(get_block_header))
-            .with_state(self.app_client.clone())
+            .with_state(app_state)
             .layer(CompressionLayer::new())
             .layer(CorsLayer::permissive())
             .layer(TraceLayer::new_for_http());
@@ -107,12 +140,13 @@ impl RpcServer {
 /// * `Json<InclusionProof>` - The inclusion proof in JSON format
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If proof generation fails
 pub async fn generate_proof(
-    State(app_client): State<AppClient>,
+    State(state): State<AppState>,
     Path(block_height): Path<u32>,
     Query(query): Query<ChainHeightQuery>,
 ) -> Result<Json<BlockInclusionProof>, StatusCode> {
-    let proof = app_client
-        .generate_block_proof(block_height, query.chain_height)
+    let proof = state
+        .mmr
+        .generate_proof(block_height, query.chain_height)
         .await
         .map_err(|e| {
             error!(
@@ -133,10 +167,11 @@ pub async fn generate_proof(
 /// * `Json<SparseRoots>` - The sparse roots in JSON format
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If getting roots fails
 pub async fn get_roots(
-    State(app_client): State<AppClient>,
+    State(state): State<AppState>,
     Query(query): Query<ChainHeightQuery>,
 ) -> Result<Json<SparseRoots>, StatusCode> {
-    let sparse_roots = app_client
+    let sparse_roots = state
+        .mmr
         .get_sparse_roots(query.chain_height)
         .await
         .map_err(|e| {
@@ -154,8 +189,8 @@ pub async fn get_roots(
 /// # Returns
 /// * `Json<u32>` - The current block count in JSON format
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If getting block count fails
-pub async fn get_head(State(app_client): State<AppClient>) -> Result<Json<u32>, StatusCode> {
-    let block_count = app_client.get_block_count().await.map_err(|e| {
+pub async fn get_head(State(state): State<AppState>) -> Result<Json<u32>, StatusCode> {
+    let block_count = state.mmr.get_block_count().await.map_err(|e| {
         error!("Failed to get block count: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
@@ -171,11 +206,12 @@ pub async fn get_head(State(app_client): State<AppClient>) -> Result<Json<u32>, 
 /// * `Json<BlockHeader>` - The block header in JSON format
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If fetching the block header fails
 pub async fn get_block_header(
-    State(app_client): State<AppClient>,
+    State(state): State<AppState>,
     Path(block_height): Path<u32>,
 ) -> Result<Json<BlockHeader>, StatusCode> {
-    let block_header = app_client
-        .get_block_header(block_height)
+    let block_header = state
+        .mmr
+        .get_block_headers(block_height, 1)
         .await
         .map_err(|e| {
             error!(
@@ -183,7 +219,10 @@ pub async fn get_block_header(
                 block_height, e
             );
             StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        })?
+        .get(0)
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?
+        .clone();
 
     Ok(Json(block_header))
 }
@@ -197,12 +236,13 @@ pub async fn get_block_header(
 /// * `Json<Vec<BlockHeader>>>` - The block headers in JSON format
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If fetching the block headers fails
 pub async fn get_block_headers(
-    State(app_client): State<AppClient>,
+    State(state): State<AppState>,
     Query(query): Query<BlockHeadersQuery>,
 ) -> Result<Json<Vec<BlockHeader>>, StatusCode> {
     let offset = query.offset.unwrap_or(0);
     let size = query.size.unwrap_or(10);
-    let block_headers = app_client
+    let block_headers = state
+        .mmr
         .get_block_headers(offset, size)
         .await
         .map_err(|e| {
@@ -222,17 +262,48 @@ pub async fn get_block_headers(
 /// * `StatusCode::BAD_REQUEST` - If the transaction ID is invalid
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If proof generation fails
 pub async fn get_transaction_proof(
-    State(app_client): State<AppClient>,
+    State(state): State<AppState>,
     Path(tx_id): Path<String>,
 ) -> Result<Json<TransactionInclusionProof>, StatusCode> {
     let txid = bitcoin::Txid::from_str(&tx_id).map_err(|_| StatusCode::BAD_REQUEST)?;
-    let transaction_proof = app_client.get_transaction_proof(txid).await.map_err(|e| {
+    let MerkleBlock {
+        header: block_header,
+        txn,
+    } = state
+        .bitcoin_client
+        .get_transaction_inclusion_proof(&txid)
+        .await
+        .map_err(|e| {
+            error!(
+                "Failed to fetch transaction proof for txid {}: {}",
+                tx_id, e
+            );
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let block_hash = block_header.block_hash();
+    let block_height = state.mmr.get_block_height(&block_hash).await.map_err(|e| {
         error!(
-            "Failed to fetch transaction proof for txid {}: {}",
-            tx_id, e
+            "Failed to get block height for block hash {}: {}",
+            block_hash, e
         );
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    Ok(Json(transaction_proof))
+    let transaction = state
+        .bitcoin_client
+        .get_transaction(&txid, &block_hash)
+        .await
+        .map_err(|e| {
+            error!("Failed to get transaction for txid {}: {}", tx_id, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let transaction_proof = TransactionInclusionProof {
+        transaction,
+        transaction_proof: consensus::encode::serialize(&txn),
+        block_header,
+        block_height,
+    };
+    Ok(Json(transaction_proof.into()))
 }

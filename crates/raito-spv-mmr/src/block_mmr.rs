@@ -13,6 +13,7 @@ use accumulators::store::{Store, StoreError};
 use async_trait::async_trait;
 use bitcoin::block::Header as BlockHeader;
 use bitcoin::hashes::Hash;
+use bitcoin::BlockHash;
 use serde::{Deserialize, Serialize};
 
 use crate::sparse_roots::SparseRoots;
@@ -37,6 +38,7 @@ pub trait BlockMMRStore: Store {
         start_height: u32,
         num_blocks: u32,
     ) -> Result<Vec<BlockHeader>, StoreError>;
+    async fn get_block_height(&self, block_hash: &BlockHash) -> Result<u32, StoreError>;
 }
 
 #[async_trait]
@@ -47,6 +49,9 @@ impl BlockMMRStore for InMemoryStore {
     }
     async fn get_block_headers(&self, _: u32, _: u32) -> Result<Vec<BlockHeader>, StoreError> {
         unimplemented!("Getting block headers from in-memory store is not supported");
+    }
+    async fn get_block_height(&self, _: &BlockHash) -> Result<u32, StoreError> {
+        unimplemented!("Getting block height from in-memory store is not supported");
     }
 }
 
@@ -141,6 +146,14 @@ impl BlockMMR {
             ));
         }
         Ok(res)
+    }
+
+    /// Get the height of a block by its hash
+    pub async fn get_block_height(&self, block_hash: &BlockHash) -> anyhow::Result<u32> {
+        self.store
+            .get_block_height(block_hash)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get block height: {}", e))
     }
 
     /// Get the number of blocks in the MMR (number of leaves)
