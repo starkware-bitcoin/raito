@@ -35,13 +35,13 @@ pub enum BitcoinClientError {
 /// Default HTTP request timeout
 pub const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Default block count update interval in seconds
-pub const BLOCK_COUNT_UPDATE_INTERVAL: Duration = Duration::from_secs(10);
+/// Default chain height update interval in seconds
+pub const CHAIN_HEIGHT_UPDATE_INTERVAL: Duration = Duration::from_secs(10);
 
 /// Bitcoin RPC client
 pub struct BitcoinClient {
     client: HttpClient,
-    block_count: u32,
+    chain_height: u32,
     backoff: backoff::ExponentialBackoff,
 }
 
@@ -65,7 +65,7 @@ impl BitcoinClient {
 
         Ok(Self {
             client,
-            block_count: 0,
+            chain_height: 0,
             backoff: backoff::ExponentialBackoff::default(),
         })
     }
@@ -153,7 +153,7 @@ impl BitcoinClient {
     }
 
     /// Get current chain height
-    pub async fn get_block_count(&self) -> Result<u32, BitcoinClientError> {
+    pub async fn get_chain_height(&self) -> Result<u32, BitcoinClientError> {
         let result: u64 = self.request("getblockcount", rpc_params![]).await?;
         Ok(result as u32)
     }
@@ -165,13 +165,13 @@ impl BitcoinClient {
         height: u32,
         lag: u32,
     ) -> Result<(BlockHeader, BlockHash), BitcoinClientError> {
-        while height >= self.block_count {
-            self.block_count = self.get_block_count().await?.saturating_sub(lag);
-            if height < self.block_count {
-                debug!("New block count: {}", self.block_count);
+        while height > self.chain_height {
+            self.chain_height = self.get_chain_height().await?.saturating_sub(lag);
+            if height <= self.chain_height {
+                debug!("New chain height: {}", self.chain_height);
                 break;
             } else {
-                tokio::time::sleep(BLOCK_COUNT_UPDATE_INTERVAL).await;
+                tokio::time::sleep(CHAIN_HEIGHT_UPDATE_INTERVAL).await;
             }
         }
         self.get_block_header_by_height(height).await
