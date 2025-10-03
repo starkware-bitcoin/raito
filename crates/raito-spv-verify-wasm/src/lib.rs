@@ -1,6 +1,11 @@
 //! WASM bindings for raito SPV verification
 //! This crate provides WebAssembly bindings for SPV proof verification
+#![no_std]
 
+extern crate alloc;
+
+use alloc::format;
+use alloc::string::String;
 use bitcoin::block::Header;
 use raito_spv_mmr::block_mmr::BlockInclusionProof;
 use raito_spv_verify::ChainState;
@@ -60,7 +65,7 @@ pub fn verify_transaction(
         transaction,
         transaction_proof,
         block_header,
-        block_height,
+        block_height: _,
     } = serde_json::from_str(transaction_proof_data)
         .map_err(|e| JsValue::from_str(&format!("Failed to parse transaction proof: {}", e)))?;
 
@@ -134,9 +139,9 @@ pub fn create_custom_config(
     task_output_size: u32,
 ) -> JsValue {
     let config = VerifierConfig {
-        min_work: min_work.to_string(),
-        bootloader_hash: bootloader_hash.to_string(),
-        task_program_hash: task_program_hash.to_string(),
+        min_work: String::from(min_work),
+        bootloader_hash: String::from(bootloader_hash),
+        task_program_hash: String::from(task_program_hash),
         task_output_size,
     };
     serde_wasm_bindgen::to_value(&config).unwrap_or(JsValue::NULL)
@@ -173,5 +178,5 @@ pub fn init() {
 /// Get the version of the WASM module
 #[wasm_bindgen]
 pub fn get_version() -> String {
-    env!("CARGO_PKG_VERSION").to_string()
+    String::from(env!("CARGO_PKG_VERSION"))
 }

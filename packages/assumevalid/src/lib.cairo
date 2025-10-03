@@ -6,7 +6,6 @@ use stwo_cairo_air::{CairoProof, VerificationOutput, get_verification_output, ve
 use utils::blake2s_hasher::{Blake2sDigestFromU256, Blake2sDigestIntoU256};
 use utils::mmr::{MMR, MMRTrait};
 
-
 #[derive(Drop, Serde)]
 struct Args {
     /// Current (initial) chain state.
@@ -109,10 +108,7 @@ fn get_prev_result(proof: CairoProof) -> Result {
     let VerificationOutput { program_hash, output } = get_verification_output(proof: @proof);
 
     // Verify the proof
-    match verify_cairo(proof) {
-        Ok(_) => {},
-        Err(e) => panic!("Invalid proof: {:?}", e),
-    }
+    verify_cairo(proof);
 
     // Deserialize the bootloader output
     let mut serialized_bootloader_output = output.span();
