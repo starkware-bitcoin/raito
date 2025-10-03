@@ -73,8 +73,3 @@ status:
 # View service logs
 logs:
 	ansible all -m shell -a "journalctl -u raito-bridge-node --lines=50 --no-pager"
-
-# Test API endpoint
-test-api:
-	@echo "Testing API endpoint..."
-	ansible all -m shell -a "curl -s http://localhost:8080/head || echo 'API not responding'"
