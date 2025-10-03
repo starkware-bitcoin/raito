@@ -8,18 +8,15 @@ use tracing::{error, info, subscriber::set_global_default};
 use tracing_subscriber::filter::EnvFilter;
 
 use crate::{
-    app::{create_app, AppConfig},
-    file_sink::SparseRootsSinkConfig,
     indexer::{Indexer, IndexerConfig},
     rpc::{RpcConfig, RpcServer},
     shutdown::Shutdown,
 };
 
-mod app;
-mod file_sink;
 mod indexer;
 mod rpc;
 mod shutdown;
+mod store;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -34,15 +31,12 @@ struct Cli {
     /// Bitcoin RPC user:password (optional)
     #[arg(long, env = "USERPWD")]
     bitcoin_rpc_userpwd: Option<String>,
-    /// Path to the database storing the MMR accumulator state
+    /// Path to the database storing the app state
     #[arg(long, default_value = "./.mmr_data/mmr.db")]
-    mmr_db_path: PathBuf,
-    /// Output directory for sparse roots JSON files
-    #[arg(long, default_value = "./.mmr_data/roots")]
-    mmr_roots_dir: PathBuf,
-    /// Number of blocks per sparse roots shard directory
-    #[arg(long, default_value = "10000")]
-    mmr_shard_size: u32,
+    db_path: PathBuf,
+    /// MMR ID
+    #[arg(long, default_value = "blocks")]
+    mmr_id: String,
     /// Indexing lag in blocks, to address potential reorgs
     #[arg(long, default_value = "1")]
     mmr_block_lag: u32,
@@ -75,39 +69,31 @@ async fn main() {
     // Instantiating components and wiring them together
     let shutdown = Shutdown::default();
 
-    let app_config = AppConfig {
-        mmr_db_path: cli.mmr_db_path,
-        api_requests_capacity: 1000,
-        bitcoin_rpc_url: cli.bitcoin_rpc_url.clone(),
-        bitcoin_rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
-    };
-    let (mut app_server, app_client) = create_app(app_config, shutdown.subscribe());
-
     let indexer_config = IndexerConfig {
         rpc_url: cli.bitcoin_rpc_url.clone(),
         rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
+        mmr_id: cli.mmr_id.clone(),
+        mmr_db_path: cli.db_path.clone(),
         indexing_lag: cli.mmr_block_lag,
-        sink_config: SparseRootsSinkConfig {
-            output_dir: cli.mmr_roots_dir,
-            shard_size: cli.mmr_shard_size,
-        },
     };
-    let mut indexer = Indexer::new(indexer_config, app_client.clone(), shutdown.subscribe());
+    let mut indexer = Indexer::new(indexer_config, shutdown.subscribe());
 
     let rpc_config = RpcConfig {
         rpc_host: cli.rpc_host,
+        mmr_id: cli.mmr_id,
+        mmr_db_path: cli.db_path.clone(),
+        rpc_url: cli.bitcoin_rpc_url.clone(),
+        rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
     };
-    let rpc_server = RpcServer::new(rpc_config, app_client.clone(), shutdown.subscribe());
+    let rpc_server = RpcServer::new(rpc_config, shutdown.subscribe());
 
     // Launching threads for each component
-    let app_handle = tokio::spawn(async move { app_server.run().await });
     let indexer_handle = tokio::spawn(async move { indexer.run().await });
     let rpc_handle = tokio::spawn(async move { rpc_server.run().await });
     let shutdown_handle = tokio::spawn(async move { shutdown.run().await });
 
     // If at least one component exits with an error, the node will exit with an error
     match tokio::try_join!(
-        flatten(app_handle),
         flatten(indexer_handle),
         flatten(rpc_handle),
         flatten(shutdown_handle)

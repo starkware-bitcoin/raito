@@ -30,10 +30,11 @@
     "./wasm/web": "./dist/bundler/index.js"
   },
   "scripts": {
-    "build": "npm run build:wasm && npm run build:ts && npm run types:copy",
+    "build": "npm run build:wasm && npm run postbuild:wasm && npm run build:ts && npm run types:copy",
     "build:wasm": "npm run build:wasm:node && npm run build:wasm:bundler",
     "build:wasm:node": "RUSTFLAGS='--cfg getrandom_backend=\"wasm_js\"' wasm-pack build ../crates/raito-spv-verify-wasm --release --target nodejs --out-dir dist/node --out-name index && mkdir -p dist/node && cp -r ../crates/raito-spv-verify-wasm/dist/node/* dist/node/",
     "build:wasm:bundler": "RUSTFLAGS='--cfg getrandom_backend=\"wasm_js\"' wasm-pack build ../crates/raito-spv-verify-wasm --release --target bundler --out-dir dist/bundler --out-name index && mkdir -p dist/bundler && cp -r ../crates/raito-spv-verify-wasm/dist/bundler/* dist/bundler/",
+    "postbuild:wasm": "node scripts/strip-bad-wasm-dts.js",
     "build:ts": "tsc -p tsconfig.json",
     "types:copy": "mkdir -p dist/types && cp dist/bundler/index.d.ts dist/types/wasm.d.ts",
     "format": "prettier --write .",

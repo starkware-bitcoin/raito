@@ -97,7 +97,7 @@ mod tests {
     }
 
     #[test]
-    fn test_next_prev_timstamps() {
+    fn test_next_prev_timestamps() {
         let prev_timestamps = array![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].span();
         let mut block_time = 12_u32;
 
