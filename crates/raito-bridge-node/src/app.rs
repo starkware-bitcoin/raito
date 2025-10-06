@@ -37,6 +37,8 @@ pub enum ApiRequestBody {
     GenerateBlockProof((u32, Option<u32>)),
     /// Get a Bitcoin block header by height
     GetBlockHeader(u32),
+    /// Get a range of Bitcoin block headers by offset and size
+    GetBlockHeaders(u32, u32),
     /// Get a Bitcoin transaction proof by transaction id
     GetTransactionProof(Txid),
 }
@@ -51,6 +53,8 @@ pub enum ApiResponseBody {
     GenerateBlockProof(BlockInclusionProof),
     /// Response containing the block header for a given height
     GetBlockHeader(BlockHeader),
+    /// Response containing the range of block headers
+    GetBlockHeaders(Vec<BlockHeader>),
     /// Response containing the transaction inclusion proof
     GetTransactionProof(TransactionInclusionProof),
 }
@@ -123,6 +127,10 @@ impl AppServer {
                         ApiRequestBody::GetBlockHeader(block_height) => {
                             let res = mmr.get_block_headers(block_height, 1).await.map(|block_headers| ApiResponseBody::GetBlockHeader(block_headers[0]));
                             req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to GetBlockHeader request"))?;
+                        }
+                        ApiRequestBody::GetBlockHeaders(offset, size) => {
+                            let res = mmr.get_block_headers(offset, size).await.map(|block_headers| ApiResponseBody::GetBlockHeaders(block_headers));
+                            req.tx_response.send(res).map_err(|_| anyhow::anyhow!("Failed to send response to GetBlockHeaders request"))?;
                         }
                         ApiRequestBody::GetTransactionProof(txid) => {
                             let res = fetch_transaction_proof(
@@ -229,6 +237,21 @@ impl AppClient {
             ApiRequestBody::GetBlockHeader(block_height),
             |response| match response {
                 ApiResponseBody::GetBlockHeader(block_header) => Some(block_header),
+                _ => None,
+            },
+        )
+        .await
+    }
+
+    pub async fn get_block_headers(
+        &self,
+        offset: u32,
+        size: u32,
+    ) -> Result<Vec<BlockHeader>, anyhow::Error> {
+        self.send_request(
+            ApiRequestBody::GetBlockHeaders(offset, size),
+            |response| match response {
+                ApiResponseBody::GetBlockHeaders(block_headers) => Some(block_headers),
                 _ => None,
             },
         )

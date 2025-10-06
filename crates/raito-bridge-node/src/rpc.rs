@@ -239,13 +239,12 @@ pub async fn get_block_header(
 /// * `Json<Vec<BlockHeader>>>` - The block headers in JSON format
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If fetching the block headers fails
 pub async fn get_block_headers(
-    State(state): State<AppState>,
+    State(app_client): State<AppClient>,
     Query(query): Query<BlockHeadersQuery>,
 ) -> Result<Json<Vec<BlockHeader>>, StatusCode> {
     let offset = query.offset.unwrap_or(0);
     let size = query.size.unwrap_or(10);
-    let block_headers = state
-        .store
+    let block_headers = app_client
         .get_block_headers(offset, size)
         .await
         .map_err(|e| {
