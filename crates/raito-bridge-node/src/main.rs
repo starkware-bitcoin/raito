@@ -8,12 +8,13 @@ use tracing::{error, info, subscriber::set_global_default};
 use tracing_subscriber::filter::EnvFilter;
 
 use crate::{
+    app::{create_app, AppConfig},
     indexer::{Indexer, IndexerConfig},
     rpc::{RpcConfig, RpcServer},
     shutdown::Shutdown,
 };
 
-mod chain_state;
+mod app;
 mod indexer;
 mod rpc;
 mod shutdown;
@@ -33,11 +34,9 @@ struct Cli {
     #[arg(long, env = "USERPWD")]
     bitcoin_rpc_userpwd: Option<String>,
     /// Path to the database storing the app state
+    /// Path to the database storing the app state
     #[arg(long, default_value = "./.mmr_data/mmr.db")]
     db_path: PathBuf,
-    /// MMR ID
-    #[arg(long, default_value = "blocks")]
-    mmr_id: String,
     /// Indexing lag in blocks, to address potential reorgs
     #[arg(long, default_value = "1")]
     mmr_block_lag: u32,
@@ -69,6 +68,14 @@ async fn main() {
 
     // Instantiating components and wiring them together
     let shutdown = Shutdown::default();
+
+    let app_config = AppConfig {
+        db_path: cli.db_path,
+        api_requests_capacity: 1000,
+        bitcoin_rpc_url: cli.bitcoin_rpc_url.clone(),
+        bitcoin_rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
+    };
+    let (mut app_server, app_client) = create_app(app_config, shutdown.subscribe());
 
     let indexer_config = IndexerConfig {
         rpc_url: cli.bitcoin_rpc_url.clone(),
