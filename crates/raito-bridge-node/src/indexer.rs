@@ -25,6 +25,8 @@ pub struct IndexerConfig {
     pub rpc_url: String,
     /// Bitcoin RPC user:password (optional)
     pub rpc_userpwd: Option<String>,
+    /// MMR ID
+    pub mmr_id: String,
     /// Path to the database storing the MMR accumulator
     pub mmr_db_path: PathBuf,
     /// Indexing lag in blocks
@@ -47,7 +49,7 @@ impl Indexer {
         info!("Bitcoin RPC client initialized");
 
         // We need to specify mmr_id to have deterministic keys in the database
-        let mmr_id = Some("blocks".to_string());
+        let mmr_id = Some(self.config.mmr_id.clone());
         let store = Arc::new(
             AppStore::single_atomic_writer(&self.config.mmr_db_path, mmr_id.clone()).await?,
         );
