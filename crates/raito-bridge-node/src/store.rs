@@ -6,16 +6,13 @@ use accumulators::store::{sqlite::SQLiteStore, Store as AccumulatorsStore, Store
 use async_trait::async_trait;
 use bitcoin::block::Header as BlockHeader;
 use bitcoin::consensus::{Decodable, Encodable};
-use bitcoin::BlockHash;
-use raito_spv_verify::ChainState;
+use raito_spv_mmr::block_mmr::BlockMMRStore;
 use sqlx::sqlite::{
     SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous,
     SqliteTransactionManager,
 };
 use sqlx::{Row, TransactionManager};
 use tokio::fs;
-
-use crate::chain_state::ChainStateStore;
 
 /// SQLite busy timeout in milliseconds
 const SQLITE_BUSY_TIMEOUT: &str = "5000";
@@ -60,16 +57,20 @@ impl AppStore {
     }
 
     /// Create a store for multiple concurrent readers
-    pub fn multiple_concurrent_readers<P: AsRef<Path>>(path: P, id: Option<String>) -> Self {
+    pub async fn multiple_concurrent_readers<P: AsRef<Path>>(
+        path: P,
+        id: Option<String>,
+    ) -> Result<Self, sqlx::Error> {
         let options = SqliteConnectOptions::new()
             .filename(path.as_ref())
             .read_only(true);
 
         let pool = SqlitePoolOptions::new()
             .max_connections(SQLITE_MAX_CONCURRENT_READERS)
-            .connect_lazy_with(options);
+            .connect_with(options)
+            .await?;
 
-        Self(SQLiteStore::with_pool(pool, id))
+        Ok(Self(SQLiteStore::with_pool(pool, id)))
     }
 
     /// Initialize the store by creating the tables if missing
@@ -83,15 +84,6 @@ impl AppStore {
                 height INTEGER PRIMARY KEY,
                 hash TEXT NOT NULL,
                 header BLOB NOT NULL
-            );"#,
-        )
-        .execute(conn.deref_mut())
-        .await?;
-        // Create a table for chain states
-        sqlx::query(
-            r#"CREATE TABLE IF NOT EXISTS chain_states (
-                height INTEGER PRIMARY KEY,
-                state BLOB NOT NULL
             );"#,
         )
         .execute(conn.deref_mut())
@@ -125,7 +117,7 @@ impl AppStore {
 }
 
 #[async_trait]
-impl ChainStateStore for AppStore {
+impl BlockMMRStore for AppStore {
     /// Add a new block header to the store
     async fn add_block_header(
         &self,
@@ -165,41 +157,6 @@ impl ChainStateStore for AppStore {
                     .map_err(|e| StoreError::Custom(Box::new(e)))
             })
             .collect()
-    }
-
-    /// Get the height of a block by its hash
-    async fn get_block_height(&self, block_hash: &BlockHash) -> Result<u32, StoreError> {
-        let mut conn = self.0.acquire_connection().await?;
-        let row = sqlx::query("SELECT height FROM block_headers WHERE hash = ?")
-            .bind(block_hash.to_string())
-            .fetch_optional(conn.deref_mut())
-            .await?;
-        row.map(|row| row.get("height")).ok_or(StoreError::GetError)
-    }
-
-    async fn get_chain_state(&self, height: u32) -> Result<ChainState, StoreError> {
-        let mut conn = self.0.acquire_connection().await?;
-        let row = sqlx::query("SELECT state FROM chain_states WHERE height = ?")
-            .bind(height)
-            .fetch_optional(conn.deref_mut())
-            .await?;
-        let data: Vec<u8> = row.ok_or(StoreError::GetError)?.get("state");
-        bincode::deserialize::<ChainState>(&data).map_err(|e| StoreError::Custom(Box::new(e)))
-    }
-
-    async fn add_chain_state(
-        &self,
-        height: u32,
-        chain_state: &ChainState,
-    ) -> Result<(), StoreError> {
-        let mut conn = self.0.acquire_connection().await?;
-        let data = bincode::serialize(chain_state).map_err(|e| StoreError::Custom(Box::new(e)))?;
-        sqlx::query("INSERT INTO chain_states (height, state) VALUES (?, ?)")
-            .bind(height)
-            .bind(data)
-            .execute(conn.deref_mut())
-            .await?;
-        Ok(())
     }
 }
 

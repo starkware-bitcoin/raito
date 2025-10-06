@@ -69,22 +69,21 @@ async fn main() {
     // Instantiating components and wiring them together
     let shutdown = Shutdown::default();
 
+    let indexer_config = IndexerConfig {
+        rpc_url: cli.bitcoin_rpc_url.clone(),
+        rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
+        mmr_db_path: cli.db_path.clone(),
+        indexing_lag: cli.mmr_block_lag,
+    };
+    let mut indexer = Indexer::new(indexer_config, shutdown.subscribe());
+
     let app_config = AppConfig {
-        db_path: cli.db_path,
+        db_path: cli.db_path.clone(),
         api_requests_capacity: 1000,
         bitcoin_rpc_url: cli.bitcoin_rpc_url.clone(),
         bitcoin_rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
     };
     let (mut app_server, app_client) = create_app(app_config, shutdown.subscribe());
-
-    let indexer_config = IndexerConfig {
-        rpc_url: cli.bitcoin_rpc_url.clone(),
-        rpc_userpwd: cli.bitcoin_rpc_userpwd.clone(),
-        mmr_id: cli.mmr_id.clone(),
-        mmr_db_path: cli.db_path.clone(),
-        indexing_lag: cli.mmr_block_lag,
-    };
-    let mut indexer = Indexer::new(indexer_config, shutdown.subscribe());
 
     let rpc_config = RpcConfig {
         rpc_host: cli.rpc_host,
@@ -97,6 +96,7 @@ async fn main() {
 
     // Launching threads for each component
     let indexer_handle = tokio::spawn(async move { indexer.run().await });
+    let app_handle = tokio::spawn(async move { app_server.run().await });
     let rpc_handle = tokio::spawn(async move { rpc_server.run().await });
     let shutdown_handle = tokio::spawn(async move { shutdown.run().await });
 

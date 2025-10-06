@@ -9,7 +9,7 @@ use tracing::{error, info};
 
 use raito_bitcoin_client::BitcoinClient;
 
-use crate::app::AppClient;
+use crate::store::AppStore;
 
 /// Bitcoin block indexer that builds MMR accumulator and generates sparse roots
 pub struct Indexer {
@@ -25,8 +25,6 @@ pub struct IndexerConfig {
     pub rpc_url: String,
     /// Bitcoin RPC user:password (optional)
     pub rpc_userpwd: Option<String>,
-    /// MMR ID
-    pub mmr_id: String,
     /// Path to the database storing the MMR accumulator
     pub mmr_db_path: PathBuf,
     /// Indexing lag in blocks
@@ -49,7 +47,7 @@ impl Indexer {
         info!("Bitcoin RPC client initialized");
 
         // We need to specify mmr_id to have deterministic keys in the database
-        let mmr_id = Some(self.config.mmr_id.clone());
+        let mmr_id = Some("blocks".to_string());
         let store = Arc::new(
             AppStore::single_atomic_writer(&self.config.mmr_db_path, mmr_id.clone()).await?,
         );
@@ -65,7 +63,9 @@ impl Indexer {
                 res = bitcoin_client.wait_block_header(next_block_height, self.config.indexing_lag) => {
                     match res {
                         Ok((block_header, block_hash)) => {
-                            self.app_client.add_block(block_header).await?;
+                            store.begin().await?;
+                            mmr.add_block_header(next_block_height, &block_header).await?;
+                            store.commit().await?;
                             info!("Block #{} {} processed", next_block_height, block_hash);
                             next_block_height += 1;
                         },

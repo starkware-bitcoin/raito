@@ -9,7 +9,8 @@ use accumulators::mmr::{
     PeaksOptions, Proof, ProofOptions, MMR,
 };
 use accumulators::store::memory::InMemoryStore;
-use accumulators::store::Store;
+use accumulators::store::{Store, StoreError};
+use async_trait::async_trait;
 use bitcoin::block::Header as BlockHeader;
 use bitcoin::hashes::Hash;
 use serde::{Deserialize, Serialize};
@@ -20,7 +21,33 @@ use crate::sparse_roots::SparseRoots;
 #[derive(Debug)]
 pub struct BlockMMR {
     hasher: Arc<dyn Hasher>,
+    store: Arc<dyn BlockMMRStore>,
     mmr: MMR,
+}
+
+#[async_trait]
+pub trait BlockMMRStore: Store {
+    async fn add_block_header(
+        &self,
+        height: u32,
+        block_header: &BlockHeader,
+    ) -> Result<(), StoreError>;
+    async fn get_block_headers(
+        &self,
+        start_height: u32,
+        num_blocks: u32,
+    ) -> Result<Vec<BlockHeader>, StoreError>;
+}
+
+#[async_trait]
+impl BlockMMRStore for InMemoryStore {
+    async fn add_block_header(&self, _: u32, _: &BlockHeader) -> Result<(), StoreError> {
+        tracing::warn!("Adding block header to in-memory store is not supported");
+        Ok(())
+    }
+    async fn get_block_headers(&self, _: u32, _: u32) -> Result<Vec<BlockHeader>, StoreError> {
+        unimplemented!("Getting block headers from in-memory store is not supported");
+    }
 }
 
 /// Proof data structure for demonstrating inclusion of a block in the MMR
@@ -47,9 +74,13 @@ impl Default for BlockMMR {
 
 impl BlockMMR {
     /// Create a new default MMR
-    pub fn new(store: Arc<dyn Store>, hasher: Arc<dyn Hasher>, mmr_id: Option<String>) -> Self {
+    pub fn new(
+        store: Arc<dyn BlockMMRStore>,
+        hasher: Arc<dyn Hasher>,
+        mmr_id: Option<String>,
+    ) -> Self {
         let mmr = MMR::new(store.clone(), hasher.clone(), mmr_id);
-        Self { hasher, mmr }
+        Self { hasher, mmr, store }
     }
 
     /// Create in-memory MMR from peaks hashes and elements count
@@ -67,7 +98,7 @@ impl BlockMMR {
             leaf_count_to_mmr_size(leaf_count),
         )
         .await?;
-        Ok(Self { hasher, mmr })
+        Ok(Self { hasher, mmr, store })
     }
 
     /// Add a leaf to the MMR
@@ -77,10 +108,39 @@ impl BlockMMR {
     }
 
     /// Add a block header to the MMR
-    pub async fn add_block_header(&mut self, block_header: &BlockHeader) -> anyhow::Result<()> {
+    pub async fn add_block_header(
+        &mut self,
+        height: u32,
+        block_header: &BlockHeader,
+    ) -> anyhow::Result<()> {
         let leaf = block_header_digest(self.hasher.clone(), block_header)?;
         self.add(leaf).await?;
+        self.store
+            .add_block_header(height, block_header)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to add block header: {}", e))?;
         Ok(())
+    }
+
+    /// Get a range of block headers from the MMR
+    pub async fn get_block_headers(
+        &self,
+        start_height: u32,
+        num_blocks: u32,
+    ) -> anyhow::Result<Vec<BlockHeader>> {
+        let res = self
+            .store
+            .get_block_headers(start_height, num_blocks)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get block headers: {}", e))?;
+        if res.len() != num_blocks as usize {
+            return Err(anyhow::anyhow!(
+                "Failed to get block headers: expected {}, got {}",
+                num_blocks,
+                res.len()
+            ));
+        }
+        Ok(res)
     }
 
     /// Get the number of blocks in the MMR (number of leaves)
@@ -390,8 +450,8 @@ mod tests {
         )
         .unwrap();
         // Add 10 blocks
-        for _ in 0..10 {
-            mmr.add_block_header(&block_header).await.unwrap();
+        for i in 0..10 {
+            mmr.add_block_header(i as u32, &block_header).await.unwrap();
         }
         // Generate a proof for the fifth block
         let proof = mmr.generate_proof(5, None).await.unwrap();
