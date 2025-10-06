@@ -20,13 +20,13 @@ pub fn verify_subchain_work(
     let start_epoch = chain_state.block_height / 2016;
     let end_epoch = block_height / 2016;
     let mut subchain_work = BigUint::ZERO;
-    let mut target = BigUint::from_str(&chain_state.current_target).unwrap();
+    let mut target = BigUint::from_bytes_be(&chain_state.current_target.to_be_bytes());
 
     for epoch in (end_epoch..=start_epoch).rev() {
         let start_block = min(2016 * (epoch + 1), chain_state.block_height);
         let end_block = max(2016 * epoch, block_height);
         let block_span = BigUint::from(start_block - end_block);
-        let block_work = compute_work_from_target(target.clone());
+        let block_work = compute_work_from_target(&target);
         subchain_work += block_work * block_span;
         target *= BigUint::from(4_u32);
     }
@@ -48,7 +48,7 @@ pub fn verify_subchain_work(
 }
 
 /// Compute the expected work for a single block given the target difficulty.
-fn compute_work_from_target(target: BigUint) -> BigUint {
+fn compute_work_from_target(target: &BigUint) -> BigUint {
     // 2^256
     let max_work = BigUint::from_str(
         "115792089237316195423570985008687907853269984665640564039457584007913129639936",

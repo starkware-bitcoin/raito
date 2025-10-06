@@ -22,6 +22,7 @@ tower-http = { version = "0.5", features = ["trace", "cors", "compression-gzip"]
 bitcoin.workspace = true
 # Storage
 sqlx.workspace = true
+bincode.workspace = true
 # CLI
 clap.workspace = true
 dotenv.workspace = true

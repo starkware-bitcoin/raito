@@ -21,9 +21,9 @@ use raito_spv_mmr::{
     block_mmr::{BlockInclusionProof, BlockMMR},
     sparse_roots::SparseRoots,
 };
-use raito_spv_verify::TransactionInclusionProof;
+use raito_spv_verify::{ChainState, TransactionInclusionProof};
 
-use crate::store::AppStore;
+use crate::{chain_state::ChainStateStore, store::AppStore};
 
 /// Query parameters for block inclusion proof generation and roots retrieval
 #[derive(Debug, Deserialize)]
@@ -62,21 +62,25 @@ pub struct RpcServer {
 #[derive(Debug, Clone)]
 pub struct AppState {
     mmr: Arc<BlockMMR>,
+    store: Arc<AppStore>,
     bitcoin_client: Arc<BitcoinClient>,
 }
 
 impl AppState {
-    pub async fn new(config: RpcConfig) -> Result<Self, anyhow::Error> {
+    pub fn new(config: RpcConfig) -> Result<Self, anyhow::Error> {
         let mmr_id = Some(config.mmr_id.clone());
-        let store =
-            AppStore::multiple_concurrent_readers(&config.mmr_db_path, mmr_id.clone()).await?;
+        let store = Arc::new(AppStore::multiple_concurrent_readers(
+            &config.mmr_db_path,
+            mmr_id.clone(),
+        ));
         let hasher = StarkBlakeHasher::default();
-        let mmr = BlockMMR::new(Arc::new(store), Arc::new(hasher), mmr_id);
+        let mmr = BlockMMR::new(store.clone(), Arc::new(hasher), mmr_id);
         let bitcoin_client =
             BitcoinClient::new(config.rpc_url.clone(), config.rpc_userpwd.clone())?;
         Ok(Self {
             mmr: Arc::new(mmr),
             bitcoin_client: Arc::new(bitcoin_client),
+            store: store.clone(),
         })
     }
 }
@@ -93,7 +97,6 @@ impl RpcServer {
         info!("Starting RPC server on {}", self.config.rpc_host);
 
         let app_state = AppState::new(self.config.clone())
-            .await
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         let app = Router::new()
@@ -103,6 +106,7 @@ impl RpcServer {
             .route("/headers", get(get_block_headers))
             .route("/transaction-proof/:tx_id", get(get_transaction_proof))
             .route("/block-header/:block_height", get(get_block_header))
+            .route("/chain-state/:block_height", get(get_chain_state))
             .with_state(app_state)
             .layer(CompressionLayer::new())
             .layer(CorsLayer::permissive())
@@ -210,7 +214,7 @@ pub async fn get_block_header(
     Path(block_height): Path<u32>,
 ) -> Result<Json<BlockHeader>, StatusCode> {
     let block_header = state
-        .mmr
+        .store
         .get_block_headers(block_height, 1)
         .await
         .map_err(|e| {
@@ -220,9 +224,8 @@ pub async fn get_block_header(
             );
             StatusCode::INTERNAL_SERVER_ERROR
         })?
-        .get(0)
-        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?
-        .clone();
+        .pop()
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(block_header))
 }
@@ -242,7 +245,7 @@ pub async fn get_block_headers(
     let offset = query.offset.unwrap_or(0);
     let size = query.size.unwrap_or(10);
     let block_headers = state
-        .mmr
+        .store
         .get_block_headers(offset, size)
         .await
         .map_err(|e| {
@@ -282,13 +285,17 @@ pub async fn get_transaction_proof(
         })?;
 
     let block_hash = block_header.block_hash();
-    let block_height = state.mmr.get_block_height(&block_hash).await.map_err(|e| {
-        error!(
-            "Failed to get block height for block hash {}: {}",
-            block_hash, e
-        );
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let block_height = state
+        .store
+        .get_block_height(&block_hash)
+        .await
+        .map_err(|e| {
+            error!(
+                "Failed to get block height for block hash {}: {}",
+                block_hash, e
+            );
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let transaction = state
         .bitcoin_client
@@ -306,4 +313,27 @@ pub async fn get_transaction_proof(
         block_height,
     };
     Ok(Json(transaction_proof.into()))
+}
+
+/// Get the chain state for a specific block height
+///
+/// # Returns
+/// * `Json<ChainState>` - The chain state in JSON format
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If fetching the chain state fails
+pub async fn get_chain_state(
+    State(state): State<AppState>,
+    Path(block_height): Path<u32>,
+) -> Result<Json<ChainState>, StatusCode> {
+    let chain_state = state
+        .store
+        .get_chain_state(block_height)
+        .await
+        .map_err(|e| {
+            error!(
+                "Failed to get chain state for height {}: {}",
+                block_height, e
+            );
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    Ok(Json(chain_state))
 }

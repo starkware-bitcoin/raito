@@ -9,7 +9,7 @@ use tracing::{error, info};
 
 use raito_bitcoin_client::BitcoinClient;
 
-use crate::store::AppStore;
+use crate::{chain_state::ChainStateManager, store::AppStore};
 
 /// Bitcoin block indexer that builds MMR accumulator and generates sparse roots
 pub struct Indexer {
@@ -60,13 +60,18 @@ impl Indexer {
         let mut next_block_height = mmr.get_block_count().await?;
         info!("Current MMR blocks count: {}", next_block_height);
 
+        let mut chain_state_mgr =
+            ChainStateManager::restore(store.clone(), next_block_height).await?;
+        info!("Chain state manager initialized");
+
         loop {
             tokio::select! {
                 res = bitcoin_client.wait_block_header(next_block_height, self.config.indexing_lag) => {
                     match res {
                         Ok((block_header, block_hash)) => {
                             store.begin().await?;
-                            mmr.add_block_header(next_block_height, &block_header).await?;
+                            mmr.add_block_header(&block_header).await.map_err(|e| anyhow::anyhow!("Failed to add block header to MMR: {}", e))?;
+                            chain_state_mgr.update(next_block_height, &block_header).await.map_err(|e| anyhow::anyhow!("Failed to update chain state: {}", e))?;
                             store.commit().await?;
                             info!("Block #{} {} processed", next_block_height, block_hash);
                             next_block_height += 1;

@@ -1,12 +1,10 @@
 //! Types representing the compressed SPV proof and helpers to decode Cairo outputs
 //! and compute chain state digests used during verification.
 
-use std::str::FromStr;
-
 use bitcoin::hashes::Hash;
 use bitcoin::{block::Header as BlockHeader, BlockHash, Transaction};
+use bitcoin::{Target, Work};
 use cairo_air::CairoProof;
-use num_bigint::BigUint;
 use raito_spv_mmr::block_mmr::BlockInclusionProof;
 use serde::{Deserialize, Serialize};
 use starknet_ff::FieldElement;
@@ -45,16 +43,16 @@ pub struct CompressedSpvProof {
 }
 
 /// Snapshot of the consensus chain state used to validate block inclusion
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainState {
     /// The height of the best block in the chain
     pub block_height: u32,
-    /// The total accumulated work of the chain as a decimal string
-    pub total_work: String,
+    /// The total accumulated work of the chain
+    pub total_work: Work,
     /// The hash of the best block in the chain
     pub best_block_hash: BlockHash,
-    /// The current target difficulty as a compact decimal string
-    pub current_target: String,
+    /// The current target difficulty
+    pub current_target: Target,
     /// The start time (UNIX seconds) of the current difficulty epoch
     pub epoch_start_time: u32,
     /// The timestamps (UNIX seconds) of the previous 11 blocks
@@ -158,9 +156,9 @@ impl ChainState {
         // Construct the payload for the hash function, all integers are little-endian
         let mut words = Vec::new();
         words.push(self.block_height);
-        words.extend_from_slice(&big_uint_to_u256_words(&self.total_work)?);
+        words.extend_from_slice(&split_bytes_into_words(&self.total_work.to_be_bytes()));
         words.extend_from_slice(&best_block_hash_words);
-        words.extend_from_slice(&big_uint_to_u256_words(&self.current_target)?);
+        words.extend_from_slice(&split_bytes_into_words(&self.current_target.to_be_bytes()));
         words.push(self.epoch_start_time);
         words.extend_from_slice(&self.prev_timestamps);
 
@@ -184,12 +182,11 @@ impl ChainState {
     }
 }
 
-fn big_uint_to_u256_words(value: &str) -> Result<Vec<u32>, anyhow::Error> {
-    let number = BigUint::from_str(value).map_err(|_| anyhow::anyhow!("Invalid number"))?;
-    let mut digits = number.to_u32_digits();
-    digits.extend(vec![0; 8 - digits.len()]);
-    digits.reverse();
-    Ok(digits)
+fn split_bytes_into_words(bytes: &[u8]) -> Vec<u32> {
+    bytes
+        .chunks_exact(4)
+        .map(|chunk| u32::from_be_bytes(chunk.try_into().unwrap()))
+        .collect()
 }
 
 #[cfg(test)]
@@ -202,13 +199,15 @@ mod tests {
     fn test_chain_state_hash() {
         let chain_state = ChainState {
             block_height: 0,
-            total_work: "4295032833".to_string(),
+            total_work: Work::from_hex("0x100010001").unwrap(),
             best_block_hash: BlockHash::from_str(
                 "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
             )
             .unwrap(),
-            current_target: "26959535291011309493156476344723991336010898738574164086137773096960"
-                .to_string(),
+            current_target: Target::from_hex(
+                "0xffff0000000000000000000000000000000000000000000000000000",
+            )
+            .unwrap(),
             epoch_start_time: 1231006505,
             prev_timestamps: vec![1231006505],
         };

@@ -13,6 +13,7 @@ use crate::{
     shutdown::Shutdown,
 };
 
+mod chain_state;
 mod indexer;
 mod rpc;
 mod shutdown;
