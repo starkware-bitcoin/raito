@@ -1,0 +1,16 @@
+[package]
+name = "raito-cairo-serialize"
+version = "0.1.0"
+edition = "2021"
+description = "Serialize Rust structures into Cairo/Scarb runner-compatible argument felts"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+anyhow = { workspace = true }
+hex = { workspace = true }
+num-traits = { workspace = true }
+num-bigint = { workspace = true }
+
+stwo = { workspace = true}
+stwo-cairo-serialize = { workspace = true }
+starknet-ff = { workspace = true }
