@@ -1,0 +1,33 @@
+[package]
+name = "raito-assumevalid"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "raito_assumevalid"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raito-assumevalid"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+clap = { workspace = true }
+hex = { workspace = true }
+tracing-subscriber = { workspace = true }
+regex = "1.0"
+
+# Raito dependencies
+raito-cairo-args = { path = "../raito-cairo-args", features = ["raito-spv-verify", "bitcoin", "raito-spv-mmr"] }
+raito-spv-verify = { path = "../raito-spv-verify" }
+raito-spv-mmr = { path = "../raito-spv-mmr" }
+
+# Bitcoin
+bitcoin = { workspace = true }
+
