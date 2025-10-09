@@ -1,0 +1,50 @@
+[package]
+name = "raito-assumevalid"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "raito_assumevalid"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raito-assumevalid"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+clap = { workspace = true }
+hex = { workspace = true }
+tracing-subscriber = { workspace = true }
+bytes = { workspace = true }
+regex = "1.0"
+num-bigint = { workspace = true }
+chrono = { version = "0.4", features = ["clock"] }
+
+# Raito dependencies
+raito-cairo-serialize = { path = "../raito-cairo-serialize"}
+stwo-cairo-serialize = { workspace = true }
+raito-spv-verify = { path = "../raito-spv-verify" }
+raito-spv-mmr = { path = "../raito-spv-mmr" }
+
+# Bitcoin
+bitcoin = { workspace = true }
+
+# Stwo-cairo
+cairo-air = { workspace = true }
+stwo = { workspace = true}
+stwo_cairo_prover = { workspace = true }
+
+# Starknet
+starknet-ff = { workspace = true }
+
+# Compression
+flate2 = "1.0"
+percent-encoding = "2"
+google-cloud-storage = "1.1.0"
+gcp_auth = "0.11"

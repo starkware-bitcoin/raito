@@ -268,7 +268,7 @@ def run_prover(job_info, executable, proof, arguments):
 
     save_prover_log(batch_dir, "PROVE", stdout, stderr, returncode, elapsed, max_memory)
 
-    if returncode == 0:
+    if returncode == 0 and False:
         temp_files = [
             program_input_file,
             # pub_json,

@@ -14,6 +14,7 @@ use stwo_cairo_serialize::serialize::CairoSerialize;
 pub struct U256String(pub String);
 pub struct ByteArrayString(pub String);
 pub struct DigestString(pub String);
+pub struct U256StringLittleEndian(pub String);
 
 impl CairoSerialize for U256String {
     fn serialize(&self, output: &mut Vec<FieldElement>) {
@@ -37,6 +38,34 @@ impl CairoSerialize for U256String {
         let mut hi_bytes = [0u8; 32];
         hi_bytes[16..].copy_from_slice(hi16);
 
+        output.push(FieldElement::from_bytes_be(&lo_bytes).unwrap());
+        output.push(FieldElement::from_bytes_be(&hi_bytes).unwrap());
+    }
+}
+
+impl CairoSerialize for U256StringLittleEndian {
+    fn serialize(&self, output: &mut Vec<FieldElement>) {
+        // Accept decimal string only, produce 32-byte big-endian
+        let s = self.0.trim();
+        assert!(
+            !s.starts_with("0x") && !s.starts_with("0X"),
+            "Hex not supported for U256StringHiLo; use decimal",
+        );
+        let n = BigUint::from_str_radix(s, 10).expect("Invalid decimal string for U256");
+        let bytes = n.to_bytes_be();
+        assert!(bytes.len() <= 32, "U256 value exceeds 256 bits");
+        let mut be = [0u8; 32];
+        be[32 - bytes.len()..].copy_from_slice(&bytes);
+
+        // hi = most-significant 16 bytes, lo = least-significant 16 bytes
+        let (lo16, hi16) = be.split_at(16);
+
+        let mut hi_bytes = [0u8; 32];
+        hi_bytes[16..].copy_from_slice(hi16);
+        let mut lo_bytes = [0u8; 32];
+        lo_bytes[16..].copy_from_slice(lo16);
+
+        // Note: emit HI first, then LO to match Cairo MMR Serde (high, low)
         output.push(FieldElement::from_bytes_be(&lo_bytes).unwrap());
         output.push(FieldElement::from_bytes_be(&hi_bytes).unwrap());
     }
@@ -113,7 +142,7 @@ impl CairoSerialize for DigestString {
 
 // Backwards-compatibility: preserve `serializer::...` path
 pub mod serializer {
-    pub use super::{ByteArrayString, DigestString, U256String};
+    pub use super::{ByteArrayString, DigestString, U256String, U256StringLittleEndian};
 }
 
 #[cfg(test)]
@@ -177,6 +206,20 @@ mod tests {
                     "0xe15a089c",
                     "0x68d61900",
                     "0x0",
+                ] as &[&str],
+            ),
+            (
+                Kind::Digest,
+                "0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098",
+                &[
+                    "0x982051fd",
+                    "0x1e4ba744",
+                    "0xbbbe680e",
+                    "0x1fee1467",
+                    "0x7ba1a3c3",
+                    "0x540bf7b1",
+                    "0xcdb606e8",
+                    "0x57233e0e",
                 ] as &[&str],
             ),
             (

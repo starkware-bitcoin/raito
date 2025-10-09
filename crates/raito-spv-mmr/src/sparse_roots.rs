@@ -1,22 +1,25 @@
 //! Sparse roots representation for MMR peaks compatible with Cairo implementation.
 
 use accumulators::mmr::elements_count_to_leaf_count;
-use num_bigint::BigInt;
+use num_bigint::{BigInt, BigUint};
 use num_traits::Num;
-use serde::{Serialize, Serializer};
+use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json;
 use std::str::FromStr;
 
 /// Sparse roots is MMR peaks for all heights, where missing ones are filled with zeros
 /// This representation is different from the "compact" one, which contains only non-zero peaks
 /// but with total number of elements.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SparseRoots {
     /// Block height
     #[serde(skip)]
     pub block_height: u32,
     /// MMR peaks for all heights, where missing ones are filled with zeros
-    #[serde(serialize_with = "serialize_u256_array")]
+    #[serde(
+        serialize_with = "serialize_u256_array",
+        deserialize_with = "deserialize_u256_array"
+    )]
     pub roots: Vec<String>,
 }
 
@@ -86,6 +89,61 @@ where
         }
     }
     seq.end()
+}
+
+/// Custom deserialization for Vec<String> where items are Cairo u256 objects {hi, lo}
+pub fn deserialize_u256_array<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::Deserialize as _;
+
+    let values = Vec::<serde_json::Value>::deserialize(deserializer)?;
+    let mut result: Vec<String> = Vec::with_capacity(values.len());
+
+    for value in values {
+        match value {
+            serde_json::Value::Object(mut map) => {
+                let hi_val = map
+                    .remove("hi")
+                    .ok_or_else(|| D::Error::custom("missing 'hi' in u256 object"))?;
+                let lo_val = map
+                    .remove("lo")
+                    .ok_or_else(|| D::Error::custom("missing 'lo' in u256 object"))?;
+
+                let hi_hex = json_value_to_padded_hex::<D::Error>(hi_val)?;
+                let lo_hex = json_value_to_padded_hex::<D::Error>(lo_val)?;
+                result.push(format!("0x{}{}", hi_hex, lo_hex));
+            }
+            other => {
+                return Err(D::Error::custom(format!(
+                    "unsupported u256 representation: {}",
+                    other
+                )))
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+fn json_value_to_padded_hex<E>(value: serde_json::Value) -> Result<String, E>
+where
+    E: DeError,
+{
+    match value {
+        serde_json::Value::Number(n) => {
+            // Convert decimal string to 32-byte (64 hex chars) lowercased hex
+            let dec_str = n.to_string();
+            let big = BigUint::from_str(&dec_str)
+                .map_err(|e| E::custom(format!("invalid decimal number: {}", e)))?;
+            Ok(format!("{:032x}", big))
+        }
+        other => Err(E::custom(format!(
+            "unexpected type for u256 limb: {}",
+            other
+        ))),
+    }
 }
 
 /// Convert a hex string to a JSON number
