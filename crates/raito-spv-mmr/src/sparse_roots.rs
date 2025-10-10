@@ -3,14 +3,14 @@
 use accumulators::mmr::elements_count_to_leaf_count;
 use num_bigint::BigInt;
 use num_traits::Num;
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_json;
 use std::str::FromStr;
 
 /// Sparse roots is MMR peaks for all heights, where missing ones are filled with zeros
 /// This representation is different from the "compact" one, which contains only non-zero peaks
 /// but with total number of elements.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SparseRoots {
     /// Block height
     #[serde(skip)]

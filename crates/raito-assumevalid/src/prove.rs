@@ -1,11 +1,14 @@
 use anyhow::{anyhow, Result};
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tracing::{debug, error, info, warn};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
-use serde::{Deserialize, Serialize};
-use regex::Regex;
-use std::fs;
+
+use crate::{ProveClient, ProveConfig, AssumeValidParams, generate_and_save_args};
 
 /// Parameters for proving batch
 #[derive(Debug, Clone)]
@@ -76,8 +79,8 @@ pub async fn generate_program_input(
     // Write to output file
     let json = serde_json::to_string_pretty(&program_input)?;
     tokio::fs::write(output_file, json).await?;
-    
-    tracing::info!("Generated program-input.json at {}", output_file.display());
+
+    info!("Generated program-input.json at {}", output_file.display());
     Ok(())
 }
 
@@ -88,7 +91,7 @@ pub async fn run_cairo_runner(
     output_dir: &Path,
 ) -> Result<StepMetrics> {
     let start_time = Instant::now();
-    
+
     // Set up output file paths
     let priv_json = output_dir.join("priv.json");
     let pub_json = output_dir.join("pub.json");
@@ -99,20 +102,28 @@ pub async fn run_cairo_runner(
     // Build the command
     let mut cmd = Command::new("cairo_program_runner");
     cmd.args([
-        "--program", bootloader_path.to_str().unwrap(),
-        "--program_input", program_input_path.to_str().unwrap(),
-        "--air_public_input", pub_json.to_str().unwrap(),
-        "--air_private_input", priv_json.to_str().unwrap(),
-        "--trace_file", trace_file.to_str().unwrap(),
-        "--memory_file", memory_file.to_str().unwrap(),
-        "--layout", "all_cairo_stwo",
+        "--program",
+        bootloader_path.to_str().unwrap(),
+        "--program_input",
+        program_input_path.to_str().unwrap(),
+        "--air_public_input",
+        pub_json.to_str().unwrap(),
+        "--air_private_input",
+        priv_json.to_str().unwrap(),
+        "--trace_file",
+        trace_file.to_str().unwrap(),
+        "--memory_file",
+        memory_file.to_str().unwrap(),
+        "--layout",
+        "all_cairo_stwo",
         "--proof_mode",
-        "--execution_resources_file", resources_file.to_str().unwrap(),
+        "--execution_resources_file",
+        resources_file.to_str().unwrap(),
         "--disable_trace_padding",
         "--merge_extra_segments",
     ]);
 
-    tracing::debug!("Running cairo_program_runner: {:?}", cmd);
+    debug!("Running cairo_program_runner: {:?}", cmd);
 
     // Execute the command
     let output = cmd.output()?;
@@ -129,13 +140,19 @@ pub async fn run_cairo_runner(
     };
 
     if output.status.success() {
-        tracing::info!("Cairo runner completed successfully in {:.2}s", elapsed.as_secs_f64());
+        info!(
+            "Cairo runner completed successfully in {:.2}s",
+            elapsed.as_secs_f64()
+        );
     } else {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
-        tracing::error!("Cairo runner failed with return code {}", metrics.return_code);
-        tracing::error!("STDOUT: {}", stdout);
-        tracing::error!("STDERR: {}", stderr);
+        error!(
+            "Cairo runner failed with return code {}",
+            metrics.return_code
+        );
+        error!("STDOUT: {}", stdout);
+        error!("STDERR: {}", stderr);
         return Err(anyhow!("Cairo runner failed: {}", stderr));
     }
 
@@ -154,15 +171,20 @@ pub async fn run_prover(
     // Build the command
     let mut cmd = Command::new("adapted_stwo");
     cmd.args([
-        "--priv_json", priv_json_path.to_str().unwrap(),
-        "--pub_json", pub_json_path.to_str().unwrap(),
-        "--params_json", prover_params_path.to_str().unwrap(),
-        "--proof_path", proof_output_path.to_str().unwrap(),
-        "--proof-format", "cairo-serde",
+        "--priv_json",
+        priv_json_path.to_str().unwrap(),
+        "--pub_json",
+        pub_json_path.to_str().unwrap(),
+        "--params_json",
+        prover_params_path.to_str().unwrap(),
+        "--proof_path",
+        proof_output_path.to_str().unwrap(),
+        "--proof-format",
+        "cairo-serde",
         "--verify",
     ]);
 
-    tracing::debug!("Running adapted_stwo: {:?}", cmd);
+    debug!("Running adapted_stwo: {:?}", cmd);
 
     // Execute the command
     let output = cmd.output()?;
@@ -179,13 +201,16 @@ pub async fn run_prover(
     };
 
     if output.status.success() {
-        tracing::info!("Prover completed successfully in {:.2}s", elapsed.as_secs_f64());
+        info!(
+            "Prover completed successfully in {:.2}s",
+            elapsed.as_secs_f64()
+        );
     } else {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
-        tracing::error!("Prover failed with return code {}", metrics.return_code);
-        tracing::error!("STDOUT: {}", stdout);
-        tracing::error!("STDERR: {}", stderr);
+        error!("Prover failed with return code {}", metrics.return_code);
+        error!("STDOUT: {}", stdout);
+        error!("STDERR: {}", stderr);
         return Err(anyhow!("Prover failed: {}", stderr));
     }
 
@@ -211,9 +236,9 @@ pub async fn prove_batch(params: ProveBatchParams) -> Result<ProveBatchResult> {
     let start_time = Instant::now();
     let mut step_metrics = Vec::new();
 
-    tracing::info!("Starting assumevalid proving process");
-    tracing::info!("Arguments file: {}", params.arguments_file.display());
-    tracing::info!("Output directory: {}", params.output_dir.display());
+    info!("Starting assumevalid proving process");
+    info!("Arguments file: {}", params.arguments_file.display());
+    info!("Output directory: {}", params.output_dir.display());
 
     // Create output directory
     tokio::fs::create_dir_all(&params.output_dir).await?;
@@ -228,46 +253,39 @@ pub async fn prove_batch(params: ProveBatchParams) -> Result<ProveBatchResult> {
     let proof_file = params.output_dir.join("proof.json");
 
     // Step 1: Generate program input
-    tracing::info!("Step 1: Generating program input");
+    info!("Step 1: Generating program input");
     generate_program_input(
         &params.executable,
         &params.arguments_file,
         &program_input_file,
-    ).await?;
+    )
+    .await?;
 
     // Step 2: Run cairo_program_runner
-    tracing::info!("Step 2: Running cairo_program_runner");
-    let cairo_metrics = run_cairo_runner(
-        &params.bootloader,
-        &program_input_file,
-        &params.output_dir,
-    ).await?;
+    info!("Step 2: Running cairo_program_runner");
+    let cairo_metrics =
+        run_cairo_runner(&params.bootloader, &program_input_file, &params.output_dir).await?;
     step_metrics.push(cairo_metrics);
 
     // Step 3: Run prover
-    tracing::info!("Step 3: Running adapted_stwo prover");
-    let prover_metrics = run_prover(
-        &priv_json,
-        &pub_json,
-        &params.prover_params,
-        &proof_file,
-    ).await?;
+    info!("Step 3: Running adapted_stwo prover");
+    let prover_metrics =
+        run_prover(&priv_json, &pub_json, &params.prover_params, &proof_file).await?;
     step_metrics.push(prover_metrics);
 
     // Clean up temporary files if requested
     if !params.keep_temp_files {
-        tracing::info!("Cleaning up temporary files");
-        let temp_files = vec![
-            program_input_file,
-            trace_file,
-            memory_file,
-            resources_file,
-        ];
+        info!("Cleaning up temporary files");
+        let temp_files = vec![program_input_file, trace_file, memory_file, resources_file];
 
         for temp_file in temp_files {
             if temp_file.exists() {
                 if let Err(e) = tokio::fs::remove_file(&temp_file).await {
-                    tracing::warn!("Failed to remove temporary file {}: {}", temp_file.display(), e);
+                    warn!(
+                        "Failed to remove temporary file {}: {}",
+                        temp_file.display(),
+                        e
+                    );
                 }
             }
         }
@@ -276,16 +294,18 @@ pub async fn prove_batch(params: ProveBatchParams) -> Result<ProveBatchResult> {
         for temp_file in [&priv_json, &pub_json] {
             if temp_file.exists() {
                 if let Err(e) = tokio::fs::remove_file(temp_file).await {
-                    tracing::warn!("Failed to remove temporary file {}: {}", temp_file.display(), e);
+                    warn!(
+                        "Failed to remove temporary file {}: {}",
+                        temp_file.display(),
+                        e
+                    );
                 }
             }
         }
     }
 
     let total_elapsed = start_time.elapsed();
-    let max_memory = step_metrics.iter()
-        .filter_map(|m| m.max_memory)
-        .max();
+    let max_memory = step_metrics.iter().filter_map(|m| m.max_memory).max();
 
     let result = ProveBatchResult {
         proof_path: proof_file,
@@ -294,11 +314,14 @@ pub async fn prove_batch(params: ProveBatchParams) -> Result<ProveBatchResult> {
         step_metrics,
     };
 
-    tracing::info!("Proving completed successfully in {:.2}s", total_elapsed.as_secs_f64());
+    info!(
+        "Proving completed successfully in {:.2}s",
+        total_elapsed.as_secs_f64()
+    );
     if let Some(mem) = max_memory {
-        tracing::info!("Maximum memory usage: {:.1} MB", mem as f64 / 1024.0);
+        info!("Maximum memory usage: {:.1} MB", mem as f64 / 1024.0);
     }
-    tracing::info!("Proof saved to: {}", result.proof_path.display());
+    info!("Proof saved to: {}", result.proof_path.display());
 
     Ok(result)
 }
@@ -325,7 +348,6 @@ pub struct ProveParams {
     /// Whether to keep temporary files after completion
     pub keep_temp_files: bool,
 }
-
 
 /// Find the previous proof file for a given start height
 pub fn find_proof_file(start_height: u32, output_dir: &Path) -> Option<PathBuf> {
@@ -364,7 +386,9 @@ pub fn auto_detect_start_height(proof_dir: &Path) -> u32 {
             if entry.path().is_dir() {
                 if let Some(dir_name) = entry.file_name().to_str() {
                     if let Some(captures) = pattern.captures(dir_name) {
-                        if let (Ok(_start), Ok(end)) = (captures[1].parse::<u32>(), captures[2].parse::<u32>()) {
+                        if let (Ok(_start), Ok(end)) =
+                            (captures[1].parse::<u32>(), captures[2].parse::<u32>())
+                        {
                             let proof_file = entry.path().join("proof.json");
                             if proof_file.exists() {
                                 if end > max_height {
@@ -382,10 +406,11 @@ pub fn auto_detect_start_height(proof_dir: &Path) -> u32 {
 
 /// Main function to prove multiple batches iteratively
 pub async fn prove(params: ProveParams) -> Result<()> {
-
-    tracing::info!(
+    info!(
         "Starting iterative proving process: start_height={}, total_blocks={}, step_size={}",
-        params.start_height, params.total_blocks, params.step_size
+        params.start_height,
+        params.total_blocks,
+        params.step_size
     );
 
     // Create output directory
@@ -403,45 +428,44 @@ pub async fn prove(params: ProveParams) -> Result<()> {
 
         // Process a single batch
         let job_info = format!("Job(height='{}', blocks={})", current_height, current_step);
-        tracing::info!("{} proving...", job_info);
+        info!("{} proving...", job_info);
 
         // Create dedicated directory for this proof batch
-        let batch_name = format!("batch_{}_to_{}", current_height, current_height + current_step);
+        let batch_name = format!(
+            "batch_{}_to_{}",
+            current_height,
+            current_height + current_step
+        );
         let batch_dir = params.output_dir.join(&batch_name);
         tokio::fs::create_dir_all(&batch_dir).await?;
 
         // Look for previous proof
-        let previous_proof_file = find_proof_file(current_height, &params.output_dir);
+        let chain_state_proof_path = find_proof_file(current_height, &params.output_dir);
 
         // Generate arguments for this batch
-        tracing::debug!("{} generating args...", job_info);
+        debug!("{} generating args...", job_info);
         let args_start_time = Instant::now();
-
-        // Import the generate_args module functions
-        use crate::generate_args::{ProveClient, ProveConfig, AssumeValidParams, generate_and_save_args};
 
         let config = ProveConfig {
             bridge_node_url: params.bridge_url.clone(),
         };
         let client = ProveClient::new(config);
 
-        let chain_state_proof_data = if let Some(proof_path) = previous_proof_file {
-            Some(tokio::fs::read(proof_path).await?)
-        } else {
-            None
-        };
-
         let assumevalid_params = AssumeValidParams {
             start_height: current_height,
             block_count: current_step,
-            chain_state_proof: chain_state_proof_data,
+            chain_state_proof_path,
         };
 
         let args_file = batch_dir.join("arguments.json");
         generate_and_save_args(&client, assumevalid_params, &args_file.to_string_lossy()).await?;
         let args_elapsed = args_start_time.elapsed();
 
-        tracing::debug!("{} [GENERATE_ARGS] time: {:.2} s", job_info, args_elapsed.as_secs_f64());
+        debug!(
+            "{} [GENERATE_ARGS] time: {:.2} s",
+            job_info,
+            args_elapsed.as_secs_f64()
+        );
 
         // Prove the batch
         let prove_params = ProveBatchParams {
@@ -460,18 +484,21 @@ pub async fn prove(params: ProveParams) -> Result<()> {
                 // Add the args generation time to the total elapsed
                 result.total_elapsed += args_elapsed;
 
-                tracing::info!("{} done, total execution time: {:.2} seconds", 
-                               job_info, result.total_elapsed.as_secs_f64());
+                info!(
+                    "{} done, total execution time: {:.2} seconds",
+                    job_info,
+                    result.total_elapsed.as_secs_f64()
+                );
                 if let Some(mem) = result.max_memory {
-                    tracing::info!("{} max memory: {:.1} MB", job_info, mem as f64 / 1024.0);
+                    info!("{} max memory: {:.1} MB", job_info, mem as f64 / 1024.0);
                 }
 
-                tracing::info!("Batch at height {} completed successfully", current_height);
+                info!("Batch at height {} completed successfully", current_height);
                 current_height += current_step;
             }
             Err(e) => {
-                tracing::error!("Batch at height {} failed: {}", current_height, e);
-                tracing::info!("Stopping further processing due to batch failure");
+                error!("Batch at height {} failed: {}", current_height, e);
+                info!("Stopping further processing due to batch failure");
                 return Err(e);
             }
         }
@@ -501,7 +528,7 @@ mod tests {
     fn test_parse_memory_usage() {
         let stderr = "Maximum resident set size (kbytes): 123456";
         assert_eq!(parse_memory_usage(stderr), Some(123456));
-        
+
         let stderr_no_memory = "Some other output";
         assert_eq!(parse_memory_usage(stderr_no_memory), None);
     }

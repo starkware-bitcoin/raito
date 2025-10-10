@@ -8,7 +8,7 @@ use anyhow::Result;
 use num_bigint::BigUint;
 use num_traits::Num;
 use starknet_ff::FieldElement;
-use stwo_cairo_serialize::serialize::CairoSerialize;
+use stwo_cairo_serialize::CairoSerialize;
 
 // Wrapper types for specialized Cairo serialization of string data
 pub struct U256String(pub String);

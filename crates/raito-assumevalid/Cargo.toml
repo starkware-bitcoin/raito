@@ -22,12 +22,17 @@ clap = { workspace = true }
 hex = { workspace = true }
 tracing-subscriber = { workspace = true }
 regex = "1.0"
+starknet-ff = { workspace = true }
 
 # Raito dependencies
-raito-cairo-args = { path = "../raito-cairo-args", features = ["raito-spv-verify", "bitcoin", "raito-spv-mmr"] }
+raito-cairo-serialize = { path = "../raito-cairo-serialize"}
+stwo-cairo-serialize = { workspace = true }
 raito-spv-verify = { path = "../raito-spv-verify" }
 raito-spv-mmr = { path = "../raito-spv-mmr" }
 
 # Bitcoin
 bitcoin = { workspace = true }
 
+cairo-air = { workspace = true }
+
+stwo-prover = { workspace = true }

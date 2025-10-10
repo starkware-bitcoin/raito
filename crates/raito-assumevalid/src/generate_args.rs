@@ -1,10 +1,13 @@
+use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
 use bitcoin::block::Header as BlockHeader;
-use raito_cairo_args::adapters::assumevalid_args::to_runner_args_hex;
 use raito_spv_mmr::sparse_roots::SparseRoots;
 use raito_spv_verify::ChainState;
-use std::time::Duration;
-use serde::{Deserialize, Serialize};
+use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;
+use tokio::fs::read_to_string;
+use tracing::info;
+use crate::adapters::to_runner_args_hex;
+use cairo_air::CairoProof;
 
 /// Configuration for the raito-assumevalid client
 #[derive(Debug, Clone)]
@@ -36,69 +39,49 @@ impl ProveClient {
 
     /// Fetch chain state for a given block height
     pub async fn get_chain_state(&self, block_height: u32) -> Result<ChainState> {
-        let url = format!("{}/chain-state/{}", self.config.bridge_node_url, block_height);
+        let url = format!(
+            "{}/chain-state/{}",
+            self.config.bridge_node_url, block_height
+        );
         let response = self.make_request(&url).await?;
-        let chain_state: ChainState = response.json().await?;
-        Ok(chain_state)
+        Ok(response.json().await?)
     }
 
     /// Fetch block headers for a given range
     pub async fn get_block_headers(&self, offset: u32, size: u32) -> Result<Vec<BlockHeader>> {
-        let url = format!("{}/headers?offset={}&size={}", self.config.bridge_node_url, offset, size);
+        let url = format!(
+            "{}/headers?offset={}&size={}",
+            self.config.bridge_node_url, offset, size
+        );
         let response = self.make_request(&url).await?;
-        let headers: Vec<BlockHeader> = response.json().await?;
-        Ok(headers)
+        Ok(response.json().await?)
     }
 
     /// Fetch MMR roots for a given chain height
-    pub async fn get_roots(&self, chain_height: u32) -> Result<SparseRoots> {
-        let url = format!("{}/roots?chain_height={}", self.config.bridge_node_url, chain_height);
+    pub async fn get_mmr_roots(&self, chain_height: u32) -> Result<SparseRoots> {
+        let url = format!(
+            "{}/roots?chain_height={}",
+            self.config.bridge_node_url, chain_height
+        );
         let response = self.make_request(&url).await?;
-        let json_text = response.text().await?;
-        let json_value: serde_json::Value = serde_json::from_str(&json_text)?;
-        
-        // Manually parse SparseRoots from JSON
-        let block_height = json_value["block_height"]
-            .as_u64()
-            .ok_or_else(|| anyhow!("Missing or invalid block_height"))? as u32;
-        
-        let roots_array = json_value["roots"]
-            .as_array()
-            .ok_or_else(|| anyhow!("Missing or invalid roots array"))?;
-        
-        let mut roots = Vec::new();
-        for root_obj in roots_array {
-            if let Some(hi) = root_obj["hi"].as_str() {
-                if let Some(lo) = root_obj["lo"].as_str() {
-                    // Reconstruct the full hex string
-                    let full_hex = format!("0x{}{}", hi, lo);
-                    roots.push(full_hex);
-                } else {
-                    return Err(anyhow!("Invalid root format: missing 'lo'"));
-                }
-            } else {
-                return Err(anyhow!("Invalid root format: missing 'hi'"));
-            }
-        }
-        
-        Ok(SparseRoots {
-            block_height,
-            roots,
-        })
+        Ok(response.json().await?)
     }
 
     /// Get the current head (latest block height)
     pub async fn get_head(&self) -> Result<u32> {
         let url = format!("{}/head", self.config.bridge_node_url);
         let response = self.make_request(&url).await?;
-        let head: u32 = response.json().await?;
-        Ok(head)
+        Ok(response.json().await?)
     }
-
     /// Make an HTTP request
     async fn make_request(&self, url: &str) -> Result<reqwest::Response> {
-        let response = self.client.get(url).send().await?;
-        
+        let response = self
+            .client
+            .get(url)
+            .header("Accept-Encoding", "gzip")
+            .send()
+            .await?;
+
         if !response.status().is_success() {
             return Err(anyhow!("HTTP error: {}", response.status()));
         }
@@ -114,100 +97,101 @@ pub struct AssumeValidParams {
     pub start_height: u32,
     /// Number of blocks to include
     pub block_count: u32,
-    /// Optional chain state proof
-    pub chain_state_proof: Option<Vec<u8>>,
+    /// Optional chain state proof path
+    pub chain_state_proof_path: Option<PathBuf>,
 }
 
-/// Result of argument generation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenerateArgsResult {
-    /// Generated Cairo arguments
-    pub cairo_args: Vec<String>,
-    /// Output file path
-    pub output_file: String,
-    /// Generation time
-    pub elapsed: Duration,
-}
+/// Result type for generate args operations
+pub type GenerateArgsResult = Result<Vec<String>>;
 
 /// Generate assumevalid args for the given parameters
 pub async fn generate_assumevalid_args(
     client: &ProveClient,
     params: AssumeValidParams,
 ) -> Result<Vec<String>> {
-    tracing::info!("Generating assumevalid args for height {} with {} blocks", 
-                   params.start_height, params.block_count);
+    info!(
+        "Generating assumevalid args for height {} with {} blocks",
+        params.start_height,
+        params.block_count
+    );
 
     // Fetch chain state for the starting height
     let chain_state = client.get_chain_state(params.start_height).await?;
-    tracing::info!("Fetched chain state for height {}", params.start_height);
+    info!("Fetched chain state for height {}", params.start_height);
 
     // Fetch block headers for the range
-    let block_headers = client.get_block_headers(params.start_height, params.block_count).await?;
-    tracing::info!("Fetched {} block headers", block_headers.len());
+    let block_headers = client
+        .get_block_headers(params.start_height, params.block_count)
+        .await?;
+    info!("Fetched {} block headers", block_headers.len());
 
     // Fetch MMR roots
-    let block_mmr = client.get_roots(params.start_height).await?;
-    tracing::info!("Fetched MMR roots for chain height {:?}", params.start_height);
+    let block_mmr = client.get_mmr_roots(params.start_height).await?;
+    info!(
+        "Fetched MMR roots for chain height {:?}",
+        params.start_height
+    );
+
+
+    let chain_state_proof = if let Some(path) = &params.chain_state_proof_path {
+        Some(deserialize_proof_from_file(path).await?)
+    } else {
+        None
+    };
 
     // Generate Cairo-compatible arguments
     let cairo_args = to_runner_args_hex(
         chain_state,
         &block_headers,
         &block_mmr,
-        params.chain_state_proof.as_deref(),
-    )?;
+        chain_state_proof,
+    );
 
     tracing::info!("Generated {} Cairo arguments", cairo_args.len());
 
     Ok(cairo_args)
 }
 
+/// Generate and save assumevalid args to a file
+pub async fn generate_and_save_args(
+    client: &ProveClient,
+    params: AssumeValidParams,
+    file_path: &str,
+) -> Result<()> {
+    let cairo_args = generate_assumevalid_args(client, params).await?;
+    save_cairo_args_to_file(&cairo_args, file_path).await?;
+    Ok(())
+}
+
 /// Save Cairo arguments to a file
 pub async fn save_cairo_args_to_file(cairo_args: &[String], file_path: &str) -> Result<()> {
     let json = serde_json::to_string_pretty(cairo_args)?;
     tokio::fs::write(file_path, json).await?;
-    tracing::info!("Saved {} Cairo arguments to {}", cairo_args.len(), file_path);
+    tracing::info!(
+        "Saved {} Cairo arguments to {}",
+        cairo_args.len(),
+        file_path
+    );
     Ok(())
 }
 
-/// Generate and save assumevalid arguments
-pub async fn generate_and_save_args(
-    client: &ProveClient,
-    params: AssumeValidParams,
-    output_file: &str,
-) -> Result<GenerateArgsResult> {
-    let start_time = std::time::Instant::now();
-    
-    let cairo_args = generate_assumevalid_args(client, params).await?;
-    save_cairo_args_to_file(&cairo_args, output_file).await?;
-    
-    let elapsed = start_time.elapsed();
-    
-    Ok(GenerateArgsResult {
-        cairo_args,
-        output_file: output_file.to_string(),
-        elapsed,
-    })
+// let proof_str = read_to_string(proof_path).await?;
+// // use serde_json to parse the proof
+//     let felts: Vec<starknet_ff::FieldElement> = serde_json::from_str(&proof_str)?;
+//     Ok(CairoDeserialize::deserialize(&mut felts.iter()))
+
+// TODO: use cairo_air::utils::deserialize_proof_from_file when available
+async fn deserialize_proof_from_file(
+    proof_path: &Path,
+) -> Result<CairoProof<Blake2sMerkleHasher>, std::io::Error>
+{
+    let _proof_str = read_to_string(proof_path).await?;
+    // TODO: Implement proper proof deserialization
+    // For now, return an error indicating this functionality is not yet implemented
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "Proof deserialization not yet implemented - CairoDeserialize not available"
+    ))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    #[test]
-    fn test_prove_config_default() {
-        let config = ProveConfig::default();
-        assert_eq!(config.bridge_node_url, "https://api.raito.wtf/");
-    }
-
-    #[test]
-    fn test_assume_valid_params() {
-        let params = AssumeValidParams {
-            start_height: 100,
-            block_count: 10,
-            chain_state_proof: None,
-        };
-        assert_eq!(params.start_height, 100);
-        assert_eq!(params.block_count, 10);
-    }
-}

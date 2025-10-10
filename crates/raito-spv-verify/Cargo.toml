@@ -22,6 +22,7 @@ num-bigint = "0.4.3"
 starknet-ff = { workspace = true }
 
 # Stwo-cairo
+cairo-air = { workspace = true }
 
 # [target.'cfg(not(target_family = "wasm"))'.dependencies]
 # stwo = { workspace = true, features = ["parallel", "prover"] }

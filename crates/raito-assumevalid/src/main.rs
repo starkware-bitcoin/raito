@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use raito_assumevalid::{
-    generate_args::{AssumeValidParams, ProveClient, ProveConfig, generate_and_save_args},
-    prove::{ProveBatchParams, prove_batch, ProveParams, prove, auto_detect_start_height},
+    generate_args::{generate_and_save_args, AssumeValidParams, ProveClient, ProveConfig},
+    prove::{auto_detect_start_height, prove, prove_batch, ProveBatchParams, ProveParams},
 };
 use std::path::PathBuf;
 use tracing::{info, Level};
@@ -78,9 +78,7 @@ async fn main() -> Result<()> {
         _ => Level::INFO,
     };
 
-    tracing_subscriber::fmt()
-        .with_max_level(log_level)
-        .init();
+    tracing_subscriber::fmt().with_max_level(log_level).init();
 
     // Create client
     let config = ProveConfig {
@@ -97,7 +95,7 @@ async fn main() -> Result<()> {
             executable,
             bootloader,
             prover_params,
-            keep_temp_files
+            keep_temp_files,
         } => {
             // Auto-detect start height if not provided
             let start_height = if let Some(height) = start_height {
@@ -108,8 +106,10 @@ async fn main() -> Result<()> {
                 detected
             };
 
-            info!("Starting iterative proving: start_height={}, total_blocks={}, step_size={}", 
-                  start_height, total_blocks, step_size);
+            info!(
+                "Starting iterative proving: start_height={}, total_blocks={}, step_size={}",
+                start_height, total_blocks, step_size
+            );
             info!("Output directory: {}", output_dir.display());
 
             let params = ProveParams {
@@ -124,10 +124,9 @@ async fn main() -> Result<()> {
                 keep_temp_files,
             };
 
-            let final_proof_path = prove(params).await?;
+            prove(params).await?;
 
             info!("Iterative proving completed successfully!");
-            info!("Final proof saved to: {}", final_proof_path.display());
         }
     }
 

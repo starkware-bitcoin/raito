@@ -11,8 +11,8 @@ hex = { workspace = true }
 num-traits = { workspace = true }
 num-bigint = { workspace = true }
 
-stwo = { git = "https://github.com/starkware-libs/stwo" }
-stwo-cairo-serialize = { git = "https://github.com/starkware-libs/stwo-cairo" }
+stwo = { workspace = true }
+stwo-cairo-serialize = { workspace = true }
 
 starknet-ff = "0.3.7"
 
