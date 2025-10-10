@@ -2,13 +2,13 @@ use anyhow::{anyhow, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tracing::{debug, error, info, warn};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
+use tracing::{debug, error, info, warn};
 
-use crate::{ProveClient, ProveConfig, AssumeValidParams, generate_and_save_args};
+use crate::{generate_and_save_args, AssumeValidParams, ProveClient, ProveConfig};
 
 /// Parameters for proving batch
 #[derive(Debug, Clone)]
@@ -408,9 +408,7 @@ pub fn auto_detect_start_height(proof_dir: &Path) -> u32 {
 pub async fn prove(params: ProveParams) -> Result<()> {
     info!(
         "Starting iterative proving process: start_height={}, total_blocks={}, step_size={}",
-        params.start_height,
-        params.total_blocks,
-        params.step_size
+        params.start_height, params.total_blocks, params.step_size
     );
 
     // Create output directory

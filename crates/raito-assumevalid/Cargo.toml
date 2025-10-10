@@ -34,5 +34,4 @@ raito-spv-mmr = { path = "../raito-spv-mmr" }
 bitcoin = { workspace = true }
 
 cairo-air = { workspace = true }
-
-stwo-prover = { workspace = true }
+stwo = { workspace = true}

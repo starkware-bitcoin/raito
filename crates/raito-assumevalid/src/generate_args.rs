@@ -1,13 +1,11 @@
-use std::path::{Path, PathBuf};
+use crate::adapters::to_runner_args_hex;
 use anyhow::{anyhow, Result};
 use bitcoin::block::Header as BlockHeader;
+use cairo_air::utils::{deserialize_proof_from_file, ProofFormat};
 use raito_spv_mmr::sparse_roots::SparseRoots;
 use raito_spv_verify::ChainState;
-use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;
-use tokio::fs::read_to_string;
+use std::path::PathBuf;
 use tracing::info;
-use crate::adapters::to_runner_args_hex;
-use cairo_air::CairoProof;
 
 /// Configuration for the raito-assumevalid client
 #[derive(Debug, Clone)]
@@ -111,8 +109,7 @@ pub async fn generate_assumevalid_args(
 ) -> Result<Vec<String>> {
     info!(
         "Generating assumevalid args for height {} with {} blocks",
-        params.start_height,
-        params.block_count
+        params.start_height, params.block_count
     );
 
     // Fetch chain state for the starting height
@@ -132,20 +129,14 @@ pub async fn generate_assumevalid_args(
         params.start_height
     );
 
-
     let chain_state_proof = if let Some(path) = &params.chain_state_proof_path {
-        Some(deserialize_proof_from_file(path).await?)
+        Some(deserialize_proof_from_file(path, ProofFormat::CairoSerde)?)
     } else {
         None
     };
 
     // Generate Cairo-compatible arguments
-    let cairo_args = to_runner_args_hex(
-        chain_state,
-        &block_headers,
-        &block_mmr,
-        chain_state_proof,
-    );
+    let cairo_args = to_runner_args_hex(chain_state, &block_headers, &block_mmr, chain_state_proof);
 
     tracing::info!("Generated {} Cairo arguments", cairo_args.len());
 
@@ -174,24 +165,3 @@ pub async fn save_cairo_args_to_file(cairo_args: &[String], file_path: &str) -> 
     );
     Ok(())
 }
-
-// let proof_str = read_to_string(proof_path).await?;
-// // use serde_json to parse the proof
-//     let felts: Vec<starknet_ff::FieldElement> = serde_json::from_str(&proof_str)?;
-//     Ok(CairoDeserialize::deserialize(&mut felts.iter()))
-
-// TODO: use cairo_air::utils::deserialize_proof_from_file when available
-async fn deserialize_proof_from_file(
-    proof_path: &Path,
-) -> Result<CairoProof<Blake2sMerkleHasher>, std::io::Error>
-{
-    let _proof_str = read_to_string(proof_path).await?;
-    // TODO: Implement proper proof deserialization
-    // For now, return an error indicating this functionality is not yet implemented
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "Proof deserialization not yet implemented - CairoDeserialize not available"
-    ))
-}
-
-

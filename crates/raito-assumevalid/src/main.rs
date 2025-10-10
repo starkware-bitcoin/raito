@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use raito_assumevalid::{
-    generate_args::{generate_and_save_args, AssumeValidParams, ProveClient, ProveConfig},
-    prove::{auto_detect_start_height, prove, prove_batch, ProveBatchParams, ProveParams},
+    generate_args::{ProveClient, ProveConfig},
+    prove::{auto_detect_start_height, prove, ProveParams},
 };
 use std::path::PathBuf;
 use tracing::{info, Level};
@@ -79,12 +79,6 @@ async fn main() -> Result<()> {
     };
 
     tracing_subscriber::fmt().with_max_level(log_level).init();
-
-    // Create client
-    let config = ProveConfig {
-        bridge_node_url: cli.bridge_url.clone(),
-    };
-    let client = ProveClient::new(config);
 
     match cli.command {
         Commands::Prove {

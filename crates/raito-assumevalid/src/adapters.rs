@@ -1,13 +1,12 @@
 use bitcoin::block::Header;
-use starknet_ff::FieldElement;
 
-use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;
+use stwo::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use stwo_cairo_serialize::CairoSerialize;
 
+use bitcoin::hashes::Hash;
 use raito_cairo_serialize::{DigestString, U256String};
 use raito_spv_mmr::sparse_roots::SparseRoots;
 use raito_spv_verify::ChainState;
-use bitcoin::hashes::Hash;
 
 use cairo_air::CairoProof;
 
@@ -75,16 +74,11 @@ pub fn to_runner_args_hex(
         })
         .collect();
 
-    // Convert Rust ChainState into Cairo-friendly view
-    let total_work_dec = bytes_to_decimal_string(&chain_state.total_work.to_be_bytes());
-    let current_target_dec = bytes_to_decimal_string(&chain_state.current_target.to_be_bytes());
-    let best_block_hash_hex = hex::encode(chain_state.best_block_hash.to_byte_array());
-
     let chain_state_view = ChainStateView {
         block_height: chain_state.block_height,
-        total_work: U256String(total_work_dec),
-        best_block_hash: DigestString(best_block_hash_hex),
-        current_target: U256String(current_target_dec),
+        total_work: U256String(chain_state.total_work.to_string()),
+        best_block_hash: DigestString(chain_state.best_block_hash.to_string()),
+        current_target: U256String(chain_state.current_target.to_string()),
         epoch_start_time: chain_state.epoch_start_time,
         prev_timestamps: chain_state.prev_timestamps.clone(),
     };
@@ -107,42 +101,8 @@ pub fn to_runner_args_hex(
     let mut felts = Vec::new();
     args_view.serialize(&mut felts);
 
-    felts.into_iter().map(fe_to_min_hex).collect()
-}
-
-// Helper function to convert bytes to decimal string
-fn bytes_to_decimal_string(bytes: &[u8]) -> String {
-    // Convert bytes to FieldElement and then to decimal string
-    let mut padded_bytes = [0u8; 32];
-    let start = 32 - bytes.len();
-    padded_bytes[start..].copy_from_slice(bytes);
-
-    match FieldElement::from_bytes_be(&padded_bytes) {
-        Ok(felt) => {
-            // Convert FieldElement to decimal string
-            // We'll use the to_string method which should give us decimal representation
-            felt.to_string()
-        }
-        Err(_) => {
-            // Fallback to hex if conversion fails
-            format!("0x{}", hex::encode(bytes))
-        }
-    }
-}
-
-fn fe_to_min_hex(fe: FieldElement) -> String {
-    let bytes = fe.to_bytes_be();
-    let mut i = 0;
-    while i < bytes.len() && bytes[i] == 0 {
-        i += 1;
-    }
-    if i == bytes.len() {
-        return "0x0".to_string();
-    }
-    let mut s = String::from("0x");
-    s.push_str(&format!("{:x}", bytes[i]));
-    for b in &bytes[i + 1..] {
-        s.push_str(&format!("{:02x}", b));
-    }
-    s
+    felts
+        .into_iter()
+        .map(|felt| format!("0x{felt:x}"))
+        .collect()
 }
