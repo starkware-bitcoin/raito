@@ -1,5 +1,11 @@
 [workspace]
-members = ["packages/*"]
+members = [
+    "packages/assumevalid",
+    "packages/client",
+    "packages/consensus",
+    "packages/utils",
+    "packages/utreexo"
+]
 
 [workspace.package]
 description = "Bitcoin ZK client."
@@ -21,7 +27,7 @@ enable-gas = false
 sierra-replace-ids = true
 # NOTE: this flag set causes build errors in Cairo 2.12.0 (because of use of print right before a panic).
 # Use only for assumevalid package.
-unsafe-panic = true
+#unsafe-panic = true
 
 [profile.release.cairo]
 enable-gas = false

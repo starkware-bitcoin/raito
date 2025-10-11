@@ -1,0 +1,12 @@
+{
+    "channel_hash": "poseidon252",
+    "pcs_config": {
+        "pow_bits": 32,
+        "fri_config": {
+            "log_last_layer_degree_bound": 0,
+            "log_blowup_factor": 2,
+            "n_queries": 32
+        }
+    },
+    "preprocessed_trace": "canonical_without_pedersen"
+}
