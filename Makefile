@@ -127,6 +127,17 @@ prove-pow:
 		$(if $(SLOW),--slow) \
 		$(if $(VERBOSE),--verbose)
 
+rust-prove-pow:
+	cargo run -p raito-assumevalid -- \
+		--log-level debug \
+		--bridge-url "https://staging.raito.wtf" \
+		prove \
+		--keep-temp-files \
+		--output-dir .rust-proofs \
+		$(if $(START),--start-height $(START)) \
+		$(if $(BLOCKS),--total-blocks $(BLOCKS)) \
+		$(if $(STEP),--step-size $(STEP))
+
 build-recent-proof:
 	@echo ">>> Building recent proof..."
 	. .venv/bin/activate && cd scripts/data && \

@@ -92,12 +92,15 @@ pub async fn run_cairo_runner(
 ) -> Result<StepMetrics> {
     let start_time = Instant::now();
 
-    // Set up output file paths
-    let priv_json = output_dir.join("priv.json");
-    let pub_json = output_dir.join("pub.json");
-    let trace_file = output_dir.join("trace.json");
-    let memory_file = output_dir.join("memory.json");
-    let resources_file = output_dir.join("resources.json");
+    // Make output directory absolute, then derive absolute output file paths
+    let out_dir = output_dir
+        .canonicalize()
+        .unwrap_or_else(|_| output_dir.to_path_buf());
+    let priv_json = out_dir.join("priv.json");
+    let pub_json = out_dir.join("pub.json");
+    let trace_file = out_dir.join("trace.json");
+    let memory_file = out_dir.join("memory.json");
+    let resources_file = out_dir.join("resources.json");
 
     // Build the command
     let mut cmd = Command::new("cairo_program_runner");
@@ -168,17 +171,31 @@ pub async fn run_prover(
 ) -> Result<StepMetrics> {
     let start_time = Instant::now();
 
+    // Ensure absolute paths are passed to the prover
+    let priv_json_abs = priv_json_path
+        .canonicalize()
+        .unwrap_or_else(|_| priv_json_path.to_path_buf());
+    let pub_json_abs = pub_json_path
+        .canonicalize()
+        .unwrap_or_else(|_| pub_json_path.to_path_buf());
+    let params_abs = prover_params_path
+        .canonicalize()
+        .unwrap_or_else(|_| prover_params_path.to_path_buf());
+    let proof_out_abs = proof_output_path
+        .canonicalize()
+        .unwrap_or_else(|_| proof_output_path.to_path_buf());
+
     // Build the command
     let mut cmd = Command::new("adapted_stwo");
     cmd.args([
         "--priv_json",
-        priv_json_path.to_str().unwrap(),
+        priv_json_abs.to_str().unwrap(),
         "--pub_json",
-        pub_json_path.to_str().unwrap(),
+        pub_json_abs.to_str().unwrap(),
         "--params_json",
-        prover_params_path.to_str().unwrap(),
+        params_abs.to_str().unwrap(),
         "--proof_path",
-        proof_output_path.to_str().unwrap(),
+        proof_out_abs.to_str().unwrap(),
         "--proof-format",
         "cairo-serde",
         "--verify",
@@ -243,14 +260,18 @@ pub async fn prove_batch(params: ProveBatchParams) -> Result<ProveBatchResult> {
     // Create output directory
     tokio::fs::create_dir_all(&params.output_dir).await?;
 
-    // Set up file paths
-    let program_input_file = params.output_dir.join("program-input.json");
-    let priv_json = params.output_dir.join("priv.json");
-    let pub_json = params.output_dir.join("pub.json");
-    let trace_file = params.output_dir.join("trace.json");
-    let memory_file = params.output_dir.join("memory.json");
-    let resources_file = params.output_dir.join("resources.json");
-    let proof_file = params.output_dir.join("proof.json");
+    // Resolve output dir to absolute and set up file paths
+    let out_dir = params
+        .output_dir
+        .canonicalize()
+        .unwrap_or_else(|_| params.output_dir.clone());
+    let program_input_file = out_dir.join("program-input.json");
+    let priv_json = out_dir.join("priv.json");
+    let pub_json = out_dir.join("pub.json");
+    let trace_file = out_dir.join("trace.json");
+    let memory_file = out_dir.join("memory.json");
+    let resources_file = out_dir.join("resources.json");
+    let proof_file = out_dir.join("proof.json");
 
     // Step 1: Generate program input
     info!("Step 1: Generating program input");
@@ -263,8 +284,7 @@ pub async fn prove_batch(params: ProveBatchParams) -> Result<ProveBatchResult> {
 
     // Step 2: Run cairo_program_runner
     info!("Step 2: Running cairo_program_runner");
-    let cairo_metrics =
-        run_cairo_runner(&params.bootloader, &program_input_file, &params.output_dir).await?;
+    let cairo_metrics = run_cairo_runner(&params.bootloader, &program_input_file, &out_dir).await?;
     step_metrics.push(cairo_metrics);
 
     // Step 3: Run prover

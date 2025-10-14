@@ -1,9 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use raito_assumevalid::{
-    generate_args::{ProveClient, ProveConfig},
-    prove::{auto_detect_start_height, prove, ProveParams},
-};
+use raito_assumevalid::prove::{auto_detect_start_height, prove, ProveParams};
 use std::path::PathBuf;
 use tracing::{info, Level};
 use tracing_subscriber;

@@ -3,12 +3,13 @@ use bitcoin::block::Header;
 use stwo::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use stwo_cairo_serialize::CairoSerialize;
 
-use bitcoin::hashes::Hash;
-use raito_cairo_serialize::{DigestString, U256String};
+use raito_cairo_serialize::{DigestString, U256String, U256StringLittleEndian};
 use raito_spv_mmr::sparse_roots::SparseRoots;
 use raito_spv_verify::ChainState;
 
 use cairo_air::CairoProof;
+use num_bigint::BigUint;
+use tracing::debug;
 
 /// View for assumevalid Args struct that matches Cairo's structure
 #[derive(CairoSerialize)]
@@ -32,7 +33,7 @@ struct ChainStateView {
 
 #[derive(CairoSerialize)]
 pub struct SparseRootsView {
-    pub roots: Vec<U256String>,
+    pub roots: Vec<U256StringLittleEndian>,
 }
 
 /// View for a single block matching Cairo's Block structure
@@ -68,9 +69,7 @@ pub fn to_runner_args_hex(
                 bits: header.bits.to_consensus(),
                 nonce: header.nonce,
             },
-            data: Some(DigestString(hex::encode(
-                header.merkle_root.as_byte_array(),
-            ))),
+            data: Some(DigestString(header.merkle_root.to_string())),
         })
         .collect();
 
@@ -87,7 +86,7 @@ pub fn to_runner_args_hex(
         roots: block_mmr
             .roots
             .iter()
-            .map(|root| U256String(root.to_string()))
+            .map(|root_hex| U256StringLittleEndian(hex_u256_to_decimal_string(root_hex)))
             .collect(),
     };
 
@@ -98,6 +97,9 @@ pub fn to_runner_args_hex(
         chain_state_proof,
     };
 
+    debug!("Serializing args view");
+    // debug!("Args view: {:?}", args_view);
+
     let mut felts = Vec::new();
     args_view.serialize(&mut felts);
 
@@ -105,4 +107,12 @@ pub fn to_runner_args_hex(
         .into_iter()
         .map(|felt| format!("0x{felt:x}"))
         .collect()
+}
+
+fn hex_u256_to_decimal_string(hex_input: &str) -> String {
+    let trimmed = hex_input.trim();
+    let hex_without_prefix = trimmed.strip_prefix("0x").unwrap_or(trimmed);
+    let big_uint = BigUint::parse_bytes(hex_without_prefix.as_bytes(), 16)
+        .expect("Invalid hex string for u256 root");
+    big_uint.to_str_radix(10)
 }

@@ -5,7 +5,7 @@ use cairo_air::utils::{deserialize_proof_from_file, ProofFormat};
 use raito_spv_mmr::sparse_roots::SparseRoots;
 use raito_spv_verify::ChainState;
 use std::path::PathBuf;
-use tracing::info;
+use tracing::{debug, info};
 
 /// Configuration for the raito-assumevalid client
 #[derive(Debug, Clone)]
@@ -73,6 +73,7 @@ impl ProveClient {
     }
     /// Make an HTTP request
     async fn make_request(&self, url: &str) -> Result<reqwest::Response> {
+        debug!("Making request to {}", url);
         let response = self
             .client
             .get(url)
@@ -116,9 +117,9 @@ pub async fn generate_assumevalid_args(
     let chain_state = client.get_chain_state(params.start_height).await?;
     info!("Fetched chain state for height {}", params.start_height);
 
-    // Fetch block headers for the range
+    // Fetch block headers for the range: starting AFTER the current chain_state height
     let block_headers = client
-        .get_block_headers(params.start_height, params.block_count)
+        .get_block_headers(params.start_height + 1, params.block_count)
         .await?;
     info!("Fetched {} block headers", block_headers.len());
 
@@ -138,7 +139,7 @@ pub async fn generate_assumevalid_args(
     // Generate Cairo-compatible arguments
     let cairo_args = to_runner_args_hex(chain_state, &block_headers, &block_mmr, chain_state_proof);
 
-    tracing::info!("Generated {} Cairo arguments", cairo_args.len());
+    info!("Generated {} Cairo arguments", cairo_args.len());
 
     Ok(cairo_args)
 }
@@ -158,7 +159,7 @@ pub async fn generate_and_save_args(
 pub async fn save_cairo_args_to_file(cairo_args: &[String], file_path: &str) -> Result<()> {
     let json = serde_json::to_string_pretty(cairo_args)?;
     tokio::fs::write(file_path, json).await?;
-    tracing::info!(
+    info!(
         "Saved {} Cairo arguments to {}",
         cairo_args.len(),
         file_path
