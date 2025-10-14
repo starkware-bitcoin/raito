@@ -41,6 +41,7 @@ gcloud compute instances create-with-container "$INSTANCE_NAME" \
   --boot-disk-type="$BOOT_DISK_TYPE" --boot-disk-size="${BOOT_DISK_SIZE_GB}GB" \
   --scopes=https://www.googleapis.com/auth/cloud-platform \
   --metadata=google-logging-enabled=true \
+  --labels="$INSTANCE_LABELS" \
   --container-image="$IMAGE_URI" \
   --container-restart-policy=never \
   --container-command="$CONTAINER_COMMAND" \

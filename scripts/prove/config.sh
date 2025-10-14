@@ -43,3 +43,6 @@ INSTANCE_PREFIX=${INSTANCE_PREFIX:-av-job}
 # Leave empty to auto-generate; otherwise use this fixed name
 INSTANCE_NAME=${INSTANCE_NAME:-}
 
+# Instance labels (comma-separated k=v pairs). Used for stable log filtering.
+INSTANCE_LABELS=${INSTANCE_LABELS:-job=assumevalid,component=prove}
+
