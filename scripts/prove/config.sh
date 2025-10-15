@@ -17,8 +17,13 @@ MACHINE_TYPE=${MACHINE_TYPE:-n2-highmem-32}    # 256GB RAM
 BOOT_DISK_TYPE=${BOOT_DISK_TYPE:-pd-balanced}
 BOOT_DISK_SIZE_GB=${BOOT_DISK_SIZE_GB:-15}
 
+# Base image (use COS for fastest boot; includes Docker/containerd by default)
+BASE_IMAGE_FAMILY=${BASE_IMAGE_FAMILY:-cos-109-lts}
+BASE_IMAGE_PROJECT=${BASE_IMAGE_PROJECT:-cos-cloud}
+
 # Container execution
-CONTAINER_COMMAND=${CONTAINER_COMMAND:-/bin/raito-assumevalid}
+# Leave empty to rely on the image ENTRYPOINT; override if needed
+CONTAINER_COMMAND=${CONTAINER_COMMAND:-}
 # Bash array for args; edit below to set defaults for your run
 if [[ -z ${CONTAINER_ARGS_SET:-} ]]; then
   # Example defaults mirroring Makefile target rust-prove-pow
@@ -29,6 +34,9 @@ if [[ -z ${CONTAINER_ARGS_SET:-} ]]; then
     prove
     --keep-temp-files
     --output-dir .rust-proofs
+    --executable /opt/raito/assumevalid.executable.json
+    --bootloader /opt/raito/bootloader.json
+    --prover-params /opt/raito/prover_params.json
   )
   CONTAINER_ARGS_SET=1
 fi

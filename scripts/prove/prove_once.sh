@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Orchestrate: build image (optional) and launch one-shot Spot VM for proving.
+# Orchestrate: launch one-shot Spot VM for proving.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/config.sh"
@@ -27,11 +27,6 @@ fi
 
 if [[ ${#CONTAINER_ARGS[@]} -eq 0 ]]; then
   CONTAINER_ARGS=(prove)
-fi
-
-# Optional build phase
-if [[ ${BUILD_FIRST} -eq 1 ]]; then
-  "$SCRIPT_DIR/build_image.sh"
 fi
 
 # Launch

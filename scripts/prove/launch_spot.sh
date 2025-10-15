@@ -32,7 +32,31 @@ echo "Launching Spot VM '$INSTANCE_NAME' in $ZONE using $MACHINE_TYPE"
 echo "Container image: $IMAGE_URI"
 echo "Container args: ${CONTAINER_ARGS[*]}"
 
-gcloud compute instances create-with-container "$INSTANCE_NAME" \
+# MIGRATION: The container startup agent is deprecated. Use a standard VM with a startup script.
+# Build a startup script that installs Docker, authenticates to Artifact Registry using the
+# instance service account, pulls the image, runs it once, and then powers off the VM.
+
+# Render CONTAINER_ARGS as a Bash array literal to preserve argument boundaries
+CONTAINER_ARGS_BASH_LITERAL="("
+for _arg in "${CONTAINER_ARGS[@]}"; do
+  printf -v _q '%q' "$_arg"
+  CONTAINER_ARGS_BASH_LITERAL+=" $_q"
+done
+CONTAINER_ARGS_BASH_LITERAL+=" )"
+
+STARTUP_SCRIPT_FILE=$(mktemp)
+{
+  echo '#!/usr/bin/env bash'
+  echo 'set -euo pipefail'
+  printf 'REGION=%q\n' "$REGION"
+  printf 'IMAGE_URI=%q\n' "$IMAGE_URI"
+  printf 'CONTAINER_COMMAND=%q\n' "$CONTAINER_COMMAND"
+  printf 'declare -a CONTAINER_ARGS=%s\n' "$CONTAINER_ARGS_BASH_LITERAL"
+  echo ''
+  cat "$SCRIPT_DIR/startup_cos.sh"
+} > "$STARTUP_SCRIPT_FILE"
+
+gcloud compute instances create "$INSTANCE_NAME" \
   --project="$PROJECT_ID" \
   --zone="$ZONE" \
   --provisioning-model=SPOT \
@@ -42,10 +66,9 @@ gcloud compute instances create-with-container "$INSTANCE_NAME" \
   --scopes=https://www.googleapis.com/auth/cloud-platform \
   --metadata=google-logging-enabled=true \
   --labels="$INSTANCE_LABELS" \
-  --container-image="$IMAGE_URI" \
-  --container-restart-policy=never \
-  --container-command="$CONTAINER_COMMAND" \
-  $(printf ' --container-arg=%q' "${CONTAINER_ARGS[@]}")
+  --image-family=cos-109-lts \
+  --image-project=cos-cloud \
+  --metadata-from-file user-data="$STARTUP_SCRIPT_FILE"
 
 echo "Instance created: $INSTANCE_NAME"
 echo "$INSTANCE_NAME" > "$SCRIPT_DIR/.last_instance"
