@@ -55,7 +55,7 @@ tempfile = "3.10"
 
 # Stwo-cairo
 stwo = { git = "https://github.com/starkware-libs/stwo", rev = "d9176e6e22319370a8501f799829b920c0db2eac", default-features = false }
-cairo-air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "5e67166f99366bc8aa7a5999a56461ce33dbe12f", default-features = false }
-stwo-cairo-serialize = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "5e67166f99366bc8aa7a5999a56461ce33dbe12f" }
+cairo-air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "e3291682c6cde6ea85db3d3d86d2f7cafd4579b3", default-features = false }
+stwo-cairo-serialize = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "e3291682c6cde6ea85db3d3d86d2f7cafd4579b3" }
 stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "d9176e6e22319370a8501f799829b920c0db2eac", features = [], default-features = false }
 

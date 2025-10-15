@@ -1,6 +1,6 @@
 # Git revisions for external dependencies
 BOOTLOADER_HINTS_REV ?= 5648cf0a5a2574c2870151cd178ff3ae4b141824
-STWO_REV ?= 33d0fcd47be86da13cb567dbc2a678a0b38e1a31
+STWO_REV ?= e3291682c6cde6ea85db3d3d86d2f7cafd4579b3
 CAIRO_EXECUTE_REV ?= e209f4557c535ddb4d2c76b2c6b14d004af99467
 ################################## CLIENT ##################################
 
@@ -45,19 +45,19 @@ install-corelib:
 	rm -rf vendor/cairo
 	git clone --single-branch --branch raito \
 		https://github.com/m-kus/cairo vendor/cairo
-	(cd vendor/cairo && git checkout $(CAIRO_EXECUTE_REV))
+
+	(cd vendor/cairo && git config --add remote.origin.fetch "+refs/pull/*/head:refs/remotes/origin/pr/*" && git fetch origin --prune && git checkout $(CAIRO_EXECUTE_REV))
 	ln -s "$(CURDIR)/vendor/cairo/corelib" \
 		packages/assumevalid/corelib
 
-install: install-bootloader-hints install-stwo install-cairo-execute \
-	install-convert-proof-format install-scarb-eject install-corelib
+install: install-bootloader-hints install-cairo-execute \
+	install-scarb-eject install-corelib
 
 ################################## ASSUMEVALID ##################################
 
 assumevalid-build:
 	scarb --profile proving build --package assumevalid \
 		--no-default-features
-
 
 assumevalid-eject:
 	scarb-eject --package assumevalid \
@@ -73,6 +73,18 @@ assumevalid-build-with-syscalls:
 		--executable assumevalid::main \
 		--ignore-warnings \
 		--allow-syscalls .
+
+
+# Run the raito-assumevalid CLI Prove subcommand
+assumevalid-prove:
+	cargo run -p raito-assumevalid -- Prove \
+		--log-level debug \
+		--keep-temp-files true \
+		$(if $(START),--start-height $(START)) \
+		$(if $(BLOCKS),--total-blocks $(BLOCKS)) \
+		$(if $(STEP),--step-size $(STEP)) \
+
+
 
 
 ################################## PIPELINE ##################################
@@ -146,6 +158,8 @@ build-recent-proof:
 		$(if $(MAX_HEIGHT),--max-height $(MAX_HEIGHT)) \
 		$(if $(SLOW),--slow) \
 		$(if $(VERBOSE),--verbose)
+
+
 
 collect-resources-all:
 	@echo ">>> Collecting resource usage data (all tests)..."

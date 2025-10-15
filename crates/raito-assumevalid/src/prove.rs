@@ -7,6 +7,14 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, warn};
+use stwo::core::vcs::blake2_merkle::Blake2sMerkleChannel;
+use cairo_air::utils::ProofFormat;
+
+// Prover API imports (available in cairo_air at the pinned revision)
+// We intentionally keep these imports grouped to make the in-process prover
+// code path easy to discover and isolate.
+use cairo_air::prover;
+use cairo_air::utils;
 
 use crate::{generate_and_save_args, AssumeValidParams, ProveClient, ProveConfig};
 
@@ -234,6 +242,44 @@ pub async fn run_prover(
     Ok(metrics)
 }
 
+/// Run the prover in-process using the library API instead of an external binary
+pub async fn run_prover_inproc(
+    priv_json_path: &Path,
+    pub_json_path: &Path,
+    prover_params_path: &Path,
+    proof_output_path: &Path,
+) -> Result<StepMetrics> {
+    let start_time = Instant::now();
+
+    // Deserialize public/private inputs and prover params
+    // These helpers are provided by cairo_air::utils at the pinned revision.
+    let public_input = utils::deserialize_public_input_from_file(pub_json_path)?;
+    let private_input = utils::deserialize_private_input_from_file(priv_json_path)?;
+    let prover_params = utils::deserialize_prover_params_from_file(prover_params_path)?;
+
+    // Prove in-process
+    let proof = prover::prove_cairo::<Blake2sMerkleChannel>(&public_input, &private_input, &prover_params)
+        .map_err(|e| anyhow!("Prover failed: {}", e))?;
+
+    // Serialize proof in the same format expected elsewhere (cairo-serde)
+    utils::serialize_proof_to_file(&proof, proof_output_path, ProofFormat::CairoSerde)?;
+
+    let elapsed = start_time.elapsed();
+    let metrics = StepMetrics {
+        step_name: "PROVE_LIB".to_string(),
+        elapsed,
+        max_memory: None,
+        return_code: 0,
+    };
+
+    info!(
+        "In-process prover completed successfully in {:.2}s",
+        elapsed.as_secs_f64()
+    );
+
+    Ok(metrics)
+}
+
 /// Parse memory usage from /usr/bin/time output
 fn parse_memory_usage(stderr: &str) -> Option<u64> {
     for line in stderr.lines() {
@@ -287,10 +333,12 @@ pub async fn prove_batch(params: ProveBatchParams) -> Result<ProveBatchResult> {
     let cairo_metrics = run_cairo_runner(&params.bootloader, &program_input_file, &out_dir).await?;
     step_metrics.push(cairo_metrics);
 
-    // Step 3: Run prover
-    info!("Step 3: Running adapted_stwo prover");
-    let prover_metrics =
-        run_prover(&priv_json, &pub_json, &params.prover_params, &proof_file).await?;
+    // Step 3: Run prover (binary by default, or in-process if enabled)
+    info!("Step 3: Running in-process prover");
+    let prover_metrics = run_prover_inproc(&priv_json, &pub_json, &params.prover_params, &proof_file).await?
+
+    // let prover_metrics = run_prover(&priv_json, &pub_json, &params.prover_params, &proof_file).await?
+
     step_metrics.push(prover_metrics);
 
     // Clean up temporary files if requested
