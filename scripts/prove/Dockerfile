@@ -14,6 +14,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 # Copy the compiled binary
 COPY --from=builder /app/target/release/raito-assumevalid /bin/raito-assumevalid
 
+# Copy required runtime assets (Cairo executable, bootloader, prover params)
+# into stable locations inside the image so the binary can reference them.
+COPY --from=builder /app/target/proving/assumevalid.executable.json /opt/raito/assumevalid.executable.json
+COPY --from=builder /app/bootloaders/simple_bootloader_compiled.json /opt/raito/bootloader.json
+COPY --from=builder /app/packages/assumevalid/prover_params.json /opt/raito/prover_params.json
+
 # Default entrypoint; pass args via container args/command
 ENTRYPOINT ["/bin/raito-assumevalid"]
 

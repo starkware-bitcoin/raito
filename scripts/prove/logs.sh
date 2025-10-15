@@ -18,8 +18,37 @@ if [[ -z "$INSTANCE_NAME" ]]; then
   exit 1
 fi
 
-gcloud compute instances get-serial-port-output "$INSTANCE_NAME" \
-  --zone="$ZONE" \
-  --port=2 \
-  --start=0 | sed -e 's/\r//g'
+START=0
+PORT=1
+while true; do
+  OUTPUT=$(gcloud compute instances get-serial-port-output "$INSTANCE_NAME" \
+    --zone="$ZONE" \
+    --port="$PORT" \
+    --start="$START" 2>&1 || true)
+
+  # Print only startup and raito lines, normalized
+  echo "$OUTPUT" \
+    | sed -e 's/\r//g' \
+    | perl -pe 's/\e\[[\d;]*[A-Za-z]//g; s/\f//g' \
+    | grep -E '^(\[startup\]|\[raito\])' || true
+
+  # Break early if we detect the startup script completion marker
+  if echo "$OUTPUT" | grep -q "\[startup\] Container exited with code"; then
+    break
+  fi
+
+  # Extract next start hint from gcloud message, e.g., "Specify --start=442 ..."
+  NEXT=$(printf '%s\n' "$OUTPUT" | grep -o 'Specify --start=[0-9]\+' | awk -F= '{print $2}' | tail -n1)
+  if [[ -n "$NEXT" ]]; then
+    START="$NEXT"
+  fi
+
+  # Break when instance is no longer RUNNING
+  STATUS=$(gcloud compute instances describe "$INSTANCE_NAME" --zone="$ZONE" --format='value(status)' 2>/dev/null || true)
+  if [[ "$STATUS" != "RUNNING" ]]; then
+    break
+  fi
+
+  sleep 2
+done
 
