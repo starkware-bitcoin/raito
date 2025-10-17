@@ -1,5 +1,5 @@
 # Git revisions for external dependencies
-BOOTLOADER_HINTS_REV ?= 5648cf0a5a2574c2870151cd178ff3ae4b141824
+BOOTLOADER_HINTS_REV ?= fbcbe23f4ed22e24738e6c439c32fedd7ff359dc
 STWO_REV ?= e3291682c6cde6ea85db3d3d86d2f7cafd4579b3
 CAIRO_EXECUTE_REV ?= e209f4557c535ddb4d2c76b2c6b14d004af99467
 ################################## CLIENT ##################################
@@ -16,7 +16,7 @@ install-bootloader-hints:
 	cargo install \
 		--git ssh://git@github.com/starkware-libs/bootloader-hints.git \
 		--rev $(BOOTLOADER_HINTS_REV) \
-		cairo-program-runner
+		cairo-program-runner stwo_run_and_prove
 
 install-stwo:
 	RUSTFLAGS="-C target-cpu=native -C opt-level=3" \

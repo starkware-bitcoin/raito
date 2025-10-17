@@ -14,6 +14,5 @@ pub use generate_args::{
     GenerateArgsResult, ProveClient, ProveConfig,
 };
 pub use prove::{
-    auto_detect_start_height, find_proof_file, prove, prove_batch, ProveBatchParams,
-    ProveBatchResult, ProveParams, StepMetrics,
+    auto_detect_start_height, find_proof_file, prove, run_and_prove, ProveParams,
 };

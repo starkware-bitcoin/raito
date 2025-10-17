@@ -36,3 +36,5 @@ bitcoin = { workspace = true }
 
 cairo-air = { workspace = true }
 stwo = { workspace = true}
+stwo_cairo_prover = { workspace = true }
+stwo_cairo_utils = { workspace = true }
