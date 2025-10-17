@@ -13,8 +13,7 @@ pub async fn generate_program_input(
     executable_path: &Path,
     arguments_file: &Path,
     input_file: &Path,
-) -> Result<()> {
-    // Convert to absolute paths
+) -> Result<()> {    // Convert to absolute paths
     let executable_path = executable_path.canonicalize()?;
     let args_file = arguments_file.canonicalize()?;
 
@@ -30,6 +29,7 @@ pub async fn generate_program_input(
             }
         ],
     });
+
 
     // Write to output file
     let json = serde_json::to_string_pretty(&program_input)?;
@@ -110,9 +110,9 @@ pub async fn run_and_prove(
         "cairo-serde",
         "--n_proof_attempts",
         "1",
-        // "--verify",
+        "--verify",
     ]);
-    debug!("Running stwo_run_and_prove: {:?}", cmd);
+    debug!("Running command: {:?}", cmd);
 
     let output = cmd.output()?;
     let elapsed = start_time.elapsed();
@@ -130,6 +130,27 @@ pub async fn run_and_prove(
                 "stwo_run_and_prove succeeded in {:.2}s",
                 elapsed.as_secs_f64()
             );
+        }
+
+        // Find and rename the generated proof file to proof.json
+        if let Ok(entries) = fs::read_dir(&out_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                        // Look for files that start with "proof_" and end with "_success" or similar patterns
+                        if file_name.starts_with("proof_") && (file_name.ends_with("_success") || file_name.contains("_success")) {
+                            if let Err(e) = fs::rename(&path, &proof_file) {
+                                warn!("Failed to rename proof file from {} to {}: {}", 
+                                    path.display(), proof_file.display(), e);
+                            } else {
+                                info!("Renamed proof file from {} to {}", file_name, proof_file.file_name().unwrap().to_string_lossy());
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
         }
     } else {
         let stdout = String::from_utf8_lossy(&output.stdout);

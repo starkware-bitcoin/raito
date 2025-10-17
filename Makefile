@@ -69,17 +69,25 @@ assumevalid-build-with-syscalls:
 	cairo-execute \
 		--build-only \
 		--output-path \
-			../../target/proving/assumevalid.executable.json \
+			../../target/proving/assumevalid-syscalls.executable.json \
 		--executable assumevalid::main \
 		--ignore-warnings \
 		--allow-syscalls .
 
+assumevalid-execute:
+	@[ -n "$(ARGS_FILE)" ] || (echo "ERROR: ARGS_FILE is required. Usage: make assumevalid-execute ARGS_FILE=path/to/args.json" >&2; exit 1)
+	scarb --profile proving execute \
+		--no-build \
+		--package assumevalid \
+		--arguments-file $(ARGS_FILE) \
+		--print-resource-usage
 
 # Run the raito-assumevalid CLI Prove subcommand
 assumevalid-prove:
-	cargo run -p raito-assumevalid -- Prove \
-		--log-level debug \
-		--keep-temp-files true \
+	cargo run -p raito-assumevalid -- \
+	    --log-level debug \
+	    prove \
+		--keep-temp-files \
 		$(if $(START),--start-height $(START)) \
 		$(if $(BLOCKS),--total-blocks $(BLOCKS)) \
 		$(if $(STEP),--step-size $(STEP)) \

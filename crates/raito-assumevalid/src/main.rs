@@ -12,7 +12,7 @@ use tracing_subscriber;
 #[command(version)]
 struct Cli {
     /// Bridge node RPC URL
-    #[arg(long, default_value = "https://api.raito.wtf/")]
+    #[arg(long, default_value = "https://staging.raito.wtf")]
     bridge_url: String,
 
     /// Log level
@@ -44,7 +44,7 @@ enum Commands {
         output_dir: PathBuf,
 
         /// Path to the Cairo executable JSON file
-        #[arg(long, default_value = "target/proving/assumevalid.executable.json")]
+        #[arg(long, default_value = "target/proving/assumevalid-syscalls.executable.json")]
         executable: PathBuf,
 
         /// Path to the bootloader JSON file

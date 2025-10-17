@@ -1,11 +1,16 @@
 use crate::adapters::to_runner_args_hex;
 use anyhow::{anyhow, Result};
 use bitcoin::block::Header as BlockHeader;
-use cairo_air::utils::{deserialize_proof_from_file, ProofFormat};
+use cairo_air::utils::{serialize_proof_to_file, ProofFormat};
 use raito_spv_mmr::sparse_roots::SparseRoots;
 use raito_spv_verify::ChainState;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::{debug, info};
+
+use stwo::core::vcs::MerkleHasher;
+use cairo_air::CairoProof;
+use serde::de::DeserializeOwned;
+use stwo_cairo_serialize::CairoDeserialize;
 
 /// Configuration for the raito-assumevalid client
 #[derive(Debug, Clone)]
@@ -103,6 +108,28 @@ pub struct AssumeValidParams {
 /// Result type for generate args operations
 pub type GenerateArgsResult = Result<Vec<String>>;
 
+/// Deserializes Cairo proof from a file given the desired format.
+pub fn deserialize_proof_from_file<H: MerkleHasher + DeserializeOwned>(
+    proof_path: &Path,
+    proof_format: ProofFormat,
+) -> Result<CairoProof<H>, std::io::Error>
+where
+    H::Hash: CairoDeserialize,
+{
+    match proof_format {
+        ProofFormat::Json => {
+            let proof_str = std::fs::read_to_string(proof_path)?;
+            serde_json::from_str(&proof_str).map_err(std::io::Error::other)
+        }
+        ProofFormat::CairoSerde => {
+            let proof_str = std::fs::read_to_string(proof_path)?;
+            let felts: Vec<starknet_ff::FieldElement> =
+                serde_json::from_str(&proof_str).map_err(std::io::Error::other)?;
+            Ok(CairoDeserialize::deserialize(&mut felts.iter()))
+        }
+    }
+}
+
 /// Generate assumevalid args for the given parameters
 pub async fn generate_assumevalid_args(
     client: &ProveClient,
@@ -135,6 +162,15 @@ pub async fn generate_assumevalid_args(
     } else {
         None
     };
+
+    // save chain_state_proof to file in cairo serde format
+    if let Some(proof) = &chain_state_proof {
+        serialize_proof_to_file::<stwo::core::vcs::blake2_merkle::Blake2sMerkleChannel>(
+            proof,
+            Path::new("chain_state_proof-check.json").to_path_buf(),
+            ProofFormat::CairoSerde,
+        )?;
+    }
 
     // Generate Cairo-compatible arguments
     let cairo_args = to_runner_args_hex(chain_state, &block_headers, &block_mmr, chain_state_proof);
