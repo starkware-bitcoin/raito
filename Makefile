@@ -91,6 +91,10 @@ assumevalid-prove:
 		$(if $(START),--start-height $(START)) \
 		$(if $(BLOCKS),--total-blocks $(BLOCKS)) \
 		$(if $(STEP),--step-size $(STEP)) \
+		$(if $(OUTPUT_DIR),--output-dir $(OUTPUT_DIR)) \
+		$(if $(LOAD_FROM_GCS),--load-from-gcs) \
+		$(if $(SAVE_TO_GCS),--save-to-gcs) \
+		$(if $(GCS_BUCKET),--gcs-bucket $(GCS_BUCKET))
 
 
 
@@ -153,10 +157,12 @@ rust-prove-pow:
 		--bridge-url "https://staging.raito.wtf" \
 		prove \
 		--keep-temp-files \
-		--output-dir .rust-proofs \
-		$(if $(START),--start-height $(START)) \
+		$(if $(OUTPUT_DIR),--output-dir $(OUTPUT_DIR)) \
 		$(if $(BLOCKS),--total-blocks $(BLOCKS)) \
-		$(if $(STEP),--step-size $(STEP))
+		$(if $(STEP),--step-size $(STEP)) \
+		$(if $(LOAD_FROM_GCS),--load-from-gcs) \
+		$(if $(SAVE_TO_GCS),--save-to-gcs) \
+		$(if $(GCS_BUCKET),--gcs-bucket $(GCS_BUCKET))
 
 build-recent-proof:
 	@echo ">>> Building recent proof..."

@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
+use cairo_air::utils::{serialize_proof_to_file, ProofFormat};
 use regex::Regex;
- 
+
 use serde_json::json;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -8,12 +9,19 @@ use std::process::Command;
 use std::time::Instant;
 use tracing::{debug, error, info, warn};
 
+use crate::gcs::{download_recent_proof_via_reqwest, upload_recent_proof, RecentProof};
+use crate::generate_args::{
+    deserialize_proof_from_file, generate_and_save_args, AssumeValidParams, ProveClient,
+    ProveConfig,
+};
+
 /// Generate program-input.json for bootloader execution
 pub async fn generate_program_input(
     executable_path: &Path,
     arguments_file: &Path,
     input_file: &Path,
-) -> Result<()> {    // Convert to absolute paths
+) -> Result<()> {
+    // Convert to absolute paths
     let executable_path = executable_path.canonicalize()?;
     let args_file = arguments_file.canonicalize()?;
 
@@ -30,7 +38,6 @@ pub async fn generate_program_input(
         ],
     });
 
-
     // Write to output file
     let json = serde_json::to_string_pretty(&program_input)?;
     tokio::fs::write(input_file, json).await?;
@@ -38,9 +45,6 @@ pub async fn generate_program_input(
     info!("Generated program-input.json at {}", input_file.display());
     Ok(())
 }
-
-use crate::{generate_and_save_args, AssumeValidParams, ProveClient, ProveConfig};
-
 
 /// Parse memory usage from /usr/bin/time output
 fn parse_memory_usage(stderr: &str) -> Option<u64> {
@@ -65,7 +69,6 @@ pub async fn run_and_prove(
     prover_params: &Path,
     keep_temp_files: bool,
 ) -> Result<PathBuf> {
-
     info!("Starting assumevalid proving process");
     info!("Arguments file: {}", arguments_file.display());
     info!("Output directory: {}", output_dir.display());
@@ -82,12 +85,7 @@ pub async fn run_and_prove(
 
     // Prepare program input for the bootloader
     info!("Generating program-input.json");
-    generate_program_input(
-        executable,
-        arguments_file,
-        &program_input_file,
-    )
-    .await?;
+    generate_program_input(executable, arguments_file, &program_input_file).await?;
 
     // Inline stwo_run_and_prove: build and run CLI
     let start_time = Instant::now();
@@ -139,12 +137,22 @@ pub async fn run_and_prove(
                 if path.is_file() {
                     if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
                         // Look for files that start with "proof_" and end with "_success" or similar patterns
-                        if file_name.starts_with("proof_") && (file_name.ends_with("_success") || file_name.contains("_success")) {
+                        if file_name.starts_with("proof_")
+                            && (file_name.ends_with("_success") || file_name.contains("_success"))
+                        {
                             if let Err(e) = fs::rename(&path, &proof_file) {
-                                warn!("Failed to rename proof file from {} to {}: {}", 
-                                    path.display(), proof_file.display(), e);
+                                warn!(
+                                    "Failed to rename proof file from {} to {}: {}",
+                                    path.display(),
+                                    proof_file.display(),
+                                    e
+                                );
                             } else {
-                                info!("Renamed proof file from {} to {}", file_name, proof_file.file_name().unwrap().to_string_lossy());
+                                info!(
+                                    "Renamed proof file from {} to {}",
+                                    file_name,
+                                    proof_file.file_name().unwrap().to_string_lossy()
+                                );
                             }
                             break;
                         }
@@ -155,7 +163,10 @@ pub async fn run_and_prove(
     } else {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
-        error!("stwo_run_and_prove failed with return code {:?}", output.status.code());
+        error!(
+            "stwo_run_and_prove failed with return code {:?}",
+            output.status.code()
+        );
         error!("STDOUT: {}", stdout);
         error!("STDERR: {}", stderr);
         return Err(anyhow!("stwo_run_and_prove failed: {}", stderr));
@@ -164,11 +175,12 @@ pub async fn run_and_prove(
     // Clean up temporary files if requested
     if !keep_temp_files {
         info!("Cleaning up temporary files");
-        let temp_files = vec![program_input_file];
+        let temp_files = vec![program_input_file, arguments_file.to_path_buf()];
 
         for temp_file in temp_files {
             if temp_file.exists() {
-                if let Err(e) = tokio::fs::remove_file(&temp_file).await {
+                // Use std::fs::remove_file for synchronous context
+                if let Err(e) = std::fs::remove_file(&temp_file) {
                     warn!(
                         "Failed to remove temporary file {}: {}",
                         temp_file.display(),
@@ -187,14 +199,15 @@ pub async fn run_and_prove(
 /// Parameters for proving multiple batches iteratively
 #[derive(Debug, Clone)]
 pub struct ProveParams {
-    /// Starting block height
-    pub start_height: u32,
+    pub load_from_gcs: bool,
+    pub save_to_gcs: bool,
+    /// URL to fetch the latest proof height from (used with --use-gcs)
+    pub gcs_bucket: String,
+    pub bridge_url: String,
     /// Total number of blocks to process
     pub total_blocks: u32,
     /// Step size for each batch
     pub step_size: u32,
-    /// Bridge node RPC URL
-    pub bridge_url: String,
     /// Output directory for all proofs
     pub output_dir: PathBuf,
     /// Path to the Cairo executable JSON file
@@ -262,18 +275,52 @@ pub fn auto_detect_start_height(proof_dir: &Path) -> u32 {
     max_height
 }
 
+pub async fn create_batch_dir(
+    start_height: u32,
+    step_size: u32,
+    output_dir: &Path,
+) -> Result<PathBuf> {
+    // Create dedicated directory for this proof batch
+    let batch_name = format!("batch_{}_to_{}", start_height, start_height + step_size);
+    let batch_dir = output_dir.join(&batch_name);
+    tokio::fs::create_dir_all(&batch_dir).await?;
+    Ok(batch_dir)
+}
+
 /// Main function to prove multiple batches iteratively
 pub async fn prove(params: ProveParams) -> Result<()> {
+    if params.load_from_gcs {
+        let recent_proof = download_recent_proof_via_reqwest(params.gcs_bucket.as_str()).await?;
+        let batch_dir =
+            create_batch_dir(0, recent_proof.chainstate.block_height, &params.output_dir).await?;
+
+        // Save the recent proof to the output directory
+        let proof_file = batch_dir.join("proof.json");
+        serialize_proof_to_file::<stwo::core::vcs::blake2_merkle::Blake2sMerkleChannel>(
+            &recent_proof.proof,
+            proof_file,
+            ProofFormat::CairoSerde,
+        )?;
+
+        info!(
+            "Using recent proof up to height: {}",
+            recent_proof.chainstate.block_height
+        );
+    }
+
+    let start_height = auto_detect_start_height(&params.output_dir);
+
     info!(
         "Starting iterative proving process: start_height={}, total_blocks={}, step_size={}",
-        params.start_height, params.total_blocks, params.step_size
+        start_height, params.total_blocks, params.step_size
     );
+    info!("Output directory: {}", params.output_dir.display());
 
     // Create output directory
     tokio::fs::create_dir_all(&params.output_dir).await?;
 
-    let end_height = params.start_height + params.total_blocks;
-    let mut current_height = params.start_height;
+    let end_height = start_height + params.total_blocks;
+    let mut current_height = start_height;
 
     // Process batches sequentially
     while current_height < end_height {
@@ -286,14 +333,7 @@ pub async fn prove(params: ProveParams) -> Result<()> {
         let job_info = format!("Job(height='{}', blocks={})", current_height, current_step);
         info!("{} proving...", job_info);
 
-        // Create dedicated directory for this proof batch
-        let batch_name = format!(
-            "batch_{}_to_{}",
-            current_height,
-            current_height + current_step
-        );
-        let batch_dir = params.output_dir.join(&batch_name);
-        tokio::fs::create_dir_all(&batch_dir).await?;
+        let batch_dir = create_batch_dir(current_height, current_step, &params.output_dir).await?;
 
         // Look for previous proof
         let chain_state_proof_path = find_proof_file(current_height, &params.output_dir);
@@ -329,9 +369,29 @@ pub async fn prove(params: ProveParams) -> Result<()> {
         .await;
 
         match batch_result {
-            Ok(_proof_path) => {
+            Ok(proof_path) => {
                 info!("{} done", job_info);
                 info!("Batch at height {} completed successfully", current_height);
+
+                // upload recent proof to gcs
+                if params.save_to_gcs {
+                    let client = ProveClient::new(ProveConfig {
+                        bridge_node_url: params.bridge_url.clone(),
+                    });
+
+                    let timestamp = format!("{}", chrono::Utc::now());
+                    let chainstate = client
+                        .get_chain_state(current_height + current_step)
+                        .await?;
+                    let proof = deserialize_proof_from_file(&proof_path, ProofFormat::CairoSerde)?;
+
+                    let recent_proof = RecentProof {
+                        timestamp,
+                        chainstate,
+                        proof,
+                    };
+                    upload_recent_proof(&recent_proof, &params.gcs_bucket).await?;
+                }
                 current_height += current_step;
             }
             Err(e) => {
@@ -343,4 +403,3 @@ pub async fn prove(params: ProveParams) -> Result<()> {
     }
     Ok(())
 }
-

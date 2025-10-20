@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use raito_assumevalid::prove::{auto_detect_start_height, prove, ProveParams};
+use raito_assumevalid::prove::{prove, ProveParams};
 use std::path::PathBuf;
-use tracing::{info, Level};
+use tracing::Level;
 use tracing_subscriber;
 
 /// Raito AssumeValid - Generate assumevalid arguments and prove Cairo programs
@@ -27,9 +27,15 @@ struct Cli {
 enum Commands {
     /// Prove multiple batches iteratively (similar to prove_pow in Python)
     Prove {
-        /// Starting block height (if not set, will auto-detect from last proof)
+        /// Use cloud storage to detect latest proof height instead of local directory scanning
         #[arg(long)]
-        start_height: Option<u32>,
+        load_from_gcs: bool,
+
+        #[arg(long)]
+        save_to_gcs: bool,
+
+        #[arg(long, default_value = "raito-proofs-tests")]
+        gcs_bucket: String,
 
         /// Total number of blocks to process
         #[arg(long, default_value = "1")]
@@ -44,7 +50,10 @@ enum Commands {
         output_dir: PathBuf,
 
         /// Path to the Cairo executable JSON file
-        #[arg(long, default_value = "target/proving/assumevalid-syscalls.executable.json")]
+        #[arg(
+            long,
+            default_value = "target/proving/assumevalid-syscalls.executable.json"
+        )]
         executable: PathBuf,
 
         /// Path to the bootloader JSON file
@@ -56,7 +65,7 @@ enum Commands {
         prover_params: PathBuf,
 
         /// Don't delete temporary files after completion
-        #[arg(long)]
+        #[arg(long, default_value = "false")]
         keep_temp_files: bool,
     },
 }
@@ -79,7 +88,9 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Prove {
-            start_height,
+            load_from_gcs,
+            save_to_gcs,
+            gcs_bucket,
             total_blocks,
             step_size,
             output_dir,
@@ -88,27 +99,14 @@ async fn main() -> Result<()> {
             prover_params,
             keep_temp_files,
         } => {
-            // Auto-detect start height if not provided
-            let start_height = if let Some(height) = start_height {
-                height
-            } else {
-                let detected = auto_detect_start_height(&output_dir);
-                info!("Auto-detected start height: {}", detected);
-                detected
-            };
-
-            info!(
-                "Starting iterative proving: start_height={}, total_blocks={}, step_size={}",
-                start_height, total_blocks, step_size
-            );
-            info!("Output directory: {}", output_dir.display());
-
             let params = ProveParams {
-                start_height,
+                load_from_gcs,
+                save_to_gcs,
+                gcs_bucket,
+                bridge_url: cli.bridge_url,
                 total_blocks,
                 step_size,
-                bridge_url: cli.bridge_url.clone(),
-                output_dir: output_dir.clone(),
+                output_dir,
                 executable,
                 bootloader,
                 prover_params,
@@ -116,8 +114,6 @@ async fn main() -> Result<()> {
             };
 
             prove(params).await?;
-
-            info!("Iterative proving completed successfully!");
         }
     }
 

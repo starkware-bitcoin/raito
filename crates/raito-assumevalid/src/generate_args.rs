@@ -1,15 +1,15 @@
 use crate::adapters::to_runner_args_hex;
 use anyhow::{anyhow, Result};
 use bitcoin::block::Header as BlockHeader;
-use cairo_air::utils::{serialize_proof_to_file, ProofFormat};
+use cairo_air::utils::ProofFormat;
 use raito_spv_mmr::sparse_roots::SparseRoots;
 use raito_spv_verify::ChainState;
 use std::path::{Path, PathBuf};
 use tracing::{debug, info};
 
-use stwo::core::vcs::MerkleHasher;
 use cairo_air::CairoProof;
 use serde::de::DeserializeOwned;
+use stwo::core::vcs::MerkleHasher;
 use stwo_cairo_serialize::CairoDeserialize;
 
 /// Configuration for the raito-assumevalid client
@@ -162,15 +162,6 @@ pub async fn generate_assumevalid_args(
     } else {
         None
     };
-
-    // save chain_state_proof to file in cairo serde format
-    if let Some(proof) = &chain_state_proof {
-        serialize_proof_to_file::<stwo::core::vcs::blake2_merkle::Blake2sMerkleChannel>(
-            proof,
-            Path::new("chain_state_proof-check.json").to_path_buf(),
-            ProofFormat::CairoSerde,
-        )?;
-    }
 
     // Generate Cairo-compatible arguments
     let cairo_args = to_runner_args_hex(chain_state, &block_headers, &block_mmr, chain_state_proof);
