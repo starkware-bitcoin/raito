@@ -3,18 +3,15 @@ use cairo_air::utils::{deserialize_proof_from_file, serialize_proof_to_file, Pro
 use regex::Regex;
 
 use serde_json::json;
-use stwo::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
+use stwo::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use tracing::{debug, error, info, warn};
 
 use crate::gcs::{download_recent_proof_via_reqwest, upload_recent_proof, RecentProof};
-use crate::generate_args::{
-    generate_and_save_args, AssumeValidParams, ProveClient,
-    ProveConfig,
-};
+use crate::generate_args::{generate_and_save_args, AssumeValidParams, ProveClient, ProveConfig};
 
 /// Generate program-input.json for bootloader execution
 pub async fn generate_program_input(

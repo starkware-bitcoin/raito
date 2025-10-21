@@ -130,7 +130,10 @@ pub async fn generate_assumevalid_args(
     );
 
     let chain_state_proof = if let Some(path) = &params.chain_state_proof_path {
-        Some(deserialize_proof_from_file::<Blake2sMerkleHasher>(path, ProofFormat::CairoSerde)?)
+        Some(deserialize_proof_from_file::<Blake2sMerkleHasher>(
+            path,
+            ProofFormat::CairoSerde,
+        )?)
     } else {
         None
     };
