@@ -92,8 +92,10 @@ pub async fn run_and_prove(
     let params_abs = prover_params.canonicalize()?;
     let proofs_dir_abs = out_dir.canonicalize()?;
 
-    let mut cmd = Command::new("stwo_run_and_prove");
+    let mut cmd = Command::new("/usr/bin/time");
     cmd.args([
+        "-v",
+        "stwo_run_and_prove",
         "--program",
         program_abs.to_str().unwrap(),
         "--program_input",
