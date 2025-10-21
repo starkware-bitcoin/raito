@@ -319,6 +319,8 @@ pub async fn prove(params: ProveParams) -> Result<()> {
 
     let end_height = start_height + params.total_blocks;
     let mut current_height = start_height;
+    let mut last_proof_path: Option<PathBuf> = None;
+    let mut last_height = start_height;
 
     // Process batches sequentially
     while current_height < end_height {
@@ -371,25 +373,9 @@ pub async fn prove(params: ProveParams) -> Result<()> {
                 info!("{} done", job_info);
                 info!("Batch at height {} completed successfully", current_height);
 
-                // upload recent proof to gcs
-                if params.save_to_gcs {
-                    let client = ProveClient::new(ProveConfig {
-                        bridge_node_url: params.bridge_url.clone(),
-                    });
-
-                    let timestamp = format!("{}", chrono::Utc::now());
-                    let chainstate = client
-                        .get_chain_state(current_height + current_step)
-                        .await?;
-                    let proof = deserialize_proof_from_file(&proof_path, ProofFormat::CairoSerde)?;
-
-                    let recent_proof = RecentProof {
-                        timestamp,
-                        chainstate,
-                        proof,
-                    };
-                    upload_recent_proof(&recent_proof, &params.gcs_bucket).await?;
-                }
+                // Store the last proof path and height for later upload
+                last_proof_path = Some(proof_path);
+                last_height = current_height + current_step;
                 current_height += current_step;
             }
             Err(e) => {
@@ -399,5 +385,28 @@ pub async fn prove(params: ProveParams) -> Result<()> {
             }
         }
     }
+
+    // Upload only the last proof to GCS
+    if params.save_to_gcs {
+        if let Some(proof_path) = last_proof_path {
+            info!("Uploading final proof to GCS for height {}", last_height);
+            let client = ProveClient::new(ProveConfig {
+                bridge_node_url: params.bridge_url.clone(),
+            });
+
+            let timestamp = format!("{}", chrono::Utc::now());
+            let chainstate = client.get_chain_state(last_height).await?;
+            let proof = deserialize_proof_from_file(&proof_path, ProofFormat::CairoSerde)?;
+
+            let recent_proof = RecentProof {
+                timestamp,
+                chainstate,
+                proof,
+            };
+            upload_recent_proof(&recent_proof, &params.gcs_bucket).await?;
+            info!("Successfully uploaded final proof to GCS");
+        }
+    }
+
     Ok(())
 }
