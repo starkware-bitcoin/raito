@@ -194,7 +194,6 @@ pub async fn upload_recent_proof(recent_proof: &RecentProof, bucket_name: &str) 
 
     // Serialize the proof to JSON
     let json_data = serde_json::to_string_pretty(recent_proof)?;
-    debug!("Serialized proof data: {} characters", json_data.len());
 
     // Compress the JSON data using gzip
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());

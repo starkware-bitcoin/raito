@@ -40,7 +40,7 @@ pub async fn generate_program_input(
     let json = serde_json::to_string_pretty(&program_input)?;
     tokio::fs::write(input_file, json).await?;
 
-    info!("Generated program-input.json at {}", input_file.display());
+    debug!("Generated program-input.json at {}", input_file.display());
     Ok(())
 }
 
@@ -68,8 +68,8 @@ pub async fn run_and_prove(
     keep_temp_files: bool,
 ) -> Result<PathBuf> {
     info!("Starting assumevalid proving process");
-    info!("Arguments file: {}", arguments_file.display());
-    info!("Output directory: {}", output_dir.display());
+    debug!("Arguments file: {}", arguments_file.display());
+    debug!("Output directory: {}", output_dir.display());
 
     // Create output directory
     tokio::fs::create_dir_all(output_dir).await?;
@@ -82,7 +82,7 @@ pub async fn run_and_prove(
     let proof_file = out_dir.join("proof.json");
 
     // Prepare program input for the bootloader
-    info!("Generating program-input.json");
+    debug!("Generating program-input.json");
     generate_program_input(executable, arguments_file, &program_input_file).await?;
 
     // Inline stwo_run_and_prove: build and run CLI
@@ -148,7 +148,7 @@ pub async fn run_and_prove(
                                     e
                                 );
                             } else {
-                                info!(
+                                debug!(
                                     "Renamed proof file from {} to {}",
                                     file_name,
                                     proof_file.file_name().unwrap().to_string_lossy()
@@ -174,7 +174,7 @@ pub async fn run_and_prove(
 
     // Clean up temporary files if requested
     if !keep_temp_files {
-        info!("Cleaning up temporary files");
+        debug!("Cleaning up temporary files");
         let temp_files = vec![program_input_file, arguments_file.to_path_buf()];
 
         for temp_file in temp_files {
@@ -302,7 +302,7 @@ pub async fn prove(params: ProveParams) -> Result<()> {
             ProofFormat::CairoSerde,
         )?;
 
-        info!(
+        debug!(
             "Using recent proof up to height: {}",
             recent_proof.chainstate.block_height
         );
@@ -314,7 +314,7 @@ pub async fn prove(params: ProveParams) -> Result<()> {
         "Starting iterative proving process: start_height={}, total_blocks={}, step_size={}",
         start_height, params.total_blocks, params.step_size
     );
-    info!("Output directory: {}", params.output_dir.display());
+    debug!("Output directory: {}", params.output_dir.display());
 
     // Create output directory
     tokio::fs::create_dir_all(&params.output_dir).await?;
@@ -373,7 +373,6 @@ pub async fn prove(params: ProveParams) -> Result<()> {
         match batch_result {
             Ok(proof_path) => {
                 info!("{} done", job_info);
-                info!("Batch at height {} completed successfully", current_height);
 
                 // Store the last proof path and height for later upload
                 last_proof_path = Some(proof_path);
