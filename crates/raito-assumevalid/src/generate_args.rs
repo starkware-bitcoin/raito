@@ -1,16 +1,13 @@
 use crate::adapters::to_runner_args_hex;
 use anyhow::{anyhow, Result};
 use bitcoin::block::Header as BlockHeader;
-use cairo_air::utils::ProofFormat;
+use cairo_air::utils::{deserialize_proof_from_file, ProofFormat};
 use raito_spv_mmr::sparse_roots::SparseRoots;
 use raito_spv_verify::ChainState;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tracing::{debug, info};
 
-use cairo_air::CairoProof;
-use serde::de::DeserializeOwned;
-use stwo::core::vcs::MerkleHasher;
-use stwo_cairo_serialize::CairoDeserialize;
+use stwo::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 
 /// Configuration for the raito-assumevalid client
 #[derive(Debug, Clone)]
@@ -105,31 +102,6 @@ pub struct AssumeValidParams {
     pub chain_state_proof_path: Option<PathBuf>,
 }
 
-/// Result type for generate args operations
-pub type GenerateArgsResult = Result<Vec<String>>;
-
-/// Deserializes Cairo proof from a file given the desired format.
-pub fn deserialize_proof_from_file<H: MerkleHasher + DeserializeOwned>(
-    proof_path: &Path,
-    proof_format: ProofFormat,
-) -> Result<CairoProof<H>, std::io::Error>
-where
-    H::Hash: CairoDeserialize,
-{
-    match proof_format {
-        ProofFormat::Json => {
-            let proof_str = std::fs::read_to_string(proof_path)?;
-            serde_json::from_str(&proof_str).map_err(std::io::Error::other)
-        }
-        ProofFormat::CairoSerde => {
-            let proof_str = std::fs::read_to_string(proof_path)?;
-            let felts: Vec<starknet_ff::FieldElement> =
-                serde_json::from_str(&proof_str).map_err(std::io::Error::other)?;
-            Ok(CairoDeserialize::deserialize(&mut felts.iter()))
-        }
-    }
-}
-
 /// Generate assumevalid args for the given parameters
 pub async fn generate_assumevalid_args(
     client: &ProveClient,
@@ -158,7 +130,7 @@ pub async fn generate_assumevalid_args(
     );
 
     let chain_state_proof = if let Some(path) = &params.chain_state_proof_path {
-        Some(deserialize_proof_from_file(path, ProofFormat::CairoSerde)?)
+        Some(deserialize_proof_from_file::<Blake2sMerkleHasher>(path, ProofFormat::CairoSerde)?)
     } else {
         None
     };

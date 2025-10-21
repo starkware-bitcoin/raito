@@ -55,10 +55,10 @@ wiremock = "0.5"
 tempfile = "3.10"
 
 # Stwo-cairo
-stwo = { git = "https://github.com/starkware-libs/stwo", rev = "411d8c6", default-features = false }
-cairo-air = { git = "https://github.com/maciejka/stwo-cairo", rev = "3b258e18a0f9a19e8a3fe573b0b3d89d92dd93ce", default-features = false }
-stwo-cairo-serialize = { git = "https://github.com/maciejka/stwo-cairo", rev = "3b258e18a0f9a19e8a3fe573b0b3d89d92dd93ce" }
-stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "411d8c6", features = [], default-features = false }
-stwo_cairo_prover = { git = "https://github.com/maciejka/stwo-cairo", rev = "3b258e18a0f9a19e8a3fe573b0b3d89d92dd93ce" }
-stwo_cairo_utils = { git = "https://github.com/maciejka/stwo-cairo", rev = "3b258e18a0f9a19e8a3fe573b0b3d89d92dd93ce" }
+stwo = { git = "https://github.com/starkware-libs/stwo", rev = "d9176e6e22319370a8501f799829b920c0db2eac", default-features = false }
+cairo-air = { git = "https://github.com/maciejka/stwo-cairo", rev = "d2793e9f19f575c13f6bc37c36f9b229797456e1", default-features = false }
+stwo-cairo-serialize = { git = "https://github.com/maciejka/stwo-cairo", rev = "d2793e9f19f575c13f6bc37c36f9b229797456e1" }
+stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "d9176e6e22319370a8501f799829b920c0db2eac", features = [], default-features = false }
+stwo_cairo_prover = { git = "https://github.com/maciejka/stwo-cairo", rev = "d2793e9f19f575c13f6bc37c36f9b229797456e1" }
+stwo_cairo_utils = { git = "https://github.com/maciejka/stwo-cairo", rev = "d2793e9f19f575c13f6bc37c36f9b229797456e1" }
 

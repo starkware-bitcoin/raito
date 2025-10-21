@@ -1,8 +1,9 @@
 use anyhow::{anyhow, Result};
-use cairo_air::utils::{serialize_proof_to_file, ProofFormat};
+use cairo_air::utils::{deserialize_proof_from_file, serialize_proof_to_file, ProofFormat};
 use regex::Regex;
 
 use serde_json::json;
+use stwo::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -11,7 +12,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::gcs::{download_recent_proof_via_reqwest, upload_recent_proof, RecentProof};
 use crate::generate_args::{
-    deserialize_proof_from_file, generate_and_save_args, AssumeValidParams, ProveClient,
+    generate_and_save_args, AssumeValidParams, ProveClient,
     ProveConfig,
 };
 
@@ -296,9 +297,9 @@ pub async fn prove(params: ProveParams) -> Result<()> {
 
         // Save the recent proof to the output directory
         let proof_file = batch_dir.join("proof.json");
-        serialize_proof_to_file::<stwo::core::vcs::blake2_merkle::Blake2sMerkleChannel>(
+        serialize_proof_to_file::<Blake2sMerkleHasher>(
             &recent_proof.proof,
-            proof_file,
+            &proof_file,
             ProofFormat::CairoSerde,
         )?;
 

@@ -10,7 +10,7 @@ allow-syscalls = true
 cairo_execute = "2.11.4"
 consensus = { path = "../consensus" }
 utils = { path = "../utils" }
-stwo_cairo_air = { git = "https://github.com/maciejka/stwo-cairo", rev = "3b258e18a0f9a19e8a3fe573b0b3d89d92dd93ce", features = ["qm31_opcode"] }
+stwo_cairo_air = { git = "https://github.com/maciejka/stwo-cairo", rev = "d2793e9f19f575c13f6bc37c36f9b229797456e1", features = ["qm31_opcode"] }
 
 [features]
 default = ["syscalls"]

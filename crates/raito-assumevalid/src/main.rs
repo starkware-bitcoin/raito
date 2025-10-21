@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 use raito_assumevalid::prove::{prove, ProveParams};
 use std::path::PathBuf;
 use tracing::Level;
-use tracing_subscriber;
+use tracing_subscriber::{self, EnvFilter};
 
 /// Raito AssumeValid - Generate assumevalid arguments and prove Cairo programs
 #[derive(Parser)]
@@ -84,7 +84,40 @@ async fn main() -> Result<()> {
         _ => Level::INFO,
     };
 
-    tracing_subscriber::fmt().with_max_level(log_level).init();
+    // Build an EnvFilter with per-target overrides to silence noisy dependencies.
+    // Always merge our suppressions even if RUST_LOG is set.
+    let base_level = match log_level {
+        Level::TRACE => "trace",
+        Level::DEBUG => "debug",
+        Level::INFO => "info",
+        Level::WARN => "warn",
+        Level::ERROR => "error",
+    };
+
+    let mut env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(base_level));
+
+    for directive in [
+        "gcp_auth::custom_service_account=off",
+        "gcp_auth::authentication_manager=off",
+        "reqwest::connect=off",
+        "hyper_util::client::legacy::connect::http=off",
+        "hyper::client::connect::dns=off",
+        "rustls::client=off",
+        // Reduce chattiness of h2/hyper/reqwest to info+ regardless of base debug level
+        "h2=info",
+        "hyper=info",
+        "hyper_util=info",
+        "reqwest=info",
+    ] {
+        if let Ok(dir) = directive.parse() {
+            env_filter = env_filter.add_directive(dir);
+        }
+    }
+
+    tracing_subscriber::fmt()
+        .with_env_filter(env_filter)
+        .init();
 
     match cli.command {
         Commands::Prove {
