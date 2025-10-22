@@ -82,22 +82,6 @@ assumevalid-execute:
 		--arguments-file $(ARGS_FILE) \
 		--print-resource-usage
 
-# Run the raito-assumevalid CLI Prove subcommand
-assumevalid-prove:
-	cargo run -p raito-assumevalid -- \
-	    --log-level debug \
-	    prove \
-		--keep-temp-files \
-		$(if $(BLOCKS),--total-blocks $(BLOCKS)) \
-		$(if $(STEP),--step-size $(STEP)) \
-		$(if $(OUTPUT_DIR),--output-dir $(OUTPUT_DIR)) \
-		$(if $(LOAD_FROM_GCS),--load-from-gcs) \
-		$(if $(SAVE_TO_GCS),--save-to-gcs) \
-		$(if $(GCS_BUCKET),--gcs-bucket $(GCS_BUCKET))
-
-
-
-
 ################################## PIPELINE ##################################
 
 build-simple-bootloader:
@@ -150,15 +134,16 @@ prove-pow:
 		$(if $(SLOW),--slow) \
 		$(if $(VERBOSE),--verbose)
 
-rust-prove-pow:
+# Run the raito-assumevalid CLI Prove subcommand
+assumevalid-prove:
 	cargo run -p raito-assumevalid -- \
-		--log-level debug \
-		--bridge-url "https://staging.raito.wtf" \
-		prove \
-		--keep-temp-files \
+		$(if $(LOG_LEVEL),--log-level $(LOG_LEVEL)) \
+		$(if $(BRIDGE_URL),--bridge-url $(BRIDGE_URL)) \
+	    prove \
+		$(if $(KEEP_TEMP_FILES),--keep-temp-files) \
 		$(if $(OUTPUT_DIR),--output-dir $(OUTPUT_DIR)) \
-		$(if $(BLOCKS),--total-blocks $(BLOCKS)) \
-		$(if $(STEP),--step-size $(STEP)) \
+		$(if $(TOTAL_BLOCKS),--total-blocks $(TOTAL_BLOCKS)) \
+		$(if $(STEP_SIZE),--step-size $(STEP_SIZE)) \
 		$(if $(LOAD_FROM_GCS),--load-from-gcs) \
 		$(if $(SAVE_TO_GCS),--save-to-gcs) \
 		$(if $(GCS_BUCKET),--gcs-bucket $(GCS_BUCKET))
@@ -171,8 +156,6 @@ build-recent-proof:
 		$(if $(MAX_HEIGHT),--max-height $(MAX_HEIGHT)) \
 		$(if $(SLOW),--slow) \
 		$(if $(VERBOSE),--verbose)
-
-
 
 collect-resources-all:
 	@echo ">>> Collecting resource usage data (all tests)..."

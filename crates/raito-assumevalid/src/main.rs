@@ -2,7 +2,6 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use raito_assumevalid::prove::{prove, ProveParams};
 use std::path::PathBuf;
-use tracing::Level;
 use tracing_subscriber::{self, EnvFilter};
 
 /// Raito AssumeValid - Generate assumevalid arguments and prove Cairo programs
@@ -34,7 +33,7 @@ enum Commands {
         #[arg(long)]
         save_to_gcs: bool,
 
-        #[arg(long, default_value = "raito-proofs-tests")]
+        #[arg(long, default_value = "raito-proofs")]
         gcs_bucket: String,
 
         /// Total number of blocks to process
@@ -74,26 +73,14 @@ enum Commands {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Initialize logging
-    let log_level = match cli.log_level.as_str() {
-        "trace" => Level::TRACE,
-        "debug" => Level::DEBUG,
-        "info" => Level::INFO,
-        "warn" => Level::WARN,
-        "error" => Level::ERROR,
-        _ => Level::INFO,
+    // Initialize logging - validate and normalize the log level
+    let base_level = match cli.log_level.as_str() {
+        "trace" | "debug" | "info" | "warn" | "error" => cli.log_level.as_str(),
+        _ => "info",
     };
 
     // Build an EnvFilter with per-target overrides to silence noisy dependencies.
     // Always merge our suppressions even if RUST_LOG is set.
-    let base_level = match log_level {
-        Level::TRACE => "trace",
-        Level::DEBUG => "debug",
-        Level::INFO => "info",
-        Level::WARN => "warn",
-        Level::ERROR => "error",
-    };
-
     let mut env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(base_level));
 
