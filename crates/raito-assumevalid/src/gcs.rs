@@ -1,15 +1,13 @@
 use anyhow::Result;
 use bytes::Bytes;
 use cairo_air::CairoProof;
-use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use google_cloud_storage::client::Storage;
 use google_cloud_storage::model_ext::ReadRange;
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use raito_spv_verify::ChainState;
 use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
+use std::io::Write;
 use stwo::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use tracing::{debug, info};
 
@@ -61,90 +59,42 @@ pub struct RecentProof {
     pub proof: CairoProof<Blake2sMerkleHasher>,
 }
 
-// Characters to percent-encode in GCS object names and query strings
-const GCS_ENCODED_CHARS: AsciiSet = CONTROLS
-    .add(b'!')
-    .add(b'#')
-    .add(b'$')
-    .add(b'&')
-    .add(b'\'')
-    .add(b'(')
-    .add(b')')
-    .add(b'*')
-    .add(b'+')
-    .add(b',')
-    .add(b'/')
-    .add(b':')
-    .add(b';')
-    .add(b'=')
-    .add(b'?')
-    .add(b'@')
-    .add(b'[')
-    .add(b']')
-    .add(b' ');
-
 /// Download complete `recent_proof` using only reqwest, bypassing the GCS crate
+/// Google Cloud Storage client library requires a content-length header when reading objects
 pub async fn download_recent_proof_via_reqwest(bucket_name: &str) -> Result<RecentProof> {
+    debug!(
+        "Downloading proof data from GCS bucket: {} (object: recent_proof)",
+        bucket_name
+    );
+
     // Build the media URL
-    let object_name = utf8_percent_encode("recent_proof", &GCS_ENCODED_CHARS).to_string();
     let url = format!(
-        "https://storage.googleapis.com/storage/v1/b/{}/o/{}?alt=media",
-        bucket_name, object_name
+        "https://storage.googleapis.com/storage/v1/b/{}/o/recent_proof?alt=media",
+        bucket_name
     );
 
     let client = reqwest::Client::new();
-    let mut req = client.get(url);
     // Fetch access token via ADC (uses GOOGLE_APPLICATION_CREDENTIALS if set)
     let scopes = &["https://www.googleapis.com/auth/devstorage.read_only"];
     let manager = gcp_auth::AuthenticationManager::new().await?;
-    let token_owned = manager.get_token(scopes).await?.as_str().to_string();
-    req = req.bearer_auth(&token_owned);
-    // Avoid transparent decompression; we want to control gzip handling
-    req = req.header("accept-encoding", "identity");
+    let token = manager.get_token(scopes).await?;
 
-    let mut resp = req.send().await?;
+    let resp = client.get(url).bearer_auth(token.as_str()).send().await?;
+
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
         anyhow::bail!("GCS request failed: {} - {}", status, body);
     }
 
-    // Accumulate the body (compressed or not)
-    let mut contents: Vec<u8> = Vec::new();
-    while let Some(chunk) = resp.chunk().await? {
-        contents.extend_from_slice(&chunk);
-    }
+    let body = resp.text().await?;
 
-    // If server indicated gzip, decompress; otherwise try plain JSON
-    let is_gzip = resp
-        .headers()
-        .get("content-encoding")
-        .and_then(|v| v.to_str().ok())
-        .map(|v| v.eq_ignore_ascii_case("gzip"))
-        .unwrap_or(false);
+    debug!("Downloaded {} bytes of GCS proof data", body.len());
 
-    let decompressed = if is_gzip {
-        let mut decoder = GzDecoder::new(&contents[..]);
-        let mut out = String::new();
-        decoder.read_to_string(&mut out)?;
-        out
-    } else {
-        match String::from_utf8(contents.clone()) {
-            Ok(s) => s,
-            Err(_) => {
-                // Try gzip as a fallback if UTF-8 fails
-                let mut decoder = GzDecoder::new(&contents[..]);
-                let mut out = String::new();
-                decoder.read_to_string(&mut out)?;
-                out
-            }
-        }
-    };
-
-    Ok(serde_json::from_str(&decompressed)?)
+    Ok(serde_json::from_str(&body)?)
 }
 
-/// Download complete `recent_proof` object from a GCS bucket
+/// Download complete `recent_proof` object from a GCS bucket, does not work with gzipped objects
 pub async fn download_recent_proof(bucket_name: &str) -> Result<RecentProof> {
     debug!(
         "Downloading proof data from GCS bucket: {} (object: recent_proof)",
@@ -165,21 +115,11 @@ pub async fn download_recent_proof(bucket_name: &str) -> Result<RecentProof> {
         contents.extend_from_slice(&chunk);
     }
 
-    debug!(
-        "Downloaded {} bytes of compressed GCS proof data",
-        contents.len()
-    );
+    let body = String::from_utf8(contents)?;
 
-    // Decompress the gzipped data
-    let mut decoder = GzDecoder::new(&contents[..]);
-    let mut decompressed = String::new();
-    decoder.read_to_string(&mut decompressed)?;
+    debug!("Downloaded {} bytes of GCS proof data", body.len());
 
-    debug!(
-        "Decompressed to {} characters of GCS proof data",
-        decompressed.len()
-    );
-    Ok(serde_json::from_str(&decompressed)?)
+    Ok(serde_json::from_str(&body)?)
 }
 
 /// Upload recent proof to Google Cloud Storage in gzipped JSON format

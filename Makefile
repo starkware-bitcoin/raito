@@ -88,7 +88,6 @@ assumevalid-prove:
 	    --log-level debug \
 	    prove \
 		--keep-temp-files \
-		$(if $(START),--start-height $(START)) \
 		$(if $(BLOCKS),--total-blocks $(BLOCKS)) \
 		$(if $(STEP),--step-size $(STEP)) \
 		$(if $(OUTPUT_DIR),--output-dir $(OUTPUT_DIR)) \
