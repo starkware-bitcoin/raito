@@ -15,7 +15,7 @@ IMAGE=${IMAGE:-raito-assumevalid}
 TAG=${TAG:-latest}
 MACHINE_TYPE=${MACHINE_TYPE:-n2-highmem-32}    # 256GB RAM
 BOOT_DISK_TYPE=${BOOT_DISK_TYPE:-pd-balanced}
-BOOT_DISK_SIZE_GB=${BOOT_DISK_SIZE_GB:-15}
+BOOT_DISK_SIZE_GB=${BOOT_DISK_SIZE_GB:-10}
 
 # Base image (use COS for fastest boot; includes Docker/containerd by default)
 BASE_IMAGE_FAMILY=${BASE_IMAGE_FAMILY:-cos-109-lts}
