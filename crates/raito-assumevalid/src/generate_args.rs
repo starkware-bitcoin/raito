@@ -5,7 +5,9 @@ use cairo_air::utils::{deserialize_proof_from_file, ProofFormat};
 use raito_spv_mmr::sparse_roots::SparseRoots;
 use raito_spv_verify::ChainState;
 use std::path::PathBuf;
-use tracing::{debug, info};
+use tracing::debug;
+
+use stwo::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 
 /// Configuration for the raito-assumevalid client
 #[derive(Debug, Clone)]
@@ -100,38 +102,38 @@ pub struct AssumeValidParams {
     pub chain_state_proof_path: Option<PathBuf>,
 }
 
-/// Result type for generate args operations
-pub type GenerateArgsResult = Result<Vec<String>>;
-
 /// Generate assumevalid args for the given parameters
 pub async fn generate_assumevalid_args(
     client: &ProveClient,
     params: AssumeValidParams,
 ) -> Result<Vec<String>> {
-    info!(
+    debug!(
         "Generating assumevalid args for height {} with {} blocks",
         params.start_height, params.block_count
     );
 
     // Fetch chain state for the starting height
     let chain_state = client.get_chain_state(params.start_height).await?;
-    info!("Fetched chain state for height {}", params.start_height);
+    debug!("Fetched chain state for height {}", params.start_height);
 
     // Fetch block headers for the range: starting AFTER the current chain_state height
     let block_headers = client
         .get_block_headers(params.start_height + 1, params.block_count)
         .await?;
-    info!("Fetched {} block headers", block_headers.len());
+    debug!("Fetched {} block headers", block_headers.len());
 
     // Fetch MMR roots
     let block_mmr = client.get_mmr_roots(params.start_height).await?;
-    info!(
+    debug!(
         "Fetched MMR roots for chain height {:?}",
         params.start_height
     );
 
     let chain_state_proof = if let Some(path) = &params.chain_state_proof_path {
-        Some(deserialize_proof_from_file(path, ProofFormat::CairoSerde)?)
+        Some(deserialize_proof_from_file::<Blake2sMerkleHasher>(
+            path,
+            ProofFormat::CairoSerde,
+        )?)
     } else {
         None
     };
@@ -139,7 +141,7 @@ pub async fn generate_assumevalid_args(
     // Generate Cairo-compatible arguments
     let cairo_args = to_runner_args_hex(chain_state, &block_headers, &block_mmr, chain_state_proof);
 
-    info!("Generated {} Cairo arguments", cairo_args.len());
+    debug!("Generated {} Cairo arguments", cairo_args.len());
 
     Ok(cairo_args)
 }
@@ -159,7 +161,7 @@ pub async fn generate_and_save_args(
 pub async fn save_cairo_args_to_file(cairo_args: &[String], file_path: &str) -> Result<()> {
     let json = serde_json::to_string_pretty(cairo_args)?;
     tokio::fs::write(file_path, json).await?;
-    info!(
+    debug!(
         "Saved {} Cairo arguments to {}",
         cairo_args.len(),
         file_path

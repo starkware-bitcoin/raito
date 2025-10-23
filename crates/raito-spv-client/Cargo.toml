@@ -32,7 +32,7 @@ tracing-subscriber = { workspace = true }
 
 # Stwo-cairo
 stwo = { workspace = true, features = ["parallel", "prover"] }
-cairo-air = { workspace = true, features = ["std"] }
+cairo-air = { workspace = true }
 starknet-ff = { workspace = true }
 
 # Serialization

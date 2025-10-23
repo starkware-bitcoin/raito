@@ -9,7 +9,6 @@ use raito_spv_verify::ChainState;
 
 use cairo_air::CairoProof;
 use num_bigint::BigUint;
-use tracing::debug;
 
 /// View for assumevalid Args struct that matches Cairo's structure
 #[derive(CairoSerialize)]
@@ -96,9 +95,6 @@ pub fn to_runner_args_hex(
         block_mmr: block_mmr_view,
         chain_state_proof,
     };
-
-    debug!("Serializing args view");
-    // debug!("Args view: {:?}", args_view);
 
     let mut felts = Vec::new();
     args_view.serialize(&mut felts);

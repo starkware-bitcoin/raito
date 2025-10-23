@@ -35,6 +35,7 @@ serde_json = { version = "1.0", features = ["arbitrary_precision"] }
 hex = "0.4"
 bincode = "1.3"
 starknet-ff = "0.3.7"
+bytes = "1.0"
 
 # BigInt
 num-bigint = { version = "0.4", features = ["serde"] }
@@ -55,7 +56,9 @@ tempfile = "3.10"
 
 # Stwo-cairo
 stwo = { git = "https://github.com/starkware-libs/stwo", rev = "d9176e6e22319370a8501f799829b920c0db2eac", default-features = false }
-cairo-air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "5e67166f99366bc8aa7a5999a56461ce33dbe12f", default-features = false }
-stwo-cairo-serialize = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "5e67166f99366bc8aa7a5999a56461ce33dbe12f" }
+cairo-air = { git = "https://github.com/maciejka/stwo-cairo", rev = "d2793e9f19f575c13f6bc37c36f9b229797456e1", default-features = false }
+stwo-cairo-serialize = { git = "https://github.com/maciejka/stwo-cairo", rev = "d2793e9f19f575c13f6bc37c36f9b229797456e1" }
 stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "d9176e6e22319370a8501f799829b920c0db2eac", features = [], default-features = false }
+stwo_cairo_prover = { git = "https://github.com/maciejka/stwo-cairo", rev = "d2793e9f19f575c13f6bc37c36f9b229797456e1" }
+stwo_cairo_utils = { git = "https://github.com/maciejka/stwo-cairo", rev = "d2793e9f19f575c13f6bc37c36f9b229797456e1" }
 

@@ -1,9 +1,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use raito_assumevalid::prove::{auto_detect_start_height, prove, ProveParams};
+use raito_assumevalid::prove::{prove, ProveParams};
 use std::path::PathBuf;
-use tracing::{info, Level};
-use tracing_subscriber;
+use tracing_subscriber::{self, EnvFilter};
 
 /// Raito AssumeValid - Generate assumevalid arguments and prove Cairo programs
 #[derive(Parser)]
@@ -12,7 +11,7 @@ use tracing_subscriber;
 #[command(version)]
 struct Cli {
     /// Bridge node RPC URL
-    #[arg(long, default_value = "https://api.raito.wtf/")]
+    #[arg(long, default_value = "https://staging.raito.wtf")]
     bridge_url: String,
 
     /// Log level
@@ -27,9 +26,15 @@ struct Cli {
 enum Commands {
     /// Prove multiple batches iteratively (similar to prove_pow in Python)
     Prove {
-        /// Starting block height (if not set, will auto-detect from last proof)
+        /// Use cloud storage to detect latest proof height instead of local directory scanning
         #[arg(long)]
-        start_height: Option<u32>,
+        load_from_gcs: bool,
+
+        #[arg(long)]
+        save_to_gcs: bool,
+
+        #[arg(long, default_value = "raito-proofs")]
+        gcs_bucket: String,
 
         /// Total number of blocks to process
         #[arg(long, default_value = "1")]
@@ -44,7 +49,10 @@ enum Commands {
         output_dir: PathBuf,
 
         /// Path to the Cairo executable JSON file
-        #[arg(long, default_value = "target/proving/assumevalid.executable.json")]
+        #[arg(
+            long,
+            default_value = "target/proving/assumevalid-syscalls.executable.json"
+        )]
         executable: PathBuf,
 
         /// Path to the bootloader JSON file
@@ -56,7 +64,7 @@ enum Commands {
         prover_params: PathBuf,
 
         /// Don't delete temporary files after completion
-        #[arg(long)]
+        #[arg(long, default_value = "false")]
         keep_temp_files: bool,
     },
 }
@@ -65,21 +73,42 @@ enum Commands {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Initialize logging
-    let log_level = match cli.log_level.as_str() {
-        "trace" => Level::TRACE,
-        "debug" => Level::DEBUG,
-        "info" => Level::INFO,
-        "warn" => Level::WARN,
-        "error" => Level::ERROR,
-        _ => Level::INFO,
+    // Initialize logging - validate and normalize the log level
+    let base_level = match cli.log_level.as_str() {
+        "trace" | "debug" | "info" | "warn" | "error" => cli.log_level.as_str(),
+        _ => "info",
     };
 
-    tracing_subscriber::fmt().with_max_level(log_level).init();
+    // Build an EnvFilter with per-target overrides to silence noisy dependencies.
+    // Always merge our suppressions even if RUST_LOG is set.
+    let mut env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(base_level));
+
+    for directive in [
+        "gcp_auth::custom_service_account=off",
+        "gcp_auth::authentication_manager=off",
+        "reqwest::connect=off",
+        "hyper_util::client::legacy::connect::http=off",
+        "hyper::client::connect::dns=off",
+        "rustls::client=off",
+        // Reduce chattiness of h2/hyper/reqwest to info+ regardless of base debug level
+        "h2=info",
+        "hyper=info",
+        "hyper_util=info",
+        "reqwest=info",
+    ] {
+        if let Ok(dir) = directive.parse() {
+            env_filter = env_filter.add_directive(dir);
+        }
+    }
+
+    tracing_subscriber::fmt().with_env_filter(env_filter).init();
 
     match cli.command {
         Commands::Prove {
-            start_height,
+            load_from_gcs,
+            save_to_gcs,
+            gcs_bucket,
             total_blocks,
             step_size,
             output_dir,
@@ -88,27 +117,14 @@ async fn main() -> Result<()> {
             prover_params,
             keep_temp_files,
         } => {
-            // Auto-detect start height if not provided
-            let start_height = if let Some(height) = start_height {
-                height
-            } else {
-                let detected = auto_detect_start_height(&output_dir);
-                info!("Auto-detected start height: {}", detected);
-                detected
-            };
-
-            info!(
-                "Starting iterative proving: start_height={}, total_blocks={}, step_size={}",
-                start_height, total_blocks, step_size
-            );
-            info!("Output directory: {}", output_dir.display());
-
             let params = ProveParams {
-                start_height,
+                load_from_gcs,
+                save_to_gcs,
+                gcs_bucket,
+                bridge_url: cli.bridge_url,
                 total_blocks,
                 step_size,
-                bridge_url: cli.bridge_url.clone(),
-                output_dir: output_dir.clone(),
+                output_dir,
                 executable,
                 bootloader,
                 prover_params,
@@ -116,8 +132,6 @@ async fn main() -> Result<()> {
             };
 
             prove(params).await?;
-
-            info!("Iterative proving completed successfully!");
         }
     }
 
