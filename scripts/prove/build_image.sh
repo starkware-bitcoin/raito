@@ -35,8 +35,9 @@ gcloud artifacts repositories create "$REPO" \
 echo "Configuring Docker auth for Artifact Registry"
 gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
 
-echo "Building Docker image with multi-stage Dockerfile"
-docker build -f "$REPO_ROOT/scripts/prove/Dockerfile" -t "$IMAGE_URI" "$REPO_ROOT"
+echo "Building Docker image with multi-stage Dockerfile (using BuildKit with SSH)"
+export DOCKER_BUILDKIT=1
+docker build --ssh default -f "$REPO_ROOT/scripts/prove/Dockerfile" -t "$IMAGE_URI" "$REPO_ROOT"
 
 echo "Pushing image to Artifact Registry"
 docker push "$IMAGE_URI"

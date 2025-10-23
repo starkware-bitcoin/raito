@@ -4,8 +4,12 @@ WORKDIR /app
 # Copy the entire workspace to ensure Cargo can resolve the workspace members
 COPY . .
 
-# Install bootloader hints before building
-RUN make install-bootloader-hints
+# Install bootloader hints before building with SSH authentication
+# This requires building with: docker build --ssh default ...
+RUN --mount=type=ssh \
+    mkdir -p -m 0700 ~/.ssh && \
+    ssh-keyscan github.com >> ~/.ssh/known_hosts && \
+    make install-bootloader-hints
 
 # Build only the raito-assumevalid binary in release mode
 RUN cargo build --release -p raito-assumevalid
