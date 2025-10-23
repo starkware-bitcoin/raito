@@ -4,6 +4,9 @@ WORKDIR /app
 # Copy the entire workspace to ensure Cargo can resolve the workspace members
 COPY . .
 
+# Install bootloader hints before building
+RUN make install-bootloader-hints
+
 # Build only the raito-assumevalid binary in release mode
 RUN cargo build --release -p raito-assumevalid
 
@@ -16,7 +19,7 @@ COPY --from=builder /app/target/release/raito-assumevalid /bin/raito-assumevalid
 
 # Copy required runtime assets (Cairo executable, bootloader, prover params)
 # into stable locations inside the image so the binary can reference them.
-COPY --from=builder /app/target/proving/assumevalid.executable.json /opt/raito/assumevalid.executable.json
+COPY --from=builder /app/target/proving/assumevalid-syscalls.executable.json /opt/raito/assumevalid-syscalls.executable.json
 COPY --from=builder /app/bootloaders/simple_bootloader_compiled.json /opt/raito/bootloader.json
 COPY --from=builder /app/packages/assumevalid/prover_params.json /opt/raito/prover_params.json
 
