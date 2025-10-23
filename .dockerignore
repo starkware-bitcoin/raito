@@ -1,0 +1,17 @@
+target/
+.proofs
+**/target/
+**/*.rlib
+**/*.rmeta
+
+.git
+.gitignore
+
+**/.vscode
+
+**/node_modules
+**/dist
+**/build
+
+*.log
+tmp/
