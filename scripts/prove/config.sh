@@ -32,9 +32,7 @@ if [[ -z ${CONTAINER_ARGS_SET:-} ]]; then
     --log-level debug
     --bridge-url https://staging.raito.wtf
     prove
-    --keep-temp-files
-    --output-dir .rust-proofs
-    --executable /opt/raito/assumevalid.executable.json
+    --executable /opt/raito/assumevalid-syscalls.executable.json
     --bootloader /opt/raito/bootloader.json
     --prover-params /opt/raito/prover_params.json
   )
