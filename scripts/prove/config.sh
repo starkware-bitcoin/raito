@@ -41,7 +41,7 @@ fi
 
 # Orchestration behavior
 BUILD_FIRST=${BUILD_FIRST:-1}
-STREAM_LOGS=${STREAM_LOGS:-0}
+STREAM_LOGS=${STREAM_LOGS:-1}
 AUTO_DELETE=${AUTO_DELETE:-1}
 
 # Instance naming

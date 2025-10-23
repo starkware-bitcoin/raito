@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fix locale warnings from gcloud/perl
+export LC_ALL=C.UTF-8
+
 # Build and push the raito-assumevalid container image to Artifact Registry.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

@@ -1,6 +1,7 @@
 target/
+!target/proving/
+!target/proving/assumevalid-syscalls.executable.json
 .proofs
-**/target/
 **/*.rlib
 **/*.rmeta
 

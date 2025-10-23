@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fix locale warnings from gcloud/perl
+export LC_ALL=C.UTF-8
+
 # Launch a one-shot Spot VM that runs the raito-assumevalid container.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -9,7 +12,12 @@ source "$SCRIPT_DIR/config.sh"
 INSTANCE_NAME=""
 IMAGE_URI=""
 
-CONTAINER_ARGS=("${CONTAINER_ARGS[@]}")
+# Accept container args from command line if provided, otherwise use defaults from config
+if [[ $# -gt 0 ]]; then
+  CONTAINER_ARGS=("$@")
+else
+  CONTAINER_ARGS=("${CONTAINER_ARGS[@]}")
+fi
 
 if [[ -z "$PROJECT_ID" ]]; then
   echo "PROJECT_ID is required. Set it in scripts/prove/config.sh or export PROJECT_ID." >&2

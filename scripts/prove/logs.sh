@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fix locale warnings from gcloud/perl
+export LC_ALL=C.UTF-8
+
 # Stream serial console logs for the Spot instance (Container-Optimized OS forwards container logs).
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

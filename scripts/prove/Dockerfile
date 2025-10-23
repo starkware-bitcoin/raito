@@ -4,28 +4,41 @@ WORKDIR /app
 # Copy the entire workspace to ensure Cargo can resolve the workspace members
 COPY . .
 
+# Verify that the executable JSON file was copied
+RUN ls -la target/proving/assumevalid-syscalls.executable.json
+
+# Install specific nightly toolchain for bootloader-hints
+RUN rustup toolchain install nightly-2025-07-14
+
 # Install bootloader hints before building with SSH authentication
 # This requires building with: docker build --ssh default ...
+# Use specific nightly channel for bootloader-hints compilation
 RUN --mount=type=ssh \
     mkdir -p -m 0700 ~/.ssh && \
     ssh-keyscan github.com >> ~/.ssh/known_hosts && \
-    make install-bootloader-hints
+    RUSTUP_TOOLCHAIN=nightly-2025-07-14 make install-bootloader-hints
 
 # Build only the raito-assumevalid binary in release mode
 RUN cargo build --release -p raito-assumevalid
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates time \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the compiled binary
 COPY --from=builder /app/target/release/raito-assumevalid /bin/raito-assumevalid
+
+# Copy required prover binaries from builder stage (installed by make install-bootloader-hints)
+COPY --from=builder /usr/local/cargo/bin/stwo_run_and_prove /bin/stwo_run_and_prove
+COPY --from=builder /usr/local/cargo/bin/cairo_program_runner /bin/cairo_program_runner
 
 # Copy required runtime assets (Cairo executable, bootloader, prover params)
 # into stable locations inside the image so the binary can reference them.
 COPY --from=builder /app/target/proving/assumevalid-syscalls.executable.json /opt/raito/assumevalid-syscalls.executable.json
 COPY --from=builder /app/bootloaders/simple_bootloader_compiled.json /opt/raito/bootloader.json
 COPY --from=builder /app/packages/assumevalid/prover_params.json /opt/raito/prover_params.json
+
+RUN ls -la /opt/raito
 
 # Default entrypoint; pass args via container args/command
 ENTRYPOINT ["/bin/raito-assumevalid"]

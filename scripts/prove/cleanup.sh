@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fix locale warnings from gcloud/perl
+export LC_ALL=C.UTF-8
+
 # Delete the Spot instance to stop billing.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
