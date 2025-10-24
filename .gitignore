@@ -45,3 +45,4 @@ cairo_project.toml
 *.bin
 *.bz2
 *.gz
+scripts/prove/.last_instance
