@@ -29,11 +29,13 @@ while true; do
     --port="$PORT" \
     --start="$START" 2>&1 || true)
 
-  # Print only startup and raito lines, normalized
+  # Print only startup and raito lines, normalized and cleaned
   echo "$OUTPUT" \
     | sed -e 's/\r//g' \
     | perl -pe 's/\e\[[\d;]*[A-Za-z]//g; s/\f//g' \
-    | grep -E '^(\[startup\]|\[raito\])' || true
+    | sed -E 's/^\[[[:space:]]*[0-9]+\.[0-9]+\][[:space:]]*cloud-init\[[0-9]+\]:[[:space:]]*//g' \
+    | grep -E '^(\[startup\]|\[raito\])' \
+    | awk '!seen[$0]++' || true
 
   # Break early if we detect the startup script completion marker
   if echo "$OUTPUT" | grep -q "\[startup\] Container exited with code"; then
