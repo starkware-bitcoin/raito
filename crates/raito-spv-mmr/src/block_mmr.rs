@@ -137,7 +137,7 @@ impl BlockMMR {
 
     /// Verify an inclusion proof for a given block height and block header
     /// NOTE that this only guarantees that the block was included in the MMR with the known peaks hashes.
-    /// In order to verify the correctness you have to compute the root hash of the MMR and compare it with the commitеed root.
+    /// In order to verify the correctness you have to compute the root hash of the MMR and compare it with the committed root.
     pub async fn verify_proof(
         &self,
         block_header: &BlockHeader,
