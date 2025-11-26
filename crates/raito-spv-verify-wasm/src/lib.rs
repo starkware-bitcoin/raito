@@ -60,7 +60,7 @@ pub fn verify_transaction(
         transaction,
         transaction_proof,
         block_header,
-        block_height,
+        block_height: _,
     } = serde_json::from_str(transaction_proof_data)
         .map_err(|e| JsValue::from_str(&format!("Failed to parse transaction proof: {}", e)))?;
 

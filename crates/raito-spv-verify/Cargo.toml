@@ -19,15 +19,10 @@ tracing = "0.1"
 hex = "0.4.3"
 serde = { workspace = true }
 num-bigint = "0.4.3"
-starknet-ff = "0.3.7" 
+
+# Starknet
+starknet-ff = { workspace = true }
 
 # Stwo-cairo
-cairo-air = { git = "https://github.com/maciejka/stwo-cairo", rev = "e5981958234c4b28fa2b4c3368a0290ec3fc57c2", default-features = false, features = ["std"] }
-
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "0e90b31", features = [
-    "parallel",
-], default-features = false }
-
-[target.'cfg(target_family = "wasm")'.dependencies]
-stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "0e90b31", features = [], default-features = false }
+cairo-air = { workspace = true }
+stwo = { workspace = true }

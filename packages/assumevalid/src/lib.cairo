@@ -109,10 +109,7 @@ fn get_prev_result(proof: CairoProof) -> Result {
     let VerificationOutput { program_hash, output } = get_verification_output(proof: @proof);
 
     // Verify the proof
-    match verify_cairo(proof) {
-        Ok(_) => {},
-        Err(e) => panic!("Invalid proof: {:?}", e),
-    }
+    verify_cairo(proof);
 
     // Deserialize the bootloader output
     let mut serialized_bootloader_output = output.span();

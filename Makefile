@@ -1,7 +1,8 @@
 # Git revisions for external dependencies
 BOOTLOADER_HINTS_REV ?= 5648cf0a5a2574c2870151cd178ff3ae4b141824
-STWO_REV ?= e5981958234c4b28fa2b4c3368a0290ec3fc57c2
-CAIRO_EXECUTE_REV ?= 7fbbd0112b5a926403c17fa95ad831c1715fd1b1
+STWO_REV ?= ec3420524ecc8486d2f3d887805f26fa52bc6f96
+CAIRO_EXECUTE_REV ?= e209f4557c535ddb4d2c76b2c6b14d004af99467
+SCARB_EJECT_REV ?= 9c9b35870ac35af46e62b725219a8ac925281fe5
 ################################## CLIENT ##################################
 
 client-build:
@@ -30,8 +31,8 @@ install-cairo-execute:
 		--rev $(CAIRO_EXECUTE_REV) cairo-execute
 
 install-scarb-eject:
-	cargo install --git \
-		https://github.com/software-mansion-labs/scarb-eject
+	cargo install --git https://github.com/software-mansion-labs/scarb-eject \
+		--rev $(SCARB_EJECT_REV)
 
 install-convert-proof-format:
 	RUSTFLAGS="-C target-cpu=native -C opt-level=3" \
@@ -42,7 +43,7 @@ install-convert-proof-format:
 install-corelib:
 	mkdir -p vendor
 	rm -rf vendor/cairo
-	git clone --single-branch --branch m-kus/system-builtin \
+	git clone --single-branch --branch raito \
 		https://github.com/m-kus/cairo vendor/cairo
 	(cd vendor/cairo && git checkout $(CAIRO_EXECUTE_REV))
 	ln -s "$(CURDIR)/vendor/cairo/corelib" \
@@ -63,6 +64,7 @@ assumevalid-eject:
 		--output packages/assumevalid/cairo_project.toml
 
 assumevalid-build-with-syscalls:
+	mkdir -p target/proving
 	cd packages/assumevalid && \
 	cairo-execute \
 		--build-only \

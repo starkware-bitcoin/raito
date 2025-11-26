@@ -2,9 +2,6 @@
 resolver = "2"
 members = ["crates/*"]
 
-[patch."https://github.com/m-kus/cairo-vm"]
-cairo-vm = { git = "https://github.com/maciejka/cairo-vm", rev = "19d8a07ce9799a8af9db6f8a14a8accaad900214" }
-
 [workspace.dependencies]
 # Accumulators
 accumulators = { version = "0.5.1", features = ["blake", "memory", "mmr"]}
@@ -54,3 +51,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 mockall = "0.12"
 wiremock = "0.5"
 tempfile = "3.10"
+
+# Stwo-cairo
+stwo = { git = "https://github.com/starkware-libs/stwo", rev = "45d0180", default-features = false }
+cairo-air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "ec3420524ecc8486d2f3d887805f26fa52bc6f96", default-features = false }
+stwo-cairo-serialize = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "ec3420524ecc8486d2f3d887805f26fa52bc6f96" }
+
+# Starknet
+starknet-ff = "0.3.7"

@@ -8,8 +8,8 @@ use cairo_air::CairoProof;
 use raito_spv_mmr::block_mmr::BlockInclusionProof;
 use serde::{Deserialize, Serialize};
 use starknet_ff::FieldElement;
-use stwo_prover::core::vcs::blake2_hash::Blake2sHasher;
-use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleHasher;
+use stwo::core::vcs::blake2_hash::Blake2sHasher;
+use stwo::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 
 /// Bitcoin transaction inclusion data in a specific block
 #[derive(Serialize, Deserialize)]
