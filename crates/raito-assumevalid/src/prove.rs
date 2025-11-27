@@ -1,215 +1,132 @@
+//! Proving module for raito-assumevalid
+//!
+//! This module provides functionality to run Cairo programs and generate STARK proofs
+//! using the stwo-cairo prover library directly.
+
 use anyhow::{anyhow, Result};
 use cairo_air::utils::{deserialize_proof_from_file, serialize_proof_to_file, ProofFormat};
+use cairo_program_runner_lib::cairo_run_program;
+use cairo_program_runner_lib::utils::get_cairo_run_config;
+use cairo_vm::types::layout_name::LayoutName;
+use cairo_vm::types::program::Program;
 use regex::Regex;
-
 use serde_json::json;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::Instant;
 use stwo::core::vcs::blake2_merkle::Blake2sMerkleHasher;
+use stwo_cairo_adapter::adapter::adapt;
+use stwo_cairo_prover::prover::create_and_serialize_proof;
 use tracing::{debug, error, info, warn};
 
 use crate::gcs::{download_recent_proof_via_reqwest, upload_recent_proof, RecentProof};
 use crate::generate_args::{generate_and_save_args, AssumeValidParams, ProveClient, ProveConfig};
+use crate::BOOTLOADER_STR;
 
-/// Generate program-input.json for bootloader execution
-pub async fn generate_program_input(
-    executable_path: &Path,
+/// Runs the Cairo program through the bootloader and generates a STARK proof.
+///
+/// This function:
+/// 1. Loads the bootloader program from embedded resources
+/// 2. Generates the program input JSON for the bootloader
+/// 3. Runs the Cairo VM
+/// 4. Adapts the VM output for the prover
+/// 5. Generates and serializes the STARK proof
+pub fn run_and_prove_with_library(
+    executable: &Path,
     arguments_file: &Path,
-    input_file: &Path,
-) -> Result<()> {
-    // Convert to absolute paths
-    let executable_path = executable_path.canonicalize()?;
-    let args_file = arguments_file.canonicalize()?;
+    output_dir: &Path,
+    prover_params: Option<&Path>,
+    verify: bool,
+) -> Result<PathBuf> {
+    let start_time = Instant::now();
 
-    // Create the program input structure
+    // Create output directory
+    fs::create_dir_all(output_dir)?;
+
+    // Resolve paths to absolute with helpful error messages
+    let executable_abs = executable.canonicalize().map_err(|e| {
+        anyhow!(
+            "Executable file not found at '{}': {}",
+            executable.display(),
+            e
+        )
+    })?;
+    let args_file = arguments_file.canonicalize().map_err(|e| {
+        anyhow!(
+            "Arguments file not found at '{}': {}",
+            arguments_file.display(),
+            e
+        )
+    })?;
+
+    // Generate program input JSON for the bootloader
     let program_input = json!({
         "single_page": true,
         "tasks": [
             {
                 "type": "Cairo1Executable",
-                "path": executable_path.to_string_lossy(),
+                "path": executable_abs.to_string_lossy(),
                 "program_hash_function": "blake",
                 "user_args_file": args_file.to_string_lossy(),
             }
         ],
     });
+    let program_input_str = serde_json::to_string(&program_input)?;
 
-    // Write to output file
-    let json = serde_json::to_string_pretty(&program_input)?;
-    tokio::fs::write(input_file, json).await?;
+    // Load bootloader program from embedded resource
+    let bootloader_program = Program::from_bytes(BOOTLOADER_STR.as_bytes(), Some("main"))
+        .map_err(|e| anyhow!("Failed to load bootloader program: {}", e))?;
 
-    debug!("Generated program-input.json at {}", input_file.display());
-    Ok(())
-}
+    // Configure Cairo VM for proof mode
+    let cairo_run_config = get_cairo_run_config(
+        &None,                      // no dynamic layout params
+        LayoutName::all_cairo_stwo, // layout
+        true,                       // proof_mode
+        true,                       // disable_trace_padding (redundant in stwo proof mode)
+        true,                       // allow_missing_builtins (bootloader simulates them)
+        false,                      // relocate_mem (adapter does relocation)
+    )?;
 
-/// Parse memory usage from /usr/bin/time output
-fn parse_memory_usage(stderr: &str) -> Option<u64> {
-    for line in stderr.lines() {
-        let trimmed = line.trim();
-        // macOS format: "  12345  maximum resident set size" (bytes)
-        if trimmed.ends_with("maximum resident set size") {
-            if let Some(bytes_str) = trimmed.split_whitespace().next() {
-                if let Ok(bytes) = bytes_str.parse::<u64>() {
-                    // Convert bytes to KB for consistent output
-                    return Some(bytes / 1024);
-                }
-            }
-        }
-        // Linux format: "Maximum resident set size (kbytes): 12345"
-        if line.contains("Maximum resident set size (kbytes):") {
-            if let Some(kb_str) = line.split(':').nth(1) {
-                if let Ok(kb) = kb_str.trim().parse::<u64>() {
-                    return Some(kb);
-                }
-            }
-        }
-    }
-    None
-}
+    // Run the bootloader with the program input
+    debug!("Running Cairo VM...");
+    let vm_start = Instant::now();
+    let runner = cairo_run_program(
+        &bootloader_program,
+        Some(program_input_str),
+        cairo_run_config,
+    )
+    .map_err(|e| anyhow!("Cairo VM execution failed: {}", e))?;
+    let vm_elapsed = vm_start.elapsed();
+    info!(
+        "Cairo VM execution completed in {:.2}s",
+        vm_elapsed.as_secs_f64()
+    );
 
-/// Main function to prove batch - orchestrates the full pipeline
-pub async fn run_and_prove(
-    arguments_file: &Path,
-    output_dir: &Path,
-    executable: &Path,
-    bootloader: &Path,
-    prover_params: &Path,
-    keep_temp_files: bool,
-) -> Result<PathBuf> {
-    info!("Starting assumevalid proving process");
-    debug!("Arguments file: {}", arguments_file.display());
-    debug!("Output directory: {}", output_dir.display());
+    // Adapt the VM output for the prover
+    debug!("Adapting VM output for prover...");
+    let prover_input = adapt(&runner).map_err(|e| anyhow!("Failed to adapt VM output: {}", e))?;
 
-    // Create output directory
-    tokio::fs::create_dir_all(output_dir).await?;
+    // Generate the proof
+    let proof_file = output_dir.join("proof.json");
+    debug!("Generating STARK proof...");
+    let prove_start = Instant::now();
+    create_and_serialize_proof(
+        prover_input,
+        verify,
+        proof_file.clone(),
+        ProofFormat::CairoSerde,
+        prover_params.map(|p| p.to_path_buf()),
+    )
+    .map_err(|e| anyhow!("Proof generation failed: {}", e))?;
+    let prove_elapsed = prove_start.elapsed();
 
-    // Resolve output dir to absolute and set up file paths
-    let out_dir = output_dir
-        .canonicalize()
-        .unwrap_or_else(|_| output_dir.to_path_buf());
-    let program_input_file = out_dir.join("program-input.json");
-    let proof_file = out_dir.join("proof.json");
-
-    // Prepare program input for the bootloader
-    debug!("Generating program-input.json");
-    generate_program_input(executable, arguments_file, &program_input_file).await?;
-
-    // Inline stwo_run_and_prove: build and run CLI
-    let start_time = Instant::now();
-    let program_abs = bootloader.canonicalize()?;
-    let input_abs = program_input_file.canonicalize()?;
-    let params_abs = prover_params.canonicalize()?;
-    let proofs_dir_abs = out_dir.canonicalize()?;
-
-    // Use -l on macOS, -v on Linux for /usr/bin/time
-    let time_flag = if cfg!(target_os = "macos") {
-        "-l"
-    } else {
-        "-v"
-    };
-
-    let mut cmd = Command::new("/usr/bin/time");
-    cmd.args([
-        time_flag,
-        "stwo_run_and_prove",
-        "--program",
-        program_abs.to_str().unwrap(),
-        "--program_input",
-        input_abs.to_str().unwrap(),
-        "--prover_params_json",
-        params_abs.to_str().unwrap(),
-        "--proofs_dir",
-        proofs_dir_abs.to_str().unwrap(),
-        "--proof-format",
-        "cairo-serde",
-        "--n_proof_attempts",
-        "1",
-        "--verify",
-    ]);
-    debug!("Running command: {:?}", cmd);
-
-    let output = cmd.output()?;
-    let elapsed = start_time.elapsed();
-    let max_memory = parse_memory_usage(&String::from_utf8_lossy(&output.stderr));
-
-    if output.status.success() {
-        if let Some(mem) = max_memory {
-            info!(
-                "stwo_run_and_prove succeeded in {:.2}s, max RSS: {:.1} MB",
-                elapsed.as_secs_f64(),
-                mem as f64 / 1024.0
-            );
-        } else {
-            info!(
-                "stwo_run_and_prove succeeded in {:.2}s",
-                elapsed.as_secs_f64()
-            );
-        }
-
-        // Find and rename the generated proof file to proof.json
-        if let Ok(entries) = fs::read_dir(&out_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_file() {
-                    if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                        // Look for files that start with "proof_" and end with "_success" or similar patterns
-                        if file_name.starts_with("proof_")
-                            && (file_name.ends_with("_success") || file_name.contains("_success"))
-                        {
-                            if let Err(e) = fs::rename(&path, &proof_file) {
-                                warn!(
-                                    "Failed to rename proof file from {} to {}: {}",
-                                    path.display(),
-                                    proof_file.display(),
-                                    e
-                                );
-                            } else {
-                                debug!(
-                                    "Renamed proof file from {} to {}",
-                                    file_name,
-                                    proof_file.file_name().unwrap().to_string_lossy()
-                                );
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    } else {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        error!(
-            "stwo_run_and_prove failed with return code {:?}",
-            output.status.code()
-        );
-        error!("STDOUT: {}", stdout);
-        error!("STDERR: {}", stderr);
-        return Err(anyhow!("stwo_run_and_prove failed: {}", stderr));
-    }
-
-    // Clean up temporary files if requested
-    if !keep_temp_files {
-        debug!("Cleaning up temporary files");
-        let temp_files = vec![program_input_file, arguments_file.to_path_buf()];
-
-        for temp_file in temp_files {
-            if temp_file.exists() {
-                // Use std::fs::remove_file for synchronous context
-                if let Err(e) = std::fs::remove_file(&temp_file) {
-                    warn!(
-                        "Failed to remove temporary file {}: {}",
-                        temp_file.display(),
-                        e
-                    );
-                }
-            }
-        }
-    }
-
-    info!("Proof saved to: {}", proof_file.display());
+    let total_elapsed = start_time.elapsed();
+    info!(
+        "Proof generated successfully in {:.2}s (VM: {:.2}s, Prove: {:.2}s)",
+        total_elapsed.as_secs_f64(),
+        vm_elapsed.as_secs_f64(),
+        prove_elapsed.as_secs_f64()
+    );
 
     Ok(proof_file)
 }
@@ -217,9 +134,11 @@ pub async fn run_and_prove(
 /// Parameters for proving multiple batches iteratively
 #[derive(Debug, Clone)]
 pub struct ProveParams {
+    /// Path to the Cairo1 executable JSON file
+    pub executable: PathBuf,
     pub load_from_gcs: bool,
     pub save_to_gcs: bool,
-    /// URL to fetch the latest proof height from (used with --use-gcs)
+    /// GCS bucket name for loading/saving proofs
     pub gcs_bucket: String,
     pub bridge_url: String,
     /// Total number of blocks to process
@@ -228,12 +147,8 @@ pub struct ProveParams {
     pub step_size: u32,
     /// Output directory for all proofs
     pub output_dir: PathBuf,
-    /// Path to the Cairo executable JSON file
-    pub executable: PathBuf,
-    /// Path to the bootloader JSON file
-    pub bootloader: PathBuf,
-    /// Path to the prover parameters JSON file
-    pub prover_params: PathBuf,
+    /// Path to the prover parameters JSON file (optional)
+    pub prover_params_file: Option<PathBuf>,
     /// Whether to keep temporary files after completion
     pub keep_temp_files: bool,
 }
@@ -279,10 +194,8 @@ pub fn auto_detect_start_height(proof_dir: &Path) -> u32 {
                             (captures[1].parse::<u32>(), captures[2].parse::<u32>())
                         {
                             let proof_file = entry.path().join("proof.json");
-                            if proof_file.exists() {
-                                if end > max_height {
-                                    max_height = end;
-                                }
+                            if proof_file.exists() && end > max_height {
+                                max_height = end;
                             }
                         }
                     }
@@ -298,7 +211,6 @@ pub async fn create_batch_dir(
     step_size: u32,
     output_dir: &Path,
 ) -> Result<PathBuf> {
-    // Create dedicated directory for this proof batch
     let batch_name = format!("batch_{}_to_{}", start_height, start_height + step_size);
     let batch_dir = output_dir.join(&batch_name);
     tokio::fs::create_dir_all(&batch_dir).await?;
@@ -345,11 +257,10 @@ pub async fn prove(params: ProveParams) -> Result<()> {
     // Process batches sequentially
     while current_height < end_height {
         let current_step = std::cmp::min(params.step_size, end_height - current_height);
-        if current_step <= 0 {
+        if current_step == 0 {
             break;
         }
 
-        // Process a single batch
         let job_info = format!("Job(height='{}', blocks={})", current_height, current_step);
         info!("{} proving...", job_info);
 
@@ -375,18 +286,21 @@ pub async fn prove(params: ProveParams) -> Result<()> {
 
         let args_file = batch_dir.join("arguments.json");
         generate_and_save_args(&client, assumevalid_params, &args_file.to_string_lossy()).await?;
-        let _args_elapsed = args_start_time.elapsed();
+        let args_elapsed = args_start_time.elapsed();
+        debug!(
+            "{} args generated in {:.2}s",
+            job_info,
+            args_elapsed.as_secs_f64()
+        );
 
-        // Prove the batch using inlined parameters
-        let batch_result = run_and_prove(
+        // Prove the batch using the library directly
+        let batch_result = run_and_prove_with_library(
+            &params.executable,
             &args_file,
             &batch_dir,
-            &params.executable,
-            &params.bootloader,
-            &params.prover_params,
-            params.keep_temp_files,
-        )
-        .await;
+            params.prover_params_file.as_deref(),
+            true, // verify
+        );
 
         match batch_result {
             Ok(proof_path) => {
@@ -396,6 +310,13 @@ pub async fn prove(params: ProveParams) -> Result<()> {
                 last_proof_path = Some(proof_path);
                 last_height = current_height + current_step;
                 current_height += current_step;
+
+                // Clean up temporary files if requested
+                if !params.keep_temp_files {
+                    if let Err(e) = std::fs::remove_file(&args_file) {
+                        warn!("Failed to remove args file: {}", e);
+                    }
+                }
             }
             Err(e) => {
                 error!("Batch at height {} failed: {}", current_height, e);

@@ -56,9 +56,20 @@ tempfile = "3.10"
 
 # Stwo-cairo
 stwo = { git = "https://github.com/starkware-libs/stwo", rev = "45d0180", default-features = false }
-cairo-air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "a8a434b521a588cf80eb3625affb984f9913be6c", default-features = false }
-stwo-cairo-serialize = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "a8a434b521a588cf80eb3625affb984f9913be6c" }
-stwo_cairo_prover = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "a8a434b521a588cf80eb3625affb984f9913be6c" }
+cairo-air = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "e8bc9571675bb654b6e26a7bd53838a6ae78c344", default-features = false }
+stwo-cairo-serialize = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "e8bc9571675bb654b6e26a7bd53838a6ae78c344" }
+stwo_cairo_prover = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "e8bc9571675bb654b6e26a7bd53838a6ae78c344" }
+stwo-cairo-adapter = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "e8bc9571675bb654b6e26a7bd53838a6ae78c344" }
+cairo-program-runner-lib = { git = "https://github.com/m-kus/proving-utils", rev = "148b20f0489f5b1e28990afdfb9e9cbb9be960ce", default-features = false }
+cairo-vm = { version = "3.0.0", features = ["std"] }
 
 # Starknet
 starknet-ff = "0.3.7"
+
+[patch.crates-io]
+cairo-lang-executable = { git = "https://github.com/m-kus/cairo", rev = "13f3701f3d6c50086beb25ee3a191949bcc8dddf" }
+cairo-lang-runner = { git = "https://github.com/m-kus/cairo", rev = "13f3701f3d6c50086beb25ee3a191949bcc8dddf" }
+cairo-lang-casm = { git = "https://github.com/m-kus/cairo", rev = "13f3701f3d6c50086beb25ee3a191949bcc8dddf" }
+cairo-lang-execute-utils = { git = "https://github.com/m-kus/cairo", rev = "13f3701f3d6c50086beb25ee3a191949bcc8dddf" }
+cairo-vm = { git = "https://github.com/m-kus/cairo-vm", rev = "c9aa51b9360a6c89389cf88c93ac30b5213e64a7" }
+stwo-cairo-adapter = { git = "https://github.com/starkware-libs/stwo-cairo", rev = "e8bc9571675bb654b6e26a7bd53838a6ae78c344" }

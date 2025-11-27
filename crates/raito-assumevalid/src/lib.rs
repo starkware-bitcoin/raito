@@ -10,3 +10,7 @@ pub mod generate_args;
 pub mod prove;
 
 pub use prove::{prove, ProveParams};
+
+/// Embedded bootloader program (Cairo0 compiled)
+pub(crate) const BOOTLOADER_STR: &str =
+    include_str!("../../../bootloaders/simple_bootloader_compiled.json");

@@ -139,7 +139,7 @@ assumevalid-bridge:
 
 # Run the raito-assumevalid CLI Prove subcommand
 assumevalid-prove:
-	cargo run -p raito-assumevalid -- \
+	RUSTFLAGS="-C target-cpu=native -C opt-level=3" cargo run --release -p raito-assumevalid -- \
 		$(if $(LOG_LEVEL),--log-level $(LOG_LEVEL)) \
 		$(if $(BRIDGE_URL),--bridge-url $(BRIDGE_URL)) \
 	    prove \

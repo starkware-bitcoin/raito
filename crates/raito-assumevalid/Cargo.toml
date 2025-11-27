@@ -37,8 +37,11 @@ bitcoin = { workspace = true }
 
 # Stwo-cairo
 cairo-air = { workspace = true }
-stwo = { workspace = true}
+cairo-vm = { workspace = true }
+stwo = { workspace = true }
 stwo_cairo_prover = { workspace = true }
+stwo-cairo-adapter = { workspace = true }
+cairo-program-runner-lib = { workspace = true }
 
 # Starknet
 starknet-ff = { workspace = true }

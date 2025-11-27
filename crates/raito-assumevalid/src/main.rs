@@ -55,13 +55,9 @@ enum Commands {
         )]
         executable: PathBuf,
 
-        /// Path to the bootloader JSON file
-        #[arg(long, default_value = "bootloaders/simple_bootloader_compiled.json")]
-        bootloader: PathBuf,
-
         /// Path to the prover parameters JSON file
-        #[arg(long, default_value = "packages/assumevalid/prover_params.json")]
-        prover_params: PathBuf,
+        #[arg(long)]
+        prover_params_file: Option<PathBuf>,
 
         /// Don't delete temporary files after completion
         #[arg(long, default_value = "false")]
@@ -106,18 +102,18 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Prove {
+            executable,
             load_from_gcs,
             save_to_gcs,
             gcs_bucket,
             total_blocks,
             step_size,
             output_dir,
-            executable,
-            bootloader,
-            prover_params,
+            prover_params_file,
             keep_temp_files,
         } => {
             let params = ProveParams {
+                executable,
                 load_from_gcs,
                 save_to_gcs,
                 gcs_bucket,
@@ -125,9 +121,7 @@ async fn main() -> Result<()> {
                 total_blocks,
                 step_size,
                 output_dir,
-                executable,
-                bootloader,
-                prover_params,
+                prover_params_file,
                 keep_temp_files,
             };
 
