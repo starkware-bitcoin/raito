@@ -46,6 +46,9 @@ cairo-program-runner-lib = { workspace = true }
 # Starknet
 starknet-ff = { workspace = true }
 
+# Memory stats
+memory-stats = "1.0"
+
 # Compression
 flate2 = "1.0"
 percent-encoding = "2"

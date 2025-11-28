@@ -9,6 +9,7 @@ use cairo_program_runner_lib::cairo_run_program;
 use cairo_program_runner_lib::utils::get_cairo_run_config;
 use cairo_vm::types::layout_name::LayoutName;
 use cairo_vm::types::program::Program;
+use memory_stats::memory_stats;
 use regex::Regex;
 use serde_json::json;
 use std::fs;
@@ -18,6 +19,13 @@ use stwo::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use stwo_cairo_adapter::adapter::adapt;
 use stwo_cairo_prover::prover::create_and_serialize_proof;
 use tracing::{debug, error, info, warn};
+
+/// Get current memory usage in MB
+fn get_memory_mb() -> f64 {
+    memory_stats()
+        .map(|usage| usage.physical_mem as f64 / (1024.0 * 1024.0))
+        .unwrap_or(0.0)
+}
 
 use crate::gcs::{download_recent_proof_via_reqwest, upload_recent_proof, RecentProof};
 use crate::generate_args::{generate_and_save_args, AssumeValidParams, ProveClient, ProveConfig};
@@ -39,6 +47,7 @@ pub fn run_and_prove_with_library(
     verify: bool,
 ) -> Result<PathBuf> {
     let start_time = Instant::now();
+    let start_mem = get_memory_mb();
 
     // Create output directory
     fs::create_dir_all(output_dir)?;
@@ -97,14 +106,24 @@ pub fn run_and_prove_with_library(
     )
     .map_err(|e| anyhow!("Cairo VM execution failed: {}", e))?;
     let vm_elapsed = vm_start.elapsed();
+    let vm_mem = get_memory_mb();
     info!(
-        "Cairo VM execution completed in {:.2}s",
-        vm_elapsed.as_secs_f64()
+        "Cairo VM: {:.2}s, memory: {:.1} MB",
+        vm_elapsed.as_secs_f64(),
+        vm_mem
     );
 
     // Adapt the VM output for the prover
     debug!("Adapting VM output for prover...");
+    let adapt_start = Instant::now();
     let prover_input = adapt(&runner).map_err(|e| anyhow!("Failed to adapt VM output: {}", e))?;
+    let adapt_elapsed = adapt_start.elapsed();
+    let adapt_mem = get_memory_mb();
+    info!(
+        "Adapt: {:.2}s, memory: {:.1} MB",
+        adapt_elapsed.as_secs_f64(),
+        adapt_mem
+    );
 
     // Generate the proof
     let proof_file = output_dir.join("proof.json");
@@ -119,13 +138,20 @@ pub fn run_and_prove_with_library(
     )
     .map_err(|e| anyhow!("Proof generation failed: {}", e))?;
     let prove_elapsed = prove_start.elapsed();
+    let prove_mem = get_memory_mb();
+    info!(
+        "Prove: {:.2}s, memory: {:.1} MB",
+        prove_elapsed.as_secs_f64(),
+        prove_mem
+    );
 
     let total_elapsed = start_time.elapsed();
+    let peak_mem = prove_mem.max(adapt_mem).max(vm_mem);
     info!(
-        "Proof generated successfully in {:.2}s (VM: {:.2}s, Prove: {:.2}s)",
+        "Total: {:.2}s, peak memory: {:.1} MB (started at {:.1} MB)",
         total_elapsed.as_secs_f64(),
-        vm_elapsed.as_secs_f64(),
-        prove_elapsed.as_secs_f64()
+        peak_mem,
+        start_mem
     );
 
     Ok(proof_file)

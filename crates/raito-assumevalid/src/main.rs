@@ -51,7 +51,7 @@ enum Commands {
         /// Path to the Cairo executable JSON file
         #[arg(
             long,
-            default_value = "target/proving/assumevalid-syscalls.executable.json"
+            default_value = "crates/raito-assumevalid/compiled/assumevalid-syscalls.executable.json"
         )]
         executable: PathBuf,
 
