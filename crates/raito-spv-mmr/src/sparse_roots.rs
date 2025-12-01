@@ -83,8 +83,8 @@ where
             let lo_json_number = num_str_to_json_number::<S>(lo)?;
             // Serialize as a dict with `hi` and `lo` keys (u256 in Cairo)
             let mut dict = serde_json::Map::new();
-            dict.insert("hi".to_string(), hi_json_number.into());
             dict.insert("lo".to_string(), lo_json_number.into());
+            dict.insert("hi".to_string(), hi_json_number.into());
             seq.serialize_element(&dict)?;
         }
     }

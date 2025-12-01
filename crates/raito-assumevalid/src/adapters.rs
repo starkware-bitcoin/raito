@@ -3,7 +3,7 @@ use bitcoin::block::Header;
 use stwo::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use stwo_cairo_serialize::CairoSerialize;
 
-use raito_cairo_serialize::{DigestString, U256String, U256StringLittleEndian};
+use raito_cairo_serialize::{DigestString, U256String};
 use raito_spv_mmr::sparse_roots::SparseRoots;
 use raito_spv_verify::ChainState;
 
@@ -32,7 +32,7 @@ struct ChainStateView {
 
 #[derive(CairoSerialize)]
 pub struct SparseRootsView {
-    pub roots: Vec<U256StringLittleEndian>,
+    pub roots: Vec<U256String>,
 }
 
 /// View for a single block matching Cairo's Block structure
@@ -85,7 +85,7 @@ pub fn to_runner_args_hex(
         roots: block_mmr
             .roots
             .iter()
-            .map(|root_hex| U256StringLittleEndian(hex_u256_to_decimal_string(root_hex)))
+            .map(|root_hex| U256String(hex_u256_to_decimal_string(root_hex)))
             .collect(),
     };
 

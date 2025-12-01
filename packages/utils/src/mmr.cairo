@@ -41,8 +41,8 @@ pub impl MaybeBlake2sDigestSerde of Serde<Option<Blake2sDigest>> {
     }
 
     fn deserialize(ref serialized: Span<felt252>) -> Option<Option<Blake2sDigest>> {
-        let high: u128 = Serde::deserialize(ref serialized).expect('digest::high');
         let low: u128 = Serde::deserialize(ref serialized).expect('digest::low');
+        let high: u128 = Serde::deserialize(ref serialized).expect('digest::high');
         if high == 0 && low == 0 {
             Some(None)
         } else {
